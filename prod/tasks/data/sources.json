@@ -1,0 +1,397 @@
+{
+  "strategyqa": {
+    "repo": "ChilleD/StrategyQA",
+    "config": null,
+    "split": "train+test (concatenated, train first)",
+    "revision": "705562638fe1d8ca6bb98c66fc8f94d45fda8c83",
+    "n_rows": 2290,
+    "selection": "ChilleD/StrategyQA splits the 2290 labelled StrategyQA examples into train (1603) and test (687); both splits were concatenated in dataset order, train first, giving exactly the 2290 labelled examples. The qid set was verified identical to voidful/StrategyQA strategyqa_train.json (2290 qids). src_idx is the position in that concatenation.",
+    "prompt_source": "agent-written",
+    "prompt_files": [
+      "prompt_strategyqa.txt"
+    ],
+    "kinds": {
+      "strategyqa": "yesno"
+    },
+    "notes": "target is lowercase yes/no derived from the boolean `answer` field."
+  },
+  "bbh": {
+    "repo": "lukaemon/bbh (six new subtasks) + frozen s26_bbh files (four reused subtasks)",
+    "config": "pooled over ten subtasks",
+    "split": "test",
+    "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+    "n_rows": 2437,
+    "selection": "ten BBH subtasks concatenated in the fixed order date_understanding, logical_deduction_five_objects, tracking_shuffled_objects_three_objects, sports_understanding, boolean_expressions, multistep_arithmetic_two, word_sorting, navigate, causal_judgement, temporal_sequences; idx runs 0..2436 across the file, src_idx is the position within the subtask.",
+    "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/<task>.txt, canary line and '-----' separator dropped (transformation verified byte-identical against the four already-frozen prompt_bbh_*.txt files)",
+    "prompt_files": [
+      "prompt_bbh_date_understanding.txt",
+      "prompt_bbh_logical_deduction_five_objects.txt",
+      "prompt_bbh_tracking_shuffled_objects_three_objects.txt",
+      "prompt_bbh_sports_understanding.txt",
+      "prompt_bbh_boolean_expressions.txt",
+      "prompt_bbh_multistep_arithmetic_two.txt",
+      "prompt_bbh_word_sorting.txt",
+      "prompt_bbh_navigate.txt",
+      "prompt_bbh_causal_judgement.txt",
+      "prompt_bbh_temporal_sequences.txt"
+    ],
+    "kinds": {
+      "bbh_date_understanding": "letter",
+      "bbh_logical_deduction_five_objects": "letter",
+      "bbh_tracking_shuffled_objects_three_objects": "letter",
+      "bbh_sports_understanding": "yesno",
+      "bbh_boolean_expressions": "boolean",
+      "bbh_multistep_arithmetic_two": "numeric",
+      "bbh_word_sorting": "freeform",
+      "bbh_navigate": "yesno",
+      "bbh_causal_judgement": "yesno",
+      "bbh_temporal_sequences": "letter"
+    },
+    "n_rows_per_subtask": {
+      "date_understanding": 250,
+      "logical_deduction_five_objects": 250,
+      "tracking_shuffled_objects_three_objects": 250,
+      "sports_understanding": 250,
+      "boolean_expressions": 250,
+      "multistep_arithmetic_two": 250,
+      "word_sorting": 250,
+      "navigate": 250,
+      "causal_judgement": 187,
+      "temporal_sequences": 250
+    },
+    "deviations": [
+      "causal_judgement has only 187 examples in BBH (identical count in lukaemon/bbh and in the official BIG-Bench-Hard repo bbh/causal_judgement.json), not 250, so the pooled file holds 2437 rows, not 2500. No rows were invented or repeated.",
+      "navigate and causal_judgement targets are capitalised 'Yes'/'No' in BBH, not lowercase. They are kept byte for byte as the source has them, which also matches their official CoT prompts ('So the answer is Yes.'). sports_understanding is lowercase 'yes'/'no' in BBH and is likewise unchanged.",
+      "gold_text is \"\" for every BBH row, matching the frozen per-task BBH files."
+    ],
+    "subtasks": {
+      "date_understanding": {
+        "repo": "reused from the frozen s26_bbh files in this directory",
+        "config": "date_understanding",
+        "split": "test",
+        "revision": null,
+        "n_rows": 250,
+        "selection": "input/target/options copied verbatim from rows_bbh_date_understanding.jsonl (the whole 250-row task); only idx/src_idx/subtask/kind/prefix_key/gold_text were added.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/date_understanding.txt",
+        "prompt_files": [
+          "prompt_bbh_date_understanding.txt"
+        ],
+        "kinds": {
+          "bbh_date_understanding": "letter"
+        }
+      },
+      "logical_deduction_five_objects": {
+        "repo": "reused from the frozen s26_bbh files in this directory",
+        "config": "logical_deduction_five_objects",
+        "split": "test",
+        "revision": null,
+        "n_rows": 250,
+        "selection": "input/target/options copied verbatim from rows_bbh_logical_deduction_five_objects.jsonl (the whole 250-row task); only idx/src_idx/subtask/kind/prefix_key/gold_text were added.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/logical_deduction_five_objects.txt",
+        "prompt_files": [
+          "prompt_bbh_logical_deduction_five_objects.txt"
+        ],
+        "kinds": {
+          "bbh_logical_deduction_five_objects": "letter"
+        }
+      },
+      "tracking_shuffled_objects_three_objects": {
+        "repo": "reused from the frozen s26_bbh files in this directory",
+        "config": "tracking_shuffled_objects_three_objects",
+        "split": "test",
+        "revision": null,
+        "n_rows": 250,
+        "selection": "input/target/options copied verbatim from rows_bbh_tracking_shuffled_objects_three_objects.jsonl (the whole 250-row task); only idx/src_idx/subtask/kind/prefix_key/gold_text were added.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/tracking_shuffled_objects_three_objects.txt",
+        "prompt_files": [
+          "prompt_bbh_tracking_shuffled_objects_three_objects.txt"
+        ],
+        "kinds": {
+          "bbh_tracking_shuffled_objects_three_objects": "letter"
+        }
+      },
+      "sports_understanding": {
+        "repo": "reused from the frozen s26_bbh files in this directory",
+        "config": "sports_understanding",
+        "split": "test",
+        "revision": null,
+        "n_rows": 250,
+        "selection": "input/target/options copied verbatim from rows_bbh_sports_understanding.jsonl (the whole 250-row task); only idx/src_idx/subtask/kind/prefix_key/gold_text were added.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/sports_understanding.txt",
+        "prompt_files": [
+          "prompt_bbh_sports_understanding.txt"
+        ],
+        "kinds": {
+          "bbh_sports_understanding": "yesno"
+        }
+      },
+      "boolean_expressions": {
+        "repo": "lukaemon/bbh",
+        "config": "boolean_expressions",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 250,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/boolean_expressions.txt",
+        "prompt_files": [
+          "prompt_bbh_boolean_expressions.txt"
+        ],
+        "kinds": {
+          "bbh_boolean_expressions": "boolean"
+        }
+      },
+      "multistep_arithmetic_two": {
+        "repo": "lukaemon/bbh",
+        "config": "multistep_arithmetic_two",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 250,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/multistep_arithmetic_two.txt",
+        "prompt_files": [
+          "prompt_bbh_multistep_arithmetic_two.txt"
+        ],
+        "kinds": {
+          "bbh_multistep_arithmetic_two": "numeric"
+        }
+      },
+      "word_sorting": {
+        "repo": "lukaemon/bbh",
+        "config": "word_sorting",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 250,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/word_sorting.txt",
+        "prompt_files": [
+          "prompt_bbh_word_sorting.txt"
+        ],
+        "kinds": {
+          "bbh_word_sorting": "freeform"
+        }
+      },
+      "navigate": {
+        "repo": "lukaemon/bbh",
+        "config": "navigate",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 250,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/navigate.txt",
+        "prompt_files": [
+          "prompt_bbh_navigate.txt"
+        ],
+        "kinds": {
+          "bbh_navigate": "yesno"
+        }
+      },
+      "causal_judgement": {
+        "repo": "lukaemon/bbh",
+        "config": "causal_judgement",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 187,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/causal_judgement.txt",
+        "prompt_files": [
+          "prompt_bbh_causal_judgement.txt"
+        ],
+        "kinds": {
+          "bbh_causal_judgement": "yesno"
+        }
+      },
+      "temporal_sequences": {
+        "repo": "lukaemon/bbh",
+        "config": "temporal_sequences",
+        "split": "test",
+        "revision": "982bb89fd79532a8ac676a61fc42eb1aeec63f99",
+        "n_rows": 250,
+        "selection": "the whole test split in dataset order; input and target kept byte for byte as the source has them.",
+        "prompt_source": "https://raw.githubusercontent.com/suzgunmirac/BIG-Bench-Hard/main/cot-prompts/temporal_sequences.txt",
+        "prompt_files": [
+          "prompt_bbh_temporal_sequences.txt"
+        ],
+        "kinds": {
+          "bbh_temporal_sequences": "letter"
+        }
+      }
+    }
+  },
+  "mmlu": {
+    "repo": "cais/mmlu",
+    "config": "all",
+    "split": "test",
+    "revision": "c30699e8356da336a370243923dbaf21066bb9fe",
+    "n_rows": 2000,
+    "selection": "n_s = largest-remainder apportionment of 2000 proportional to each subject's test-set size over the 14042 test rows, ties on the remainder broken by subject name ascending, then a floor of 5 (the floor bound on no subject: the smallest subject has 100 test rows and an exact quota of 14.24). Within each subject the first n_s entries of numpy.random.default_rng(20260908).permutation(N_s) were taken, with a fresh rng per subject. Rows are emitted in subject-alphabetical order, then in the drawn order. src_idx is the row's index in the 14042-row test split; the permutation runs over subject-local positions.",
+    "prompt_source": "agent-written",
+    "prompt_files": [
+      "prompt_mmlu_stem.txt",
+      "prompt_mmlu_humanities.txt",
+      "prompt_mmlu_social_sciences.txt",
+      "prompt_mmlu_other.txt"
+    ],
+    "kinds": {
+      "mmlu_stem": "letter",
+      "mmlu_humanities": "letter",
+      "mmlu_social_sciences": "letter",
+      "mmlu_other": "letter"
+    },
+    "flan_exemplars": "NOT fetched. google-research/FLAN flan/v2/cot_data/ holds only nine CoT source datasets (aqua, creak, ecqa, esnli, gsm8k, qasc, qed, sensemaking, strategyqa) and no MMLU file; Muennighoff/flan has no file matching 'mmlu' or 'cot'; SirNeural/flan_v2's cot_*.jsonl.gz are the same nine datasets. MMLU is a held-out evaluation benchmark in FLAN, so no FLAN MMLU CoT exemplars exist in those sources. The four prompt files are therefore AGENT-WRITTEN.",
+    "subject_to_subcategory": {
+      "abstract_algebra": "math",
+      "anatomy": "health",
+      "astronomy": "physics",
+      "business_ethics": "business",
+      "clinical_knowledge": "health",
+      "college_biology": "biology",
+      "college_chemistry": "chemistry",
+      "college_computer_science": "computer science",
+      "college_mathematics": "math",
+      "college_medicine": "health",
+      "college_physics": "physics",
+      "computer_security": "computer science",
+      "conceptual_physics": "physics",
+      "econometrics": "economics",
+      "electrical_engineering": "engineering",
+      "elementary_mathematics": "math",
+      "formal_logic": "philosophy",
+      "global_facts": "other",
+      "high_school_biology": "biology",
+      "high_school_chemistry": "chemistry",
+      "high_school_computer_science": "computer science",
+      "high_school_european_history": "history",
+      "high_school_geography": "geography",
+      "high_school_government_and_politics": "politics",
+      "high_school_macroeconomics": "economics",
+      "high_school_mathematics": "math",
+      "high_school_microeconomics": "economics",
+      "high_school_physics": "physics",
+      "high_school_psychology": "psychology",
+      "high_school_statistics": "math",
+      "high_school_us_history": "history",
+      "high_school_world_history": "history",
+      "human_aging": "health",
+      "human_sexuality": "culture",
+      "international_law": "law",
+      "jurisprudence": "law",
+      "logical_fallacies": "philosophy",
+      "machine_learning": "computer science",
+      "management": "business",
+      "marketing": "business",
+      "medical_genetics": "health",
+      "miscellaneous": "other",
+      "moral_disputes": "philosophy",
+      "moral_scenarios": "philosophy",
+      "nutrition": "health",
+      "philosophy": "philosophy",
+      "prehistory": "history",
+      "professional_accounting": "other",
+      "professional_law": "law",
+      "professional_medicine": "health",
+      "professional_psychology": "psychology",
+      "public_relations": "politics",
+      "security_studies": "politics",
+      "sociology": "culture",
+      "us_foreign_policy": "politics",
+      "virology": "health",
+      "world_religions": "philosophy"
+    },
+    "subcategory_to_group": {
+      "physics": "stem",
+      "chemistry": "stem",
+      "biology": "stem",
+      "computer science": "stem",
+      "math": "stem",
+      "engineering": "stem",
+      "history": "humanities",
+      "philosophy": "humanities",
+      "law": "humanities",
+      "politics": "social_sciences",
+      "culture": "social_sciences",
+      "economics": "social_sciences",
+      "geography": "social_sciences",
+      "psychology": "social_sciences",
+      "other": "other",
+      "business": "other",
+      "health": "other"
+    },
+    "mapping_source": "the standard MMLU categories.py from hendrycks/test, with its four categories renamed STEM -> stem, humanities -> humanities, social sciences -> social_sciences, 'other (business, health, misc.)' -> other",
+    "allocation": {
+      "abstract_algebra": 14,
+      "anatomy": 19,
+      "astronomy": 22,
+      "business_ethics": 14,
+      "clinical_knowledge": 38,
+      "college_biology": 21,
+      "college_chemistry": 14,
+      "college_computer_science": 14,
+      "college_mathematics": 14,
+      "college_medicine": 25,
+      "college_physics": 15,
+      "computer_security": 14,
+      "conceptual_physics": 33,
+      "econometrics": 16,
+      "electrical_engineering": 21,
+      "elementary_mathematics": 54,
+      "formal_logic": 18,
+      "global_facts": 14,
+      "high_school_biology": 44,
+      "high_school_chemistry": 29,
+      "high_school_computer_science": 14,
+      "high_school_european_history": 24,
+      "high_school_geography": 28,
+      "high_school_government_and_politics": 27,
+      "high_school_macroeconomics": 56,
+      "high_school_mathematics": 38,
+      "high_school_microeconomics": 34,
+      "high_school_physics": 22,
+      "high_school_psychology": 78,
+      "high_school_statistics": 31,
+      "high_school_us_history": 29,
+      "high_school_world_history": 34,
+      "human_aging": 32,
+      "human_sexuality": 19,
+      "international_law": 17,
+      "jurisprudence": 15,
+      "logical_fallacies": 23,
+      "machine_learning": 16,
+      "management": 15,
+      "marketing": 33,
+      "medical_genetics": 14,
+      "miscellaneous": 112,
+      "moral_disputes": 49,
+      "moral_scenarios": 127,
+      "nutrition": 44,
+      "philosophy": 44,
+      "prehistory": 46,
+      "professional_accounting": 40,
+      "professional_law": 218,
+      "professional_medicine": 39,
+      "professional_psychology": 87,
+      "public_relations": 16,
+      "security_studies": 35,
+      "sociology": 29,
+      "us_foreign_policy": 14,
+      "virology": 24,
+      "world_religions": 24
+    },
+    "allocation_floor_bound_on": []
+  },
+  "hellaswag": {
+    "repo": "Rowan/hellaswag",
+    "config": null,
+    "split": "validation",
+    "revision": "218ec52e09a7e7462a5400043bb9a69a41d06b76",
+    "n_rows": 2000,
+    "selection": "numpy.random.default_rng(20260908).permutation(10042)[:2000], emitted in the drawn order; src_idx is the drawn validation-split index.",
+    "prompt_source": "agent-written",
+    "prompt_files": [
+      "prompt_hellaswag.txt"
+    ],
+    "kinds": {
+      "hellaswag": "letter"
+    },
+    "notes": "input is '<activity_label>: <ctx>' then 'Which ending is most plausible?' then the BBH Options block; ending texts are verbatim. target is the gold letter derived from the string `label` field ('0'..'3')."
+  }
+}

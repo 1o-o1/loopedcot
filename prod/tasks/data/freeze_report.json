@@ -1,0 +1,18 @@
+{
+  "verify": {
+    "mode": "verify",
+    "n_files": 38,
+    "mismatches": {},
+    "tasks_missing_files": [],
+    "prompt_files_missing": [],
+    "tasks_short_of_full_N": {},
+    "sources_recorded": [
+      "bbh",
+      "hellaswag",
+      "mmlu",
+      "strategyqa"
+    ],
+    "sources_missing": [],
+    "ok": true
+  }
+}

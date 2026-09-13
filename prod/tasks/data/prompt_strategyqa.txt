@@ -1,0 +1,13 @@
+Answer yes/no questions that require combining several facts.
+
+Q: Could a person read the complete works of Shakespeare during a single transatlantic flight?
+A: Let's think step by step.
+A transatlantic flight from London to New York lasts about 8 hours. The complete works of Shakespeare run to roughly 900,000 words. A fast reader manages about 300 words per minute, which is 18,000 words per hour, so about 144,000 words in 8 hours. 144,000 is far short of 900,000. So the answer is no.
+
+Q: Can a blue whale fit inside an Olympic swimming pool?
+A: Let's think step by step.
+An Olympic swimming pool is 50 metres long and 25 metres wide. A blue whale grows to about 30 metres long. 30 metres is less than 50 metres, so the whale would fit along the length of the pool. So the answer is yes.
+
+Q: Did any signer of the United States Declaration of Independence live to see the telephone invented?
+A: Let's think step by step.
+The Declaration of Independence was signed in 1776. The last surviving signer was Charles Carroll of Carrollton, who died in 1832. Alexander Graham Bell patented the telephone in 1876. 1876 is after 1832, so every signer had already died. So the answer is no.

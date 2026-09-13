@@ -1,0 +1,11 @@
+# torch comes from the node image (a CUDA build); do not pin it here. Everything else is pinned or bounded.
+transformers==4.56.2
+datasets>=2.19,<4
+peft>=0.11,<1
+accelerate>=0.30,<2
+numpy>=1.26,<3
+scipy>=1.11,<2
+matplotlib>=3.8,<4
+math_verify>=0.5
+pyyaml>=6
+huggingface_hub>=0.23

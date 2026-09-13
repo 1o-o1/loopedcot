@@ -1,0 +1,17 @@
+# results and logs stay local; only the job list travels
+artifacts/*
+!artifacts/manifest.json
+logs/
+__pycache__/
+*.pyc
+*.slim.jsonl
+.pytest_cache/
+# the trained-checkpoint block (S33) is not part of this queue; its assets are versioned separately
+s33/
+# validation gates and their record: run against the research harness, not from this repo
+prod/gates/
+checks.json
+# local environment and model cache created by setup_env.sh
+.venv/
+hf/
+*.tgz
