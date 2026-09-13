@@ -48,7 +48,7 @@ OLD_DEFAULTS = {
         "temporal_sequences",
     ],
     "mem_util": 0.85,
-    "prompt_allowance": 1024,
+    "prompt_allowance": 1536,
     "workers_per_gpu": 1,
     "cluster_factor": 4.0,
     "version": "PP3",

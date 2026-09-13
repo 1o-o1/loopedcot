@@ -298,7 +298,13 @@ class RavenAdapter(Adapter):
                       "head_dim": int(cfg.n_embd // cfg.num_attention_heads),
                       "emb_scale": float(m.emb_scale),
                       "init_std": float(cfg.init_values["std"]),
-                      "pad_id": self.pad_id(), "stop_ids": self.stop_ids()}
+                      "pad_id": self.pad_id(), "stop_ids": self.stop_ids(),
+                      "block_size": int(getattr(cfg, "block_size", 0) or 0)}
+        # Huginn's apply_rotary_emb_complex_like indexes a precomputed table of block_size
+        # positions, so an absolute position at or past block_size raises; McLeish's llama-style
+        # rotary is computed on the fly and its block_size (1024) is not a limit (S9f ran past it).
+        self.max_positions = (int(cfg.block_size) if patch.get("rotary_style") == "complex"
+                              and getattr(cfg, "block_size", None) else None)
         return self
 
     def set_depth(self, k):

@@ -394,3 +394,5 @@ if __name__ == "__main__":
     save_json(os.path.join(DATA, "freeze_report.json"), out)
     print(json.dumps({k: {kk: vv for kk, vv in v.items() if kk != "hashes"}
                       for k, v in out.items()}, indent=2, default=str))
+    if not out["verify"].get("ok"):
+        sys.exit(1)

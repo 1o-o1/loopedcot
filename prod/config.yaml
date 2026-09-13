@@ -161,7 +161,7 @@ models:
 # fraction of a device's memory a GPU slot's running sum may occupy (the Spark rule)
 mem_util: 0.85
 # prompt tokens the KV estimate allows on top of the horizon (mean prompt + suffix + answer)
-prompt_allowance: 1024
+prompt_allowance: 1536
 # workers per GPU (decision 1). 1 reproduces PP2's one-job-per-GPU behaviour exactly.
 workers_per_gpu: 1
 # assumed cluster/GB10 throughput factor until the first timed job on the cluster

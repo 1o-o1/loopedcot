@@ -17764,7 +17764,7 @@
       "temporal_sequences"
     ],
     "mem_util": 0.85,
-    "prompt_allowance": 1024,
+    "prompt_allowance": 1536,
     "workers_per_gpu": 1,
     "cluster_factor": 4.0,
     "budget_fractions": [
@@ -17774,5 +17774,5 @@
     ],
     "version": "PP3"
   },
-  "config_sha256": "6bedfabab53cc29437b69489067aae7c229010745eb80f598dac2ee105568e05"
+  "config_sha256": "b01f9c8f6ab312918534fe79962e57955974a6dca416747f8485a352b27bd81a"
 }

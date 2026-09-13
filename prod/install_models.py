@@ -164,6 +164,9 @@ def main(argv=None):
     p.add_argument("--models", default=None)
     p.add_argument("--resolve-only", dest="resolve_only", action="store_true")
     p.add_argument("--verify", action="store_true")
+    p.add_argument("--repin", action="store_true",
+                   help="re-resolve every repo's current main from the Hub and overwrite the shipped "
+                        "pins; without it the revisions in the pins file are what gets installed")
     p.add_argument("--out", default=REVISIONS_FILE)
     a = p.parse_args(argv)
     models = [x.strip() for x in a.models.split(",")] if a.models else None
@@ -176,11 +179,24 @@ def main(argv=None):
         doc = verify(doc)
         save_json(a.out, doc)
         print(json.dumps({"verify_ok": doc["verify_ok"], "notes": doc["verify_notes"]}, indent=2))
+        if not doc["verify_ok"]:
+            raise SystemExit(1)
         return doc
 
     _no_token_env()
-    print("[install] resolving revisions from the Hub (public repos, no token)", flush=True)
-    ent = resolve(models)
+    shipped = (load_json(a.out, {}) or {}).get("models") or {}
+    wanted = models or list(cfgmod.MODEL_ORDER)
+    if shipped and not a.repin and all(m in shipped and shipped[m].get("revision") for m in wanted):
+        # the pins file is the record: install exactly those revisions (a later `main` on the Hub
+        # must not change what this package evaluates); --repin refreshes them deliberately
+        print("[install] installing the PINNED revisions from %s (use --repin to re-resolve main)"
+              % a.out, flush=True)
+        ent = {m: dict(shipped[m]) for m in wanted}
+        for m, e in ent.items():
+            print("  %-22s %s  rev %s" % (m, e["repo"], e["revision"][:12]), flush=True)
+    else:
+        print("[install] resolving revisions from the Hub (public repos, no token)", flush=True)
+        ent = resolve(models)
     if not a.resolve_only:
         print("[install] downloading at the pinned revisions", flush=True)
         for name, e in ent.items():
@@ -196,6 +212,8 @@ def main(argv=None):
     print("[install] wrote %s (%d models, verify_ok=%s)"
           % (a.out, len(doc["models"]), doc.get("verify_ok")), flush=True)
     os.environ["HF_HUB_OFFLINE"] = "1"
+    if not a.resolve_only and not doc.get("verify_ok"):
+        raise SystemExit(1)
     return doc
 
 

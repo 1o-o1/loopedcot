@@ -135,8 +135,8 @@ def write_chains(out_dir, model, task, k, rws, enc, cur, st, bw):
     try:
         for i, r in enumerate(rws):
             ridx = int(r["idx"])
-            if ridx in have:
-                continue
+            if ridx in have or not cur[i].get("done"):
+                continue            # a truncated trace (unrecoverable OOM) is never a chain
             c = st[i][0]
             c = len(cur[i]["ids"]) if c is None else int(c)
             ap.write({"idx": ridx, "natural_stop": (None if st[i][0] is None else int(st[i][0])),
@@ -309,9 +309,26 @@ def main(argv=None):
             extra_meta["tag_line"] = tl
         find_cut = make_find_cut(tok, stops or [], eos_ids, chat_template=ad.chat_template,
                                  eos_cut=bool(a.eos_cut))
+        if ad.family in ("huginn", "mcleish"):
+            # the family's stop ids of record (S9c: end_text, end_turn, begin_text for Huginn) join
+            # the tokenizer eos, for the decoder, the cut rule and the strip alike
+            eos_ids = sorted(set(eos_ids) | set(ad.stop_ids()))
+            find_cut = make_find_cut(tok, stops or [], eos_ids, chat_template=ad.chat_template,
+                                     eos_cut=bool(a.eos_cut))
         enc = [tok(p, add_special_tokens=ast)["input_ids"] for p in prompts]
         plen = [len(e) for e in enc]
-        meta["passes"][key] = {"tag_line": tl, "horizon": hor, "suffix_text":
+        maxpos = getattr(ad, "max_positions", None)
+        if maxpos:
+            # Huginn indexes a rotary table of block_size (4096) entries by absolute position, so
+            # prompt + trace + suffix + read-out must stay below it or the forward raises
+            room = int(maxpos) - max(plen) - len(suf) - nans - 1
+            if room < hor:
+                print("[warn] %s: horizon %d clamped to %d (positions limited to %d; longest prompt "
+                      "%d, read-out %d)" % (key, hor, max(16, room), maxpos, max(plen),
+                                           len(suf) + nans), flush=True)
+                hor = max(16, room)
+        meta["passes"][key] = {"tag_line": tl, "horizon": hor, "horizon_requested": horizon,
+                               "max_positions": maxpos, "suffix_text":
                                extra_meta["suffix_text"], "stop_strings": stops,
                                "eos_ids": eos_ids,
                                "prompt_tokens_mean": sum(plen) / max(1, len(plen)),
@@ -517,7 +534,10 @@ def main(argv=None):
             ro_widths.setdefault(len(grp), 0)
             ro_widths[len(grp)] += 1
             for j, (i, c, bs) in enumerate(grp):
-                atxt = tok.decode(o[j], clean_up_tokenization_spaces=False)
+                # the eos token is KEPT in o[j] for the token accounting (Q8) but must not reach
+                # the parsed text: "42<|endoftext|>" is not "42" for the math and free-form parsers
+                atxt = tok.decode([t for t in o[j] if t not in eos_ids],
+                                  clean_up_tokenization_spaces=False)
                 ctxt = tok.decode(cur[i]["ids"][:c], clean_up_tokenization_spaces=False)
                 opts = rws[i].get("options") or None
                 gold = rws[i]["target"]
@@ -529,7 +549,8 @@ def main(argv=None):
                 # the whole difference from the S9a-family spikes without a second generation.
                 nostrip = None
                 if len(raw[j]) != len(o[j]):
-                    rtxt = tok.decode(raw[j], clean_up_tokenization_spaces=False)
+                    rtxt = tok.decode([t for t in raw[j] if t not in eos_ids],
+                                      clean_up_tokenization_spaces=False)
                     nostrip = {"n_answer_tokens": len(raw[j]),
                                "pred": parse_forced(rtxt, a.task, opts, kind)}
                     nostrip["correct"] = bool(ans_eq(nostrip["pred"], gold, a.task, kind))
@@ -620,7 +641,16 @@ def main(argv=None):
             meta["chains_path"] = chain_p
             save_meta()
         jobs = []
+        incomplete = {i for i in range(N) if not cur[i]["done"]}
+        if incomplete:
+            meta["n_incomplete_rows"] = len(incomplete)
+            meta["incomplete_row_idx"] = sorted(int(rws[i]["idx"]) for i in incomplete)[:500]
+            print("[warn] %d row(s) have truncated traces (OOM or stalled wave) and are left "
+                  "unscored; the job will exit 3" % len(incomplete), flush=True)
+            save_meta()
         for i in range(N):
+            if i in incomplete:
+                continue
             m = {}
             for B in all_caps:
                 cut = min(st[i][0], B) if not forced else min(len(cur[i]["ids"]), B)
@@ -657,6 +687,15 @@ def main(argv=None):
     meta["seconds"] = round(time.time() - t0, 1)
     meta["peak_gb"] = round(torch.cuda.max_memory_allocated() / 1024 ** 3, 3) \
         if torch.cuda.is_available() else None
+    n_inc = int(meta.get("n_incomplete_rows") or 0)
+    if meta["errors"] or n_inc or len(done) < meta["cells_expected"]:
+        meta["complete"] = False
+        save_meta()
+        print("INCOMPLETE %s %d/%d cells (%d row(s) unscored) in %.0fs peak %s GB; errors %s"
+              % (tag, len(done), meta["cells_expected"], n_inc, meta["seconds"], meta["peak_gb"],
+                 meta["errors"]), flush=True)
+        sys.exit(3)
+    meta["complete"] = True
     save_meta()
     print("DONE %s %d/%d cells in %.0fs peak %s GB | acc_v2 %s"
           % (tag, len(done), meta["cells_expected"], meta["seconds"], meta["peak_gb"],

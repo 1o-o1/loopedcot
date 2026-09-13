@@ -99,6 +99,15 @@ def plan(gpus, shards, priorities=None, forced_n=None, dry_run_n=None, root=None
     cfg = cfg or cfgmod.defaults()
     man = manifest(forced_n, shards, priorities, cfg=cfg)
     q = queue_dir(root)
+    stale = [f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json")]
+    for f in stale:
+        os.remove(os.path.join(q, "todo", f))
+    if stale:
+        print("[launcher] cleared %d job file(s) of the previous plan from todo/" % len(stale))
+    busy = os.listdir(os.path.join(q, "claimed"))
+    if busy:
+        print("[launcher] WARNING: %d claimed job(s) in %s; a launcher may still be running on "
+              "this queue" % (len(busy), q), flush=True)
     if only:
         keep = [x for x in only if x]
         man["shard_jobs"] = [j for j in man["shard_jobs"]
@@ -168,17 +177,20 @@ def requeue_claimed(q, older_than=0.0):
     working: pass a value larger than the longest expected job, or --no-requeue.
     """
     n = []
-    for fn in sorted(os.listdir(os.path.join(q, "claimed"))):
-        src = os.path.join(q, "claimed", fn)
-        if older_than and (time.time() - os.path.getmtime(src)) < older_than:
-            continue
-        try:
-            os.rename(src, os.path.join(q, "todo", fn))
-        except OSError:
-            continue
-        n.append(fn)
+    # failed/ is re-queued too: a job that exited non-zero (OOM at batch 1, a node fault) resumes
+    # from its per-problem checkpoint exactly like a stranded claim, which is what the README says
+    for sub in ("claimed", "failed"):
+        for fn in sorted(os.listdir(os.path.join(q, sub))):
+            src = os.path.join(q, sub, fn)
+            if older_than and (time.time() - os.path.getmtime(src)) < older_than:
+                continue
+            try:
+                os.rename(src, os.path.join(q, "todo", fn))
+            except OSError:
+                continue
+            n.append(fn)
     if n:
-        print("[launcher] re-queued %d stale claim(s): %s"
+        print("[launcher] re-queued %d stale claim(s) / failed job(s): %s"
               % (len(n), ", ".join(x[6:-5] for x in n[:6])), flush=True)
     return n
 
@@ -296,13 +308,16 @@ def run_worker(q, gpu, root=None, python=None, max_jobs=None, slot=0, budget=Non
         cmd[0] = python or sys.executable
         log = os.path.join(LOGS, "%s_%s.log" % (rec["tag"], worker))
         t0 = time.time()
-        with open(log, "a", encoding="utf-8") as f:
-            f.write("\n=== %s %s\n%s\n" % (time.strftime("%FT%T"), worker, " ".join(cmd)))
-            f.flush()
-            rc = subprocess.call(cmd, stdout=f, stderr=subprocess.STDOUT, env=env,
-                                 cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        if budget is not None:
-            budget.release(gpu, est)
+        rc = 99
+        try:
+            with open(log, "a", encoding="utf-8") as f:
+                f.write("\n=== %s %s\n%s\n" % (time.strftime("%FT%T"), worker, " ".join(cmd)))
+                f.flush()
+                rc = subprocess.call(cmd, stdout=f, stderr=subprocess.STDOUT, env=env,
+                                     cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        finally:
+            if budget is not None:
+                budget.release(gpu, est)      # on every exit path, or the slot's GPU budget leaks
         rec.update({"returncode": rc, "seconds": round(time.time() - t0, 1), "log": log,
                     "finished_at": time.strftime("%FT%T")})
         dest = os.path.join(q, "done" if rc == 0 else "failed", os.path.basename(path))

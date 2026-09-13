@@ -111,7 +111,7 @@ plan a new queue with `--root=<new dir>`.
 - `prod/manifest.py`, `prod/launcher.py`: the job list with priorities; a claim-file queue over GPUs with memory-aware placement, re-queue and resume.
 - `prod/live_check.py`: the allocation rule end to end on one dataset, against its offline value.
 - `prod/analyze/`: cards, surface tests, the allocator with paired and calibration-draw bootstraps, figures.
-- `prod/cleanup.py`, `prod/install_models.py`, `prod/checks.py`.
+- `prod/cleanup.py`, `prod/install_models.py`, `prod/checks.py`, `prod/rescore.py` (rebuilds labels from the stored read-out text; dry run by default).
 - `tests/`: CPU unit tests (`python tests/test_parsers_pp3.py`, `tests/test_config_yaml.py`, `tests/test_launcher_placement.py`).
 
 ## 8. Protocol in one paragraph
