@@ -68,11 +68,17 @@ offline by the jobs. The GPU check is one submission:
 sbatch slurm/gpu_check.sbatch          # then read logs/slurm-check-<jobid>.out for the DONE line
 ```
 
-Plan on the login node, giving the GPU memory since no GPU is visible there (96 for a 96 GB device):
+Plan either as a one-GPU job (`sbatch slurm/plan.sbatch`) or on the login node, giving the GPU memory
+since no GPU is visible there (96 for a 96 GB device):
 
 ```bash
-$PROD_PYTHON -m prod.launcher --plan --gpus=8 --workers-per-gpu=2 --device-gb=96 --placement-horizon=1024
+$PROD_PYTHON -m prod.launcher --plan --gpus=8 --workers-per-gpu=2 --device-gb=96 --placement-horizon=2048
 ```
+
+The three `slurm/*.sbatch` files are templates. Copy each to `<name>.slurm` at the repository root,
+put your partition, account, mail and environment lines there, and submit those: `*.slurm` and
+`slurm_script.sh` are git-ignored, so `git pull` never touches them. The install record
+(`artifacts/model_install.json`) is local too; the pins file in `prod/tasks/data/` is only read.
 
 Run inside one allocation (edit `--gres`, `--time`, partition and account in the file; `--gpus`
 inside it follows the allocation):
@@ -124,7 +130,8 @@ at width 16 and horizon 4096 by the memory estimate, so `prod/config.yaml` overr
 k=3,4 width 8, Huginn k=16 width 8, Huginn k=32 width 4. With those, nothing is unplaceable on a 141 GB
 device. The estimate is a worst case (every row of a batch at 4096 tokens); on GPUs under about 80 GB it
 refuses most jobs while the measured peak of a 16-row Ouro-1.4B k=4 job is 13 GB. There, plan with
-`--placement-horizon=1024` (typical trace lengths) and one worker per GPU; a long tail that still
+`--placement-horizon=2048` (a k=3/4 job then shares a card only with a k=1/2 job; measured peaks of
+long-chain jobs reach 50 GB) and two workers per GPU; a long tail that still
 overflows is caught by the decoder, which halves the batch and retries, and exits non-zero if a row
 still fails (the job is then re-queued by the next `--run`).
 

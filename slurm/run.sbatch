@@ -12,6 +12,8 @@
 #SBATCH --output=logs/slurm-run-%j.out
 # add --partition=... / --account=... as your cluster requires; match --gres to --gpus below
 cd "$SLURM_SUBMIT_DIR"
+# conda instead of .venv: uncomment and adapt, so env.sh keeps your interpreter
+# source /opt/conda/etc/profile.d/conda.sh && conda activate loopedcot && export PROD_PYTHON=$(which python)
 source env.sh
 NGPU=$($PROD_PYTHON -c "import torch; print(torch.cuda.device_count())")
 echo "allocation: $NGPU GPU(s), CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"

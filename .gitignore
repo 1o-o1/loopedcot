@@ -15,3 +15,6 @@ checks.json
 .venv/
 hf/
 *.tgz
+# the operator's own cluster scripts (copies of slurm/*.sbatch with local partition, account, env)
+*.slurm
+slurm_script.sh
