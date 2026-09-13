@@ -11,7 +11,10 @@ python3 -m venv "$ROOT/.venv" --system-site-packages
 "$ROOT/.venv/bin/python" - <<'PY'
 import torch, transformers
 assert transformers.__version__ == "4.56.2", transformers.__version__
-assert torch.cuda.is_available(), "torch is not a CUDA build or no GPU is visible"
+import math_verify   # the MATH500 scorer of record; without it math_eq falls back to string comparison
+assert torch.version.cuda, "torch is not a CUDA build"
+if not torch.cuda.is_available():
+    print("WARNING: no GPU visible to this shell (a login node?). Setup continues; run the jobs on a GPU node.")
 print("torch", torch.__version__, "cuda", torch.version.cuda, "gpus", torch.cuda.device_count(), "transformers", transformers.__version__)
 PY
 mkdir -p "$HF_HOME" "$ROOT/artifacts" "$ROOT/logs"

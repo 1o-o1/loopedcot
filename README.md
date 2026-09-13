@@ -59,6 +59,33 @@ command again. It moves stranded claims back to the queue and every job resumes 
 per-problem checkpoint; no row is generated twice. A `--run` on an existing queue never re-plans it.
 Never start a second launcher on a live queue without `--no-requeue`.
 
+## 3b. The same under Slurm
+
+Setup (section 1) runs on the login node, which has internet; the model cache it fills is read
+offline by the jobs. The GPU check is one submission:
+
+```bash
+sbatch slurm/gpu_check.sbatch          # then read logs/slurm-check-<jobid>.out for the DONE line
+```
+
+Plan on the login node, giving the GPU memory since no GPU is visible there (96 for a 96 GB device):
+
+```bash
+$PROD_PYTHON -m prod.launcher --plan --gpus=8 --workers-per-gpu=2 --device-gb=96 --placement-horizon=1024
+```
+
+Run inside one allocation (edit `--gres`, `--time`, partition and account in the file; `--gpus`
+inside it follows the allocation):
+
+```bash
+sbatch slurm/run.sbatch
+$PROD_PYTHON -m prod.launcher --status   # from the login node, any time
+```
+
+When the time limit ends the job, `sbatch slurm/run.sbatch` again: the queue re-queues what was
+running and every job resumes from its checkpoint. Do not submit a second one while the first is
+alive. Inside the allocation the launcher maps its slots onto the GPUs Slurm made visible.
+
 ## 4. Completeness and cleanup
 
 ```bash
@@ -95,7 +122,11 @@ replaces that assumption.
 Batch width is pinned at 16 and stored per row. Three (checkpoint, depth) pairs do not fit a 141 GB GPU
 at width 16 and horizon 4096 by the memory estimate, so `prod/config.yaml` overrides them: Ouro-2.6B at
 k=3,4 width 8, Huginn k=16 width 8, Huginn k=32 width 4. With those, nothing is unplaceable on a 141 GB
-device.
+device. The estimate is a worst case (every row of a batch at 4096 tokens); on GPUs under about 80 GB it
+refuses most jobs while the measured peak of a 16-row Ouro-1.4B k=4 job is 13 GB. There, plan with
+`--placement-horizon=1024` (typical trace lengths) and one worker per GPU; a long tail that still
+overflows is caught by the decoder, which halves the batch and retries, and exits non-zero if a row
+still fails (the job is then re-queued by the next `--run`).
 
 The forced-continuation block ("Wait" injection to 4096 on GSM8K and MATH500, Ouro only) is OFF by
 default (`forced_block.enabled: false` in `prod/config.yaml`). To run it later: set it to `true` and

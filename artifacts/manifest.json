@@ -17765,6 +17765,7 @@
     ],
     "mem_util": 0.85,
     "prompt_allowance": 1536,
+    "placement_horizon": null,
     "workers_per_gpu": 1,
     "cluster_factor": 4.0,
     "budget_fractions": [
@@ -17774,5 +17775,5 @@
     ],
     "version": "PP3"
   },
-  "config_sha256": "b01f9c8f6ab312918534fe79962e57955974a6dca416747f8485a352b27bd81a"
+  "config_sha256": "a201f9b26b5fed453f729d662a722022a813e44814ff8d02b9e68d6e45d6f362"
 }

@@ -49,6 +49,7 @@ OLD_DEFAULTS = {
     ],
     "mem_util": 0.85,
     "prompt_allowance": 1536,
+    "placement_horizon": None,
     "workers_per_gpu": 1,
     "cluster_factor": 4.0,
     "version": "PP3",

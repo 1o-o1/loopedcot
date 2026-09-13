@@ -116,7 +116,11 @@ def trace_files_for(cells_dir, tag):
     """Per-problem generation checkpoints for one job. Never a `chains_<model>_<task>_k<k>.jsonl`
     sidecar (Fix 1, PP3b): those carry no tag in their name and the glob below cannot match one, but
     the filter is kept anyway as an explicit guarantee that cleanup never deletes a chains file."""
-    found = sorted(glob.glob(os.path.join(cells_dir, "trace_%s_*.jsonl" % tag)))
+    # a job's trace files are trace_<tag>_single.jsonl or trace_<tag>_T<cap>.jsonl; the glob would
+    # also match a sharded (<tag>_s0of8), tagged (<tag>_tagK) or only-rows (<tag>_sub20) sibling
+    found = sorted(f for f in glob.glob(os.path.join(cells_dir, "trace_%s_*.jsonl" % tag))
+                   if re.match(r"^(single|T\d+)\.jsonl$",
+                               os.path.basename(f)[len("trace_%s_" % tag):]))
     return [f for f in found if not os.path.basename(f).startswith("chains_")]
 
 

@@ -257,7 +257,10 @@ def claim(q, worker, gpu=0, budget=None):
     for fn in sorted(os.listdir(os.path.join(q, "todo"))):
         src = os.path.join(q, "todo", fn)
         if budget is not None:
-            rec0 = load_json(src, {})
+            try:
+                rec0 = load_json(src, {})
+            except (OSError, ValueError):
+                continue                  # another slot renamed it between listdir and open
             need = int(rec0.get("est_bytes") or 0)
             if not budget.try_take(gpu, need):
                 skipped.append((fn, need, budget.idle(gpu)))
@@ -287,6 +290,16 @@ def claim(q, worker, gpu=0, budget=None):
     return None, None
 
 
+def visible_gpu_id(gpu, parent=None):
+    """The CUDA_VISIBLE_DEVICES value for slot `gpu`: the gpu-th entry of the parent's own visible
+    list when one is set (a Slurm allocation, or a user-restricted shell), else the bare index."""
+    parent = os.environ.get("CUDA_VISIBLE_DEVICES") if parent is None else parent
+    vis = [x.strip() for x in str(parent).split(",") if x.strip()] if parent else []
+    if vis and int(gpu) < len(vis):
+        return vis[int(gpu)]
+    return str(gpu)
+
+
 def run_worker(q, gpu, root=None, python=None, max_jobs=None, slot=0, budget=None):
     worker = "gpu%d" % gpu if slot == 0 and (budget is None or budget.budgets.get(gpu) is None)         else "gpu%d.w%d" % (gpu, slot)
     done = 0
@@ -301,7 +314,7 @@ def run_worker(q, gpu, root=None, python=None, max_jobs=None, slot=0, budget=Non
             break
         est = int(rec.get("est_bytes") or 0)
         env = dict(os.environ)
-        env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+        env["CUDA_VISIBLE_DEVICES"] = visible_gpu_id(gpu)
         env.setdefault("HF_HUB_OFFLINE", "1")
         env.setdefault("PROD_ART", root or ART)
         cmd = list(rec["cmd"])

@@ -50,6 +50,18 @@ def rescore_file(path, apply=False):
             changed += 1
             r["pred"], r["correct"], r["correct_v2"] = pred, correct, v2
             r["rescored"] = True
+        if r.get("cost_fields") != "prompt+cut+suffix+answer":
+            # rows written before the suffix tokens entered the cost fields: layer_passes was
+            # ppt * (prompt + cut + answer); recover ppt exactly and add the suffix
+            plen, ngen = int(r["n_prompt_tokens"]), int(r.get("n_generated") or 0)
+            nsuf = int(r.get("n_suffix_tokens") or 0)
+            base = plen + ngen
+            if base > 0 and int(r["layer_passes"]) % base == 0:
+                ppt = int(r["layer_passes"]) // base
+                r["layer_passes"] = ppt * (plen + ngen + nsuf)
+                r["layer_passes_promptfree"] = ppt * (ngen + nsuf)
+                r["cost_fields"] = "prompt+cut+suffix+answer"
+                changed += 1
         out.append(json.dumps(r, ensure_ascii=False))
     if apply and changed:
         tmp = path + ".tmp"

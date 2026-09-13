@@ -535,7 +535,7 @@ def parse_freeform(text):
     """
     if text is None:
         return None
-    t = text.split("\n")[0].strip()
+    t = text.strip().split("\n")[0].strip()
     t = t.rstrip(".").strip()
     t = " ".join(t.split())
     return t or None
@@ -564,7 +564,7 @@ def parse_forced(text, task, options=None, kind=None):
     b = last_boxed(text)
     if b is not None:
         return b
-    t = text.split("\n")[0].strip()
+    t = text.strip().split("\n")[0].strip()
     return t or None
 
 

@@ -89,6 +89,7 @@ for _name, _m in _RAW["models"].items():
 MEM_UTIL = float(_RAW["mem_util"])
 #: prompt tokens the KV estimate allows on top of the horizon (mean prompt + suffix + answer)
 PROMPT_ALLOWANCE = int(_RAW["prompt_allowance"])
+PLACEMENT_HORIZON = _RAW.get("placement_horizon")      # None = the run horizon (worst case)
 #: workers per GPU (decision 1). 1 reproduces PP2's one-job-per-GPU behaviour exactly.
 WORKERS_PER_GPU = int(_RAW["workers_per_gpu"])
 #: assumed cluster/GB10 throughput factor until the first timed job on the cluster
@@ -119,6 +120,7 @@ def defaults():
         "bbh_subtasks": list(BBH_SUBTASKS),
         "mem_util": MEM_UTIL,
         "prompt_allowance": PROMPT_ALLOWANCE,
+        "placement_horizon": PLACEMENT_HORIZON,
         "workers_per_gpu": WORKERS_PER_GPU,
         "cluster_factor": CLUSTER_FACTOR,
         "budget_fractions": list(BUDGET_FRACTIONS),
@@ -165,6 +167,8 @@ def add_args(p):
     g.add_argument("--no-forced-block", dest="no_forced_block", action="store_true")
     g.add_argument("--mem-util", dest="mem_util", type=float, default=None)
     g.add_argument("--prompt-allowance", dest="prompt_allowance", type=int, default=None)
+    g.add_argument("--placement-horizon", dest="placement_horizon", type=int, default=None,
+                   help="tokens per row the launcher's memory estimate assumes (default: the horizon)")
     g.add_argument("--cluster-factor", dest="cluster_factor", type=float, default=None)
     g.add_argument("--budget-fractions", dest="budget_fractions", default=None,
                    help="e.g. 0.25,0.5,1.0")
@@ -254,6 +258,8 @@ def from_args(a):
         cfg["mem_util"] = float(a.mem_util)
     if v("prompt_allowance") is not None:
         cfg["prompt_allowance"] = int(a.prompt_allowance)
+    if v("placement_horizon") is not None:
+        cfg["placement_horizon"] = int(a.placement_horizon)
     if v("cluster_factor") is not None:
         cfg["cluster_factor"] = float(a.cluster_factor)
     if v("budget_fractions") is not None:
@@ -365,8 +371,9 @@ def job_bytes(model, k, batch_width, horizon, prompt_allowance=None, cfg=None):
     cfg = cfg or defaults()
     pa = cfg["prompt_allowance"] if prompt_allowance is None else int(prompt_allowance)
     width = int(batch_width) or int(cfg["batch_cap"])
+    hz = int(cfg.get("placement_horizon") or horizon)
     return int(weight_bytes(model)
-               + width * (int(horizon) + pa) * kv_bytes_per_token(model, k))
+               + width * (hz + pa) * kv_bytes_per_token(model, k))
 
 
 def main(argv=None):

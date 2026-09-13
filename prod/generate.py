@@ -529,6 +529,10 @@ def main(argv=None):
                     break
                 b = max(1, b // 2)
                 continue
+            # the group decoded max(n_answer) new tokens; each row keeps only its OWN read-out length
+            # (a letter row 8, word_sorting 48), so the parse and the token accounting see exactly
+            # the read-out the protocol defines for that row
+            o = [list(oj)[:nans_row[i]] for oj, (i, _c, _x) in zip(o, grp)]
             raw = [list(x) for x in o]          # before the eos strip, for G1 cause attribution
             o = strip_tail(o, eos_ids)          # Q8 option O1, every family
             ro_widths.setdefault(len(grp), 0)
@@ -573,8 +577,12 @@ def main(argv=None):
                            "n_trace": len(cur[i]["ids"]), "n_generated": ngen,
                            "n_prompt_tokens": plen[i], "n_answer_tokens": len(o[j]),
                            "n_suffix_tokens": len(suf),
-                           "layer_passes": ppt * (plen[i] + ngen),
-                           "layer_passes_promptfree": ppt * ngen,
+                           # the budget of record is k L (P + T + R) with R = suffix + answer
+                           # tokens (LEDGER compute reporting rule); n_generated counts the cut and
+                           # the answer, the suffix is added here
+                           "layer_passes": ppt * (plen[i] + ngen + len(suf)),
+                           "layer_passes_promptfree": ppt * (ngen + len(suf)),
+                           "cost_fields": "prompt+cut+suffix+answer",
                            "answer_text": atxt,
                            # rulings Q6 (iv): the width is pinned and STORED PER ROW, because a
                            # per-problem label is only comparable to another taken at the same width
