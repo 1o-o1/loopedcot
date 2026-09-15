@@ -14,9 +14,17 @@ Ported, with the source named at each function:
                                                        v3_bootstrap.py
 
 Two cost conventions are kept apart on purpose and never mixed in one table:
-  CAP cost      k L (P_mean + B)              -- b1t / S28's budget axis, one number per (k, B)
-  PER-PROMPT    k L (P_i + B + R_i)           -- D2's headline, one number per (k, B, question);
+  CAP cost      (L_fixed + k L) (P_mean + B)  -- b1t / S28's budget axis, one number per (k, B)
+  PER-PROMPT    (L_fixed + k L) (P_i + B + R_i)
+                                              -- D2's headline, one number per (k, B, question);
                 `promptfree=True` drops P_i (LEDGER's prompt-inclusive / prompt-free pair)
+
+L is the layers INSIDE the loop and L_fixed the layers executed once per token whatever k is, so the
+passes per token are L_fixed + k L. Ouro runs every layer inside the recurrence (L_fixed = 0, the
+default, which is why every pre-existing caller and the frozen G3 reproduction are unchanged); the
+raven families do not (Huginn prelude 2 + k * 4 + coda 2, so L = 4 and L_fixed = 4; McLeish
+4 + k * 6 + 4, so L = 6 and L_fixed = 8). `cost.model_shapes` is the single source of both numbers
+(`layers_per_loop`, `layers_fixed`) and the callers read them from there.
 
 `default_cost` (Fix 2, PP3b, decision 7) is a third quantity, not a cost FORMULA but a cost
 STATISTIC read off the cells: the mean realised layer-pass cost of the default operating point
@@ -29,13 +37,29 @@ N_BUDGETS = 16
 BAD_REGRET = 0.05           # b1t_v3.BAD: a "bad selection" is a regret above 5 points
 
 
+def _nanmean(x):
+    """The mean over the defined entries, NaN when there are none.
+
+    np.nanmean warns on an all-NaN slice; a bootstrap draw can select only questions that are
+    infeasible at one budget, so the empty case is expected here and is not worth a warning.
+    """
+    v = np.asarray(x, float)
+    m = ~np.isnan(v)
+    return float(v[m].mean()) if m.any() else float("nan")
+
+
 # ------------------------------------------------------------------ grids (b1t.py)
 class Grid(object):
-    """(ks, Bs, idx, acc[k, B, question], prompt tokens, layers per loop)."""
+    """(ks, Bs, idx, acc[k, B, question], prompt tokens, layers per loop, layers executed once).
 
-    def __init__(self, name, ks, Bs, idx, acc, ptok, L, reserve=None, split=None):
+    `L_fixed` is 0 by default: Ouro runs every layer inside the recurrence, so the pre-existing
+    callers and the frozen G3 tables are untouched. A raven family passes its prelude + coda.
+    """
+
+    def __init__(self, name, ks, Bs, idx, acc, ptok, L, reserve=None, split=None, L_fixed=0):
         self.name, self.ks, self.Bs, self.idx = name, list(ks), list(Bs), list(idx)
         self.acc, self.ptok, self.L = acc, np.asarray(ptok, float), L
+        self.L_fixed = L_fixed
         self.reserve = (np.zeros(len(idx)) if reserve is None else np.asarray(reserve, float))
         self.split = list(split) if split is not None else ["eval"] * len(idx)
         self.P = float(np.mean(self.ptok))
@@ -43,17 +67,21 @@ class Grid(object):
     def restrict_B(self, Bs):
         bi = [self.Bs.index(b) for b in Bs]
         return Grid(self.name, self.ks, list(Bs), self.idx, self.acc[:, bi], self.ptok, self.L,
-                    self.reserve, self.split)
+                    self.reserve, self.split, self.L_fixed)
 
     def mean_acc(self, sel=None):
         a = self.acc if sel is None else self.acc[:, :, sel]
         return a.mean(2)
 
     def cost_cap(self):
-        """b1t.Grid.cost_cap, verbatim: k * L * (mean prompt tokens + B)."""
+        """b1t.Grid.cost_cap, with the family's fixed layers: (L_fixed + k L) (mean prompt + B).
+
+        L_fixed = 0 reduces to b1t's k * L * (P + B) verbatim, which is the Ouro case the frozen
+        b1t / S28 numbers were measured on.
+        """
         k = np.array(self.ks, float)[:, None]
         B = np.array(self.Bs, float)[None, :]
-        return k * self.L * (self.P + B)
+        return (self.L_fixed + k * self.L) * (self.P + B)
 
     def select(self, split):
         if split == "all":
@@ -181,11 +209,15 @@ def nested_regret(grid, rng, n_cal=50, n_rep=20, n_budgets=N_BUDGETS, arms=None)
 
 
 # ------------------------------------------------------------------ per-prompt policy (v5)
-def per_prompt_cost(L, promptfree=False):
-    """D2's cost: k L (P_i + B + R_i), or k L (B + R_i) prompt-free (v5_s32_analysis)."""
+def per_prompt_cost(L, promptfree=False, L_fixed=0):
+    """D2's cost: (L_fixed + k L) (P_i + B + R_i), or the same prompt-free (v5_s32_analysis).
+
+    `L_fixed = 0` is v5's formula verbatim and is right for Ouro; a raven family passes its
+    prelude + coda, whose passes per token do not scale with k.
+    """
     if promptfree:
-        return lambda k, B, p, r: k * L * (B + r)
-    return lambda k, B, p, r: k * L * (p + B + r)
+        return lambda k, B, p, r: (L_fixed + k * L) * (B + r)
+    return lambda k, B, p, r: (L_fixed + k * L) * (p + B + r)
 
 
 def default_cost(cells, promptfree=False, k=None, split="eval"):
@@ -261,11 +293,16 @@ def policy_vectors(grid, ev_sel, cost, Xs, order):
     return out
 
 
-def budget_ranges(grid, cost, Xs, Pm, Rm):
+def budget_ranges(grid, cost, Xs, Pm, Rm, L=None, L_fixed=None):
     """B* and B_low (Brief S32 and its Addendum A1).
 
     B*    budgets at which BOTH (k=2, T=64) and (k=k_max, T=64) are feasible at the median prompt
     B_low budgets at which (k_max, 64) is NOT feasible but (k=1, 64) is
+
+    `cost` already prices the cells with the family's fixed layers; `L` and `L_fixed` (default: the
+    grid's own) are recorded in the returned meta, so a table states which pass count the ranges
+    were priced with. A raven range priced as if L_fixed were 0 is a different question, and the
+    meta is where that shows.
     """
     kmax = grid.ks[-1]
     k2 = 2 if 2 in grid.ks else grid.ks[min(1, len(grid.ks) - 1)]
@@ -274,11 +311,13 @@ def budget_ranges(grid, cost, Xs, Pm, Rm):
              if cost(k2, T, Pm, Rm) <= X and cost(kmax, T, Pm, Rm) <= X]
     blow = [i for i, X in enumerate(Xs)
             if cost(kmax, T, Pm, Rm) > X and cost(grid.ks[0], T, Pm, Rm) <= X]
-    return bstar, blow, {"k2": k2, "kmax": kmax, "T": T}
+    return bstar, blow, {"k2": k2, "kmax": kmax, "T": T,
+                         "L": (grid.L if L is None else L),
+                         "L_fixed": (grid.L_fixed if L_fixed is None else L_fixed)}
 
 
 def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
-                     n_cal_draws=100, seed=7, min_normal_feasible=0.9):
+                     n_cal_draws=100, seed=7, min_normal_feasible=0.9, L_fixed=None):
     """D2's headline: the gain of the calibration-chosen policy over normal operation.
 
     Two bootstraps, both from v3_bootstrap / v5_s32_analysis:
@@ -286,9 +325,20 @@ def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
       * over calibration draws (n_cal_draws resamples of the calibration questions, each re-ranking
         the cells) -- SELECTION noise, reported as the share of draws with a positive mean gain and
         the sd of the mean over draws
+
+    The per-budget gain vectors are kept at FULL LENGTH, one entry per evaluation question, NaN where
+    the policy or normal operation is infeasible for that question at that budget, and are stacked
+    without truncation. Column j is therefore the same question at every budget, and the paired
+    bootstrap resamples QUESTION INDICES (the same columns at every budget) and takes a nanmean per
+    draw. The earlier version dropped the NaNs per budget and cut every vector to the shortest,
+    which re-indexed the columns: one question infeasible at a low budget moved every later question
+    a place to the left, so the paired bootstrap paired different questions at different budgets.
+
+    `L_fixed` defaults to the grid's own (0 for Ouro, prelude + coda for a raven family).
     """
     rng = np.random.default_rng(seed)
-    cost = per_prompt_cost(grid.L, promptfree)
+    cost = per_prompt_cost(grid.L, promptfree,
+                           grid.L_fixed if L_fixed is None else L_fixed)
     ev, cal = grid.select("eval"), grid.select("cal")
     if len(cal) == 0 or len(ev) == 0:
         raise ValueError("%s: need both splits (eval %d, cal %d)" % (grid.name, len(ev), len(cal)))
@@ -309,9 +359,10 @@ def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
                "normal_acc": float(np.nanmean(nv)) if feas.any() else None,
                "in_Bstar": xi in bstar, "in_Blow": xi in blow}
         if feas.mean() >= min_normal_feasible and (~np.isnan(pv) & feas).sum() > 0:
-            d = pv[feas] - nv[feas]
-            rec["gain"] = float(np.nanmean(d))
-            gains.append(d[~np.isnan(d)])
+            d = pv - nv                  # NaN wherever either arm is infeasible, kept IN PLACE
+            rec["gain"] = _nanmean(d)
+            rec["n_questions_in_gain"] = int(np.sum(~np.isnan(d)))
+            gains.append(d)
         per_budget.append(rec)
 
     out = {"grid": grid.name, "promptfree": bool(promptfree), "n_eval": int(len(ev)),
@@ -322,12 +373,22 @@ def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
     if not gains:
         out["gain_mean"] = None
         return out
-    n = min(len(g) for g in gains)
-    G = np.stack([g[:n] for g in gains])
-    boots = [float(G[:, rng.integers(0, n, n)].mean()) for _ in range(n_boot)]
-    out.update({"gain_mean": float(G.mean()), "gain_worst_budget": float(G.mean(1).min()),
-                "gain_ci95": [float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
-                "n_budgets_with_normal": int(G.shape[0])})
+    G = np.stack(gains)              # (budgets with normal operation, evaluation questions)
+    nq = G.shape[1]
+    per_b = np.array([_nanmean(G[i]) for i in range(G.shape[0])])
+    boots = []
+    for _ in range(n_boot):
+        cols = rng.integers(0, nq, nq)   # ONE resample of the questions, shared by every budget
+        b = _nanmean(G[:, cols])
+        if not np.isnan(b):
+            boots.append(b)
+    out.update({"gain_mean": _nanmean(G), "gain_worst_budget": float(np.nanmin(per_b)),
+                "gain_ci95": ([float(np.percentile(boots, 2.5)),
+                               float(np.percentile(boots, 97.5))] if boots else None),
+                "n_budgets_with_normal": int(G.shape[0]),
+                "n_eval_in_gain": int(nq),
+                "n_gain_cells_defined": int(np.sum(~np.isnan(G))),
+                "gain_per_budget": [float(v) for v in per_b]})
     # calibration-draw bootstrap (selection noise)
     draws = []
     for d in range(n_cal_draws):
@@ -352,32 +413,52 @@ def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
 
 
 def contrast(grid_a, grid_b, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000, seed=7,
-             which="Bstar"):
+             which="Bstar", L_fixed=None, L_fixed_b=None):
     """v5_s32_analysis's contrast: the mean over a predeclared budget range of the paired difference
     between two arms' calibration-chosen policies, with a 95% paired bootstrap over evaluation
-    questions. Used for the training arms (S32/S19) and for any two checkpoints on one task."""
+    questions. Used for the training arms (S32/S19) and for any two checkpoints on one task.
+
+    Each grid is PRICED WITH ITS OWN (L, L_fixed): two checkpoints of different families spend
+    different numbers of passes per token at the same k. The BUDGET GRID, the median prompt and the
+    median reserve come from grid_a alone, so both arms are still read at the same budgets.
+    `L_fixed` and `L_fixed_b` override grid_a's and grid_b's own value.
+
+    COMPLETE CASE over questions, on purpose and unlike `gain_over_normal`: a question with a NaN at
+    ANY budget of the range leaves every budget, so the mean over the range is a mean over one fixed
+    set of questions and the paired bootstrap resamples that set. The price is that a question one
+    arm cannot afford at the cheapest budget of the range leaves the comparison entirely;
+    `n_eval` and `n_eval_dropped_incomplete` report how many survived and how many went.
+    """
     rng = np.random.default_rng(seed)
-    cost = per_prompt_cost(grid_a.L, promptfree)
+    cost_a = per_prompt_cost(grid_a.L, promptfree,
+                             grid_a.L_fixed if L_fixed is None else L_fixed)
+    cost_b = per_prompt_cost(grid_b.L, promptfree,
+                             grid_b.L_fixed if L_fixed_b is None else L_fixed_b)
     ev = grid_a.select("eval")
     cal = grid_a.select("cal")
     Pm = float(np.median(grid_a.ptok[ev]))
     Rm = float(np.median(grid_a.reserve[ev]))
-    cmat = np.array([[cost(k, B, Pm, Rm) for B in grid_a.Bs] for k in grid_a.ks])
+    cmat = np.array([[cost_a(k, B, Pm, Rm) for B in grid_a.Bs] for k in grid_a.ks])
     Xs = budget_grid(cmat, n_budgets)
-    bstar, blow, _m = budget_ranges(grid_a, cost, Xs, Pm, Rm)
+    bstar, blow, _m = budget_ranges(grid_a, cost_a, Xs, Pm, Rm)
     rng_idx = bstar if which == "Bstar" else blow
     if not rng_idx:
         return {"range": which, "empty": True}
-    pa = policy_vectors(grid_a, ev, cost, [Xs[i] for i in rng_idx],
-                        rank_from_cal(grid_a, cal, cost, Pm, Rm))
-    pb = policy_vectors(grid_b, grid_b.select("eval"), cost, [Xs[i] for i in rng_idx],
-                        rank_from_cal(grid_b, grid_b.select("cal"), cost, Pm, Rm))
+    pa = policy_vectors(grid_a, ev, cost_a, [Xs[i] for i in rng_idx],
+                        rank_from_cal(grid_a, cal, cost_a, Pm, Rm))
+    pb = policy_vectors(grid_b, grid_b.select("eval"), cost_b, [Xs[i] for i in rng_idx],
+                        rank_from_cal(grid_b, grid_b.select("cal"), cost_b, Pm, Rm))
     D = np.stack([pa[j][0] - pb[j][0] for j in range(len(rng_idx))])
     ok = ~np.isnan(D).any(0)
     D = D[:, ok]
     n = D.shape[1]
     boots = [float(D[:, rng.integers(0, n, n)].mean()) for _ in range(n_boot)]
     return {"range": which, "n_budgets": len(rng_idx), "n_eval": int(n),
+            "n_eval_dropped_incomplete": int(np.sum(~ok)),
+            "pricing": {"L_a": grid_a.L,
+                        "L_fixed_a": (grid_a.L_fixed if L_fixed is None else L_fixed),
+                        "L_b": grid_b.L,
+                        "L_fixed_b": (grid_b.L_fixed if L_fixed_b is None else L_fixed_b)},
             "mean": float(D.mean()), "lo95": float(np.percentile(boots, 2.5)),
             "hi95": float(np.percentile(boots, 97.5)),
             "noninferiority_lo95_top3": float(np.percentile(

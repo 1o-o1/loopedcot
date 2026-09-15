@@ -18,3 +18,7 @@ hf/
 # the operator's own cluster scripts (copies of slurm/*.sbatch with local partition, account, env)
 *.slurm
 slurm_script.sh
+# gate outputs written to the root by prod.gates.* runs
+/g3_score.json
+/g4_cost.json
+/g0_report*.md

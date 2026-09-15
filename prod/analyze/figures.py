@@ -175,8 +175,10 @@ def main(argv=None):
             arrival_figure(cells, os.path.join(out_dir, "fig_arrival_%s.pdf" % stem), title)]
     from ..cost import model_shapes
     sh = model_shapes(a.model)
+    # passes per token are layers_fixed + k * layers_per_loop: 0 fixed layers for Ouro, prelude +
+    # coda for a raven family, so the gain figure's budget axis is the family's own cost axis
     grid = Grid(stem, cells.ks, cells.Bs, cells.idx, cells.acc, cells.ptok,
-                sh["layers_per_loop"], cells.reserve, list(cells.split))
+                sh["layers_per_loop"], cells.reserve, list(cells.split), sh["layers_fixed"])
     try:
         pth, _g = gain_figure(grid, os.path.join(out_dir, "fig_gain_%s.pdf" % stem), title)
         made.append(pth)

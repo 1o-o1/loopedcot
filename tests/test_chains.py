@@ -45,7 +45,8 @@ def test_write_chains_schema_and_resume_skip():
     try:
         rws = [{"idx": 100}, {"idx": 101}]
         enc = [[1, 2, 3], [4, 5]]
-        cur = {0: {"ids": [10, 11, 12, 13]}, 1: {"ids": [20, 21]}}
+        # `done` is required: write_chains never stores a truncated (unfinished) trace as a chain
+        cur = {0: {"ids": [10, 11, 12, 13], "done": True}, 1: {"ids": [20, 21], "done": True}}
         st = {0: (3, "hash_line"), 1: (None, None)}     # 1: no marker found -> whole trace
         n, path = write_chains(tmp, "toy_model", "toy_task", 4, rws, enc, cur, st, bw=16)
         assert n == 2 and os.path.exists(path)
@@ -63,7 +64,7 @@ def test_write_chains_schema_and_resume_skip():
         # a second call (simulating a resumed job) must not duplicate or overwrite idx 100/101, and
         # must append a genuinely new problem -- the same resume semantics as the cells file.
         rws2 = [{"idx": 100}, {"idx": 102}]
-        cur2 = {0: {"ids": [999]}, 1: {"ids": [30, 31, 32]}}     # idx100's ids ignored (already done)
+        cur2 = {0: {"ids": [999], "done": True}, 1: {"ids": [30, 31, 32], "done": True}}   # idx100 ignored (present)
         st2 = {0: (1, "x"), 1: (3, "y")}
         n2, _ = write_chains(tmp, "toy_model", "toy_task", 4, rws2, enc, cur2, st2, bw=16)
         assert n2 == 1

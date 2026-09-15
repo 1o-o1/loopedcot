@@ -15,6 +15,7 @@ Decisions of record:
 import argparse
 import glob
 import os
+import re
 
 import numpy as np
 
@@ -64,13 +65,60 @@ def norm_answer(p):
 
 
 # ------------------------------------------------------------------ loading
-def cell_files(cells_dir, model=None, task=None, protocol=None, k=None):
-    pats = ["cells_%s_%s_%s_k%s*.jsonl" % (model.replace("+", "-") if model else "*",
-                                           task or "*", protocol or "*",
-                                           k if k is not None else "*")]
+# `generate.py` builds a cells filename as cells_<model>_<task>_<protocol>_k<k><tag><shard>.jsonl
+# with tag in {"", "_tagK", "_tagT"} (an arm whose prompt carries a control line) and shard in
+# {"", "_s<i>of<n>", "_sub<N>", "_s<i>of<n>_sub<N>"} ("_sub<N>" is an --only-rows subset). Only the
+# shards of one tag are a UNION of the same grid; a _tagK arm is a DIFFERENT arm and a _sub file
+# holds only some rows, so mixing either into one grid makes load_cells' last-write-wins override
+# real rows with rows from another arm or another subset.
+CELL_NAME_RE = re.compile(r"^cells_(?P<body>.+)_k(?P<k>\d+)(?P<rest>.*)\.jsonl$")
+SHARD_RE = re.compile(r"^_s\d+of\d+")
+SUB_RE = re.compile(r"^_sub\d+$")
+
+
+def cell_suffix_ok(rest, tag="", include_sub=False):
+    """Is `rest` (what follows k<k> in a cells filename) part of the grid the caller asked for?
+
+    tag=""  the untagged arm: "" or "_s<i>of<n>" only
+    tag=X   that arm's files only ("_tagK" / "_tagT", with or without a shard suffix)
+    include_sub  also accept an --only-rows subset file ("_sub<N>")
+    """
+    if tag:
+        want = "_" + str(tag).lstrip("_")
+        if not rest.startswith(want):
+            return False
+        rest = rest[len(want):]
+    elif rest.startswith("_tag"):
+        return False
+    m = SHARD_RE.match(rest)
+    if m:
+        rest = rest[m.end():]
+    if rest.startswith("_sub"):
+        return bool(include_sub) and bool(SUB_RE.match(rest))
+    return rest == ""
+
+
+def cell_files(cells_dir, model=None, task=None, protocol=None, k=None, tag="",
+               include_sub=False):
+    """The cells files of ONE grid: the exact tag, its shards, and nothing else.
+
+    The trailing wildcard this replaces ("..._k<k>*.jsonl") also matched a sibling _tagK arm, a
+    _sub20 only-rows file and anything else appended to the tag, which `load_cells` then merged into
+    one grid with the last file's rows winning.
+    """
+    pat = "cells_%s_%s_%s_k%s*.jsonl" % (model.replace("+", "-") if model else "*",
+                                         task or "*", protocol or "*",
+                                         k if k is not None else "*")
     out = []
-    for p in pats:
-        out += sorted(glob.glob(os.path.join(cells_dir, p)))
+    for fp in sorted(glob.glob(os.path.join(cells_dir, pat))):
+        m = CELL_NAME_RE.match(os.path.basename(fp))
+        if m is None:
+            continue
+        if k is not None and int(m.group("k")) != int(k):
+            continue
+        if not cell_suffix_ok(m.group("rest"), tag, include_sub):
+            continue
+        out.append(fp)
     return out
 
 
@@ -154,13 +202,28 @@ class Cells(object):
         a = self.acc if sel is None else self.acc[:, :, sel]
         return np.nanmean(a, 2)
 
-    def parse_rate(self):
-        """Forced parse rate per (k, B): the share of cells whose read-out parsed."""
-        got = np.vectorize(lambda x: x is not None)(self.pred)
+    def parse_rate(self, sel=None):
+        """Forced parse rate per (k, B): the share of cells whose read-out parsed.
+
+        `sel` is a question selection (`select(split)`); None is every question, which is what the
+        whole-grid checks want. `table(split)` passes the split's own questions, because an all-split
+        parse rate printed beside a split accuracy is two different populations in one row.
+
+        An empty grid or an empty split has nothing to average: the rate is NaN, not a crash
+        (np.vectorize raises on an empty object array) and not a silent 0.
+        """
+        pr = self.pred if sel is None else self.pred[:, :, sel]
+        if pr.size == 0:
+            return np.full(pr.shape[:2], np.nan)
+        got = np.vectorize(lambda x: x is not None, otypes=[bool])(pr)
         return got.mean(2)
 
-    def own_rate(self):
-        return np.nanmean(self.own, 2)
+    def own_rate(self, sel=None):
+        """Share of cells whose OWN answer parsed, over `sel` (None: every question)."""
+        ow = self.own if sel is None else self.own[:, :, sel]
+        if ow.size == 0:
+            return np.full(ow.shape[:2], np.nan)
+        return np.nanmean(ow, 2)
 
     def table(self, split="eval"):
         sel = self.select(split)
@@ -169,8 +232,8 @@ class Cells(object):
                "label": self.label, "split": split, "n": int(len(sel)),
                "ks": self.ks, "Bs": self.Bs,
                "acc": np.round(A, 6).tolist(),
-               "parse_rate_forced": np.round(self.parse_rate(), 6).tolist(),
-               "own_rate": np.round(self.own_rate(), 6).tolist(),
+               "parse_rate_forced": np.round(self.parse_rate(sel), 6).tolist(),
+               "own_rate": np.round(self.own_rate(sel), 6).tolist(),
                "natural_stop_mean": np.round(np.nanmean(self.nstop[:, :, sel], 2), 3).tolist(),
                "mean_layer_passes": np.round(np.nanmean(self.passes[:, :, sel], 2), 1).tolist(),
                "mean_layer_passes_promptfree":
@@ -241,11 +304,14 @@ class Cells(object):
                 "strict": bool(strict)}
 
 
-def load_grid(cells_dir, model, task, protocol="natural", label="v2", split="all", caps=None):
-    paths = cell_files(cells_dir, model, task, protocol)
+def load_grid(cells_dir, model, task, protocol="natural", label="v2", split="all", caps=None,
+              tag="", include_sub=False):
+    """One grid's Cells and the files it came from: the exact tag and its shards (see cell_files)."""
+    paths = cell_files(cells_dir, model, task, protocol, tag=tag, include_sub=include_sub)
     if not paths:
-        raise FileNotFoundError("no cells for %s/%s/%s under %s"
-                                % (model, task, protocol, cells_dir))
+        raise FileNotFoundError("no cells for %s/%s/%s%s under %s"
+                                % (model, task, protocol,
+                                   (" tag=%s" % tag) if tag else "", cells_dir))
     return Cells(load_cells(paths, split="all"), label=label, caps=caps), paths
 
 

@@ -89,8 +89,11 @@ def natural_stop_distribution(cells, sel, cap=512):
 
 def oracle_frontier(grid, promptfree=False, n_budgets=16):
     """V(X) on the TEST grid at 16 log-spaced budgets. Labelled ORACLE (measurement rule 2): this is
-    the ceiling, never a policy result."""
-    cost = per_prompt_cost(grid.L, promptfree)
+    the ceiling, never a policy result.
+
+    Priced with the grid's own passes per token, L_fixed + k L, so a raven frontier is not read off
+    an Ouro cost axis."""
+    cost = per_prompt_cost(grid.L, promptfree, grid.L_fixed)
     ev = grid.select("eval")
     Pm = float(np.median(grid.ptok[ev]))
     Rm = float(np.median(grid.reserve[ev]))
@@ -118,8 +121,11 @@ def card(cells_dir, model, task, protocol="natural", label="v2", shapes=None):
         model if model in ("huginn_0125", "mcleish_llama32_r32") or model.startswith("ouro")
         else model)
     L_per_loop = sh["layers_per_loop"]
+    # the family's FIXED layers (prelude + coda; 0 for Ouro) are part of the price of a cell:
+    # passes per token are L_fixed + k * L_per_loop, not k * L_per_loop (cost.model_shapes)
+    L_fixed = sh["layers_fixed"]
     grid = Grid("%s/%s/%s" % (model, task, protocol), cells.ks, cells.Bs, cells.idx,
-                cells.acc, cells.ptok, L_per_loop, cells.reserve, list(cells.split))
+                cells.acc, cells.ptok, L_per_loop, cells.reserve, list(cells.split), L_fixed)
     out = {
         "model": model, "task": task, "protocol": protocol, "label": label, "files": paths,
         "n_eval": int(len(sel_ev)), "n_cal": int(len(cells.select("cal"))),
@@ -139,14 +145,16 @@ def card(cells_dir, model, task, protocol="natural", label="v2", shapes=None):
         "default_cost_promptfree": default_cost(cells, promptfree=True),
         "dip_cells": dip_cells(cells, sel_ev),
         "natural_stop": natural_stop_distribution(cells, sel_ev),
-        "cost_model": {"layers_per_loop": L_per_loop, "layers_fixed": sh["layers_fixed"],
+        "cost_model": {"layers_per_loop": L_per_loop, "layers_fixed": L_fixed,
                        "d_model": sh["d_model"], "n_nonembed": sh["n_nonembed"],
                        "cells": cell_costs(cells, sh)},
         "mechanism_commitment": cells.mechanism("eval"),
         "mechanism_commitment_strict": cells.mechanism("eval", strict=True),
         # fitted quantities LAST (rule 1: never without the raw contrasts, which are above)
         "surface": card_fit_block(A, cells.ks, cells.Bs),
-        "parse_rate_forced": np.round(cells.parse_rate(), 6).tolist(),
+        # the EVALUATION split, the same questions as `acc_table` below it
+        "parse_rate_forced": np.round(cells.parse_rate(sel_ev), 6).tolist(),
+        "parse_rate_forced_all_splits": np.round(cells.parse_rate(sel_all), 6).tolist(),
         "acc_table": np.round(A, 6).tolist(),
         "acc_table_all_splits": np.round(cells.mean_acc(sel_all), 6).tolist(),
     }

@@ -162,7 +162,7 @@ def make_stopper(chat_template, pieces, eos_ids, task):
         return stopper
 
     eos = eos_ids[0]
-    if task == "gsm8k":
+    if task in ("gsm8k", "svamp"):          # SVAMP uses the GSM8K prompt, marker and stop strings
         def stopper_gsm(x, tail_old):                                  # S9d verbatim
             if x == eos:
                 return "eos"
@@ -174,22 +174,67 @@ def make_stopper(chat_template, pieces, eos_ids, task):
             return None
         return stopper_gsm
 
-    def stopper_math(x, tail_old):
+    if task == "math500":
+        def stopper_math(x, tail_old):
+            if x == eos:
+                return "eos"
+            new = tail_old + pieces[x]
+            if "Final Answer:" in new and "Final Answer:" not in tail_old:
+                return "final_answer"
+            if "\n\nProblem" in new and "\n\nProblem" not in tail_old:
+                return "new_problem"
+            return None
+        return stopper_math
+
+    # Every other task uses the CoT layout ("... So the answer is (b)." / "yes" / "True" / a number,
+    # then "\n\nQ:" for the next question). The natural stop rule cuts at the stop strings; the
+    # forced stopper, like GSM8K's hash-line rule, fires one token earlier, at the terminator of the
+    # answer sentence, so "Wait," replaces the period and the chain reads "So the answer is (b)\nWait,".
+    from ..tasks import task_cfg
+    tc = task_cfg(task)
+    marker = re.escape(tc["own_marker"])
+    re_answer = re.compile(marker + r"[ \t]*\(?(?:[A-Fa-f]|yes|no|true|false|-?\$?\d[\d,]*(?:\.\d+)?)"
+                           r"\)?[ \t]*[.\n]", re.IGNORECASE)
+    stops = list(tc.get("stops") or [])
+
+    def stopper_generic(x, tail_old):
         if x == eos:
             return "eos"
         new = tail_old + pieces[x]
-        if "Final Answer:" in new and "Final Answer:" not in tail_old:
-            return "final_answer"
-        if "\n\nProblem" in new and "\n\nProblem" not in tail_old:
-            return "new_problem"
+        if re_answer.search(new) and not re_answer.search(tail_old):
+            return "answer_sentence"
+        for s in stops:
+            if s in new and s not in tail_old:
+                return "new_question"
         return None
-    return stopper_math
+    return stopper_generic
 
 
 def new_forced_states(b):
     return [{"pending": [], "natural_stop_pos": None, "natural_stop_reason": None,
              "n_forced_continuations": 0, "forced_positions": [],
              "tail": deque(maxlen=TAIL_WINDOW), "off": 0} for _ in range(b)]
+
+
+def copy_forced_states(states):
+    """Independent copies of the per-row forced states, `tail` rebuilt as the bounded deque.
+
+    decode works on copies and hands the copies back (it never writes through to what it was given),
+    because a decode can RAISE: the caller retries an OOM at half the batch with the same rows, and
+    in-place mutation would make that retry count the injections and positions of the failed attempt
+    a second time and drain a `pending` wait the model never proposed. Copying also accepts a state
+    read back from a checkpoint, whose `tail` is a plain list.
+    """
+    out = []
+    for st in states:
+        out.append({"pending": list(st.get("pending") or []),
+                    "natural_stop_pos": st.get("natural_stop_pos"),
+                    "natural_stop_reason": st.get("natural_stop_reason"),
+                    "n_forced_continuations": int(st.get("n_forced_continuations") or 0),
+                    "forced_positions": [list(p) for p in (st.get("forced_positions") or [])],
+                    "tail": deque(st.get("tail") or (), maxlen=TAIL_WINDOW),
+                    "off": int(st.get("off") or 0)})
+    return out
 
 
 # ------------------------------------------------------------------ the adapter
@@ -319,6 +364,10 @@ class OuroAdapter(Adapter):
         stopper given   -> forced continuation: no row stops; a token that would stop is NOT
                            emitted, `wait_ids` are queued instead, so every row emits n_new tokens
         Returns (gen, seconds) when stopper is None, else (gen, states, seconds).
+
+        The forced states passed in are never written through: decode works on copies and returns
+        them, so a call that raises (the OOM the caller retries at a smaller batch) leaves the
+        caller's own states exactly as they were. The caller keeps the returned states.
         """
         assert int(k) == self._k, "set_depth(%r) before decode" % (k,)
         m, tok = self.model, self.tok
@@ -336,8 +385,10 @@ class OuroAdapter(Adapter):
         del out
 
         gen = [[] for _ in range(B)]
-        if stopper is not None and states is None:
-            states = new_forced_states(B)
+        if stopper is not None:
+            # copy before the first token: every write below lands on the copies, which are what the
+            # caller gets back on success (copy_forced_states says why)
+            states = new_forced_states(B) if states is None else copy_forced_states(states)
         fin = [False] * B
         tails = [""] * B
         eset = set(eos_ids or [])

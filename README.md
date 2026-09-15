@@ -89,8 +89,13 @@ $PROD_PYTHON -m prod.launcher --status   # from the login node, any time
 ```
 
 When the time limit ends the job, `sbatch slurm/run.sbatch` again: the queue re-queues what was
-running and every job resumes from its checkpoint. Do not submit a second one while the first is
-alive. Inside the allocation the launcher maps its slots onto the GPUs Slurm made visible.
+running and every job resumes from its checkpoint. Inside the allocation the launcher maps its
+slots onto the GPUs Slurm made visible.
+
+**More than one node on the same queue** is fine: claims are atomic renames, and every claim records
+the Slurm job that holds it. A launcher that starts (or restarts) re-queues only claims whose Slurm
+job is no longer in `squeue`, so a second `sbatch slurm/run.sbatch` on another node simply takes
+the next jobs. Both nodes write into the same `artifacts/` (a shared home is required).
 
 ## 4. Completeness and cleanup
 

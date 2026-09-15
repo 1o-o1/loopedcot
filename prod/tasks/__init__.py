@@ -80,7 +80,7 @@ TASKS = {
         "sep": "", "q_prefix": "Question: ", "a_prefix": "\nAnswer:",
         "suffix": " Final Answer:", "suffix_think": "\n\nFinal Answer:",
         "stops": ["\n\nQuestion:", "Final Answer:"], "own_marker": "####",
-        "chance": 0.0, "forced": False,
+        "chance": 0.0, "forced": True,
     },
     "aqua": {
         "kind": "letter", "n_answer": 8, "n_full": cfgmod.DATASETS["aqua"],
@@ -88,7 +88,7 @@ TASKS = {
         "sep": "\n\n", "q_prefix": "Q: ", "a_prefix": "\nA:",
         "suffix": "\nThe answer is", "suffix_think": "\nThe answer is",
         "stops": ["\n\nQ:", "\nQ:"], "own_marker": "The answer is",
-        "chance": 0.2, "forced": False,
+        "chance": 0.2, "forced": True,
     },
     "csqa": {
         "kind": "letter", "n_answer": 8, "n_full": cfgmod.DATASETS["csqa"],
@@ -96,7 +96,7 @@ TASKS = {
         "sep": "\n\n", "q_prefix": "Q: ", "a_prefix": "\nA:",
         "suffix": "\nSo the answer is", "suffix_think": "\nSo the answer is",
         "stops": ["\n\nQ:", "\nQ:"], "own_marker": "So the answer is",
-        "chance": 0.2, "forced": False,
+        "chance": 0.2, "forced": True,
     },
     "arc": {
         "kind": "letter", "n_answer": 8, "n_full": cfgmod.DATASETS["arc"],
@@ -104,7 +104,7 @@ TASKS = {
         "sep": "\n\n", "q_prefix": "Q: ", "a_prefix": "\nA:",
         "suffix": "\nSo the answer is", "suffix_think": "\nSo the answer is",
         "stops": ["\n\nQ:", "\nQ:"], "own_marker": "So the answer is",
-        "chance": 0.25, "forced": False,
+        "chance": 0.25, "forced": True,
     },
 }
 
@@ -129,7 +129,7 @@ BBH_SUBTASKS = list(cfgmod.BBH_SUBTASKS)
 _COT_LAYOUT = {
     "sep": "\n\n", "q_prefix": "Q: ", "a_prefix": "\nA: Let's think step by step.",
     "suffix": "\nSo the answer is", "suffix_think": "\nSo the answer is",
-    "stops": ["\n\nQ:", "\nQ:"], "own_marker": "So the answer is", "forced": False,
+    "stops": ["\n\nQ:", "\nQ:"], "own_marker": "So the answer is", "forced": True,
 }
 
 TASKS["bbh"] = dict(_COT_LAYOUT, **{

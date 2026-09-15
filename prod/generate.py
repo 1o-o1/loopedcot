@@ -36,6 +36,7 @@ import os
 import sys
 import time
 import traceback
+from collections import deque
 
 import torch
 
@@ -149,17 +150,90 @@ def write_chains(out_dir, model, task, k, rws, enc, cur, st, bw):
     return n, path
 
 
-def seed_from_chain(chain_row, pieces, tail_window):
+def stopper_fire_index(ids, pieces, tail_window, stopper):
+    """The index of the first token of `ids` at which the forced stopper fires, or None.
+
+    The replay is the decoder's own rule (prod/models/ouro.py decode): `tail_old` is the decoded
+    text of the last up-to-`tail_window` tokens BEFORE the candidate, and the candidate is the token
+    at that index, so the index returned is the position the forced protocol would have injected at.
+    """
+    tail = deque(maxlen=tail_window)
+    for j, x in enumerate(ids):
+        if stopper(int(x), "".join(tail)) is not None:
+            return j
+        tail.append(pieces[int(x)])
+    return None
+
+
+def seed_from_chain(chain_row, pieces, tail_window, stopper=None):
     """The prefill-and-continue bookkeeping `--resume-from-chains` needs: the resumed trace, and the
     tail-window seed a forced state's stopper requires (the last up-to-`tail_window` decoded pieces
     of the chain) so a pattern straddling the chain/continuation boundary (e.g. a '####' line split
     across the two) is still seen whole by the stopper on the very first newly generated token.
     Positions fall out for free: the caller sets fstate['off'] = len(cur[i]['ids']) exactly as it
     already does for a fresh row (generate.py, the wave loop), so an absolute position computed as
-    off + len(gen[b]) is correct whether the trace started empty or from a stored chain."""
+    off + len(gen[b]) is correct whether the trace started empty or from a stored chain.
+
+    With `stopper` given (the same make_stopper the job decodes with), the chain is replayed through
+    it and truncated just BEFORE the first token at which it fires, so the decoder regenerates that
+    token, the stopper fires on it, and the injection lands exactly where a run from the prompt
+    would have put it. The truncation is not cosmetic: the chain was cut by the NATURAL rule (a stop
+    string or eos), which fires LATER than the forced stopper -- after the '#### <number>' on gsm8k,
+    after 'Final Answer:' on math500 -- so an untruncated replay both overshoots the injection point
+    and seeds a tail that already holds the stop pattern, which makes the stopper's own
+    "... and not in tail_old" guard false from the first generated token: the row then emits NO
+    injection at all and reports a null natural stop while still being labelled forced.
+    Returns (ids, tail_seed) with no stopper, else (ids, tail_seed, n_truncated) -- the same "the
+    forced branch returns one field more" contract as OuroAdapter.decode.
+    """
     ids = [int(x) for x in chain_row["chain_ids"]]
+    if stopper is None:
+        return ids, ([pieces[t] for t in ids[-tail_window:]] if pieces is not None else [])
+    cut = None if pieces is None else stopper_fire_index(ids, pieces, tail_window, stopper)
+    n_truncated = 0
+    if cut is not None:
+        n_truncated = len(ids) - cut
+        ids = ids[:cut]
     tail_seed = [pieces[t] for t in ids[-tail_window:]] if pieces is not None else []
-    return ids, tail_seed
+    return ids, tail_seed, n_truncated
+
+
+# ------------------------------------------------------------------ forced state checkpointing
+# A forced row's whole protocol state lives in its `fstate`: where its natural stop was and why, how
+# many injections it has had and at which positions, the wait tokens still draining, the stopper's
+# tail window, and the absolute offset of the next token. None of it can be recomputed from the ids
+# (an injected "Wait," is indistinguishable from one the model wrote itself), so a job killed
+# mid-wave must read it back out of the trace checkpoint. Without it the resumed row reports
+# natural_stop_pos null and n_forced_continuations 0 for injections it had already made, and the
+# empty tail window also loses the stopper's "not already in the tail" guard, so a '#### n' line
+# emitted before the kill fires the stopper a SECOND time and records a stop position later than the
+# true one. Written for the forced protocol only; a natural-stop checkpoint row is unchanged.
+def fstate_to_json(fs):
+    """The JSON-serialisable form of a forced state (`tail` is a deque, every other field is
+    already JSON). None when the row has no state yet."""
+    if not fs:
+        return None
+    return {"pending": [int(x) for x in fs.get("pending") or []],
+            "natural_stop_pos": (None if fs.get("natural_stop_pos") is None
+                                 else int(fs["natural_stop_pos"])),
+            "natural_stop_reason": fs.get("natural_stop_reason"),
+            "n_forced_continuations": int(fs.get("n_forced_continuations") or 0),
+            "forced_positions": [list(p) for p in (fs.get("forced_positions") or [])],
+            "tail": list(fs.get("tail") or []),
+            "off": int(fs.get("off") or 0)}
+
+
+def fstate_from_json(d):
+    """Rebuild a forced state from a trace checkpoint row, with `tail` back as the bounded deque the
+    stopper reads (a plain list would keep growing and widen the window the guard looks at)."""
+    from .models.ouro import TAIL_WINDOW
+    return {"pending": [int(x) for x in d.get("pending") or []],
+            "natural_stop_pos": d.get("natural_stop_pos"),
+            "natural_stop_reason": d.get("natural_stop_reason"),
+            "n_forced_continuations": int(d.get("n_forced_continuations") or 0),
+            "forced_positions": [list(p) for p in (d.get("forced_positions") or [])],
+            "tail": deque(d.get("tail") or (), maxlen=TAIL_WINDOW),
+            "off": int(d.get("off") or 0)}
 
 
 # ------------------------------------------------------------------ the job
@@ -338,6 +412,10 @@ def main(argv=None):
         for i, r in load_ckpt(tp, lambda r: int(r["idx"])).items():
             if i < N:
                 cur[i] = {"ids": r["ids"], "done": bool(r["done"])}
+                if forced and r.get("fstate"):
+                    # the forced row resumes its protocol state, not only its ids (see
+                    # fstate_to_json for what is lost without this)
+                    cur[i]["fstate"] = fstate_from_json(r["fstate"])
         apt = Appender(tp) if a.save_traces != "0" else None
         gen_tokens, gen_seconds = 0, 0.0
 
@@ -351,6 +429,7 @@ def main(argv=None):
             # A row whose OWN trace checkpoint already has ids (a resumed/incomplete forced job) is
             # left alone -- the chain is only for a row this forced job has not touched yet.
             chains_loaded, cpath = 0, chain_path(out_dir, a.model, a.task, a.k)
+            chains_truncated, chain_tokens_truncated, truncated_detail = 0, 0, []
             if a.resume_from_chains and os.path.exists(cpath):
                 chain_by_idx = {int(r["idx"]): r for r in read_jsonl(cpath)}
                 for i in range(N):
@@ -363,12 +442,24 @@ def main(argv=None):
                         print("[warn] chain prompt mismatch idx=%s (%s); full generation"
                               % (rws[i]["idx"], key), flush=True)
                         continue
-                    ids, tail_seed = seed_from_chain(cr, pieces, TAIL_WINDOW)
+                    ids, tail_seed, ntr = seed_from_chain(cr, pieces, TAIL_WINDOW, stopper)
                     cur[i] = {"ids": ids, "done": len(ids) >= hor, "_tail_seed": tail_seed}
                     chains_loaded += 1
+                    if ntr:
+                        chains_truncated += 1
+                        chain_tokens_truncated += ntr
+                        truncated_detail.append([int(rws[i]["idx"]), int(ntr)])
             meta["passes"][key].update({"resume_from_chains_requested": bool(a.resume_from_chains),
                                         "chains_path": cpath, "chains_file_found": os.path.exists(cpath),
-                                        "chains_loaded": chains_loaded})
+                                        "chains_loaded": chains_loaded,
+                                        # the stored chain is cut by the natural rule, which fires
+                                        # later than the forced stopper, so each chain is truncated
+                                        # back to the stopper's own first fire before it is replayed
+                                        # (seed_from_chain). These say how many chains were cut and
+                                        # by how many tokens in total.
+                                        "chains_truncated": chains_truncated,
+                                        "chain_tokens_truncated": chain_tokens_truncated,
+                                        "chains_truncated_detail": truncated_detail[:500]})
 
         waves = [w for w in (128, 256, 512, 1024, 2048) if w < hor] + [hor]
         for T_next in waves:
@@ -447,6 +538,13 @@ def main(argv=None):
                     if not forced:
                         g = strip_tail(g, eos_ids)
                     for j, i in enumerate(grp):
+                        if forced:
+                            # decode works on COPIES of the forced states and returns the new ones
+                            # (prod/models/ouro.py), so the row's state is replaced only HERE, on a
+                            # call that returned: an attempt that raised OOM left cur[i]["fstate"]
+                            # untouched, and the retry at half the batch cannot count the injections
+                            # of the failed attempt a second time.
+                            cur[i]["fstate"] = states[j]
                         cur[i]["width"] = max(cur[i].get("width") or 0, len(grp))
                         cur[i]["ids"] = cur[i]["ids"] + g[j]
                         gen_tokens += len(g[j])
@@ -454,9 +552,15 @@ def main(argv=None):
                         cur[i]["done"] = bool(forced is False and (mk is not None)) or \
                             len(cur[i]["ids"]) >= hor
                         if apt is not None:
-                            apt.write({"idx": i, "row_idx": rws[i]["idx"], "ids": cur[i]["ids"],
-                                       "done": cur[i]["done"], "natural_stop": c, "marker": mk,
-                                       "wave": T_next})
+                            ck = {"idx": i, "row_idx": rws[i]["idx"], "ids": cur[i]["ids"],
+                                  "done": cur[i]["done"], "natural_stop": c, "marker": mk,
+                                  "wave": T_next}
+                            if forced:
+                                # the forced row's protocol state travels WITH its ids, so a kill
+                                # mid-wave resumes the stop position, the injection count, the
+                                # pending wait tokens and the stopper's tail window
+                                ck["fstate"] = fstate_to_json(cur[i].get("fstate"))
+                            apt.write(ck)
                     gi += len(grp)
                     gc.collect()
                     torch.cuda.empty_cache()

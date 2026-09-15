@@ -45,6 +45,7 @@ Three behaviours gate G5 fixed (2026-09-12):
 import argparse
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -164,6 +165,19 @@ def plan(gpus, shards, priorities=None, forced_n=None, dry_run_n=None, root=None
     return written, q
 
 
+def _alive_slurm_jobs():
+    """The set of Slurm job ids currently pending or running, or None when squeue is unavailable
+    (no Slurm here: every stale claim is re-queued, the pre-Slurm behaviour)."""
+    try:
+        out = subprocess.run(["squeue", "-h", "-o", "%i", "-u", os.environ.get("USER", "")],
+                             capture_output=True, text=True, timeout=20)
+        if out.returncode != 0:
+            return None
+        return {x.strip().split("_")[0] for x in out.stdout.split() if x.strip()}
+    except Exception:                                         # noqa: BLE001
+        return None
+
+
 def requeue_claimed(q, older_than=0.0):
     """Move stale claims back to `todo`.
 
@@ -177,6 +191,7 @@ def requeue_claimed(q, older_than=0.0):
     working: pass a value larger than the longest expected job, or --no-requeue.
     """
     n = []
+    alive = _alive_slurm_jobs()
     # failed/ is re-queued too: a job that exited non-zero (OOM at batch 1, a node fault) resumes
     # from its per-problem checkpoint exactly like a stranded claim, which is what the README says
     for sub in ("claimed", "failed"):
@@ -184,6 +199,10 @@ def requeue_claimed(q, older_than=0.0):
             src = os.path.join(q, sub, fn)
             if older_than and (time.time() - os.path.getmtime(src)) < older_than:
                 continue
+            if sub == "claimed" and alive is not None:
+                jid = str((load_json(src, {}) or {}).get("slurm_job_id") or "")
+                if jid and jid in alive and jid != str(os.environ.get("SLURM_JOB_ID") or ""):
+                    continue          # another Slurm job (a second node) is still running it
             try:
                 os.rename(src, os.path.join(q, "todo", fn))
             except OSError:
@@ -276,6 +295,8 @@ def claim(q, worker, gpu=0, budget=None):
         rec["worker"] = worker
         rec["gpu"] = gpu
         rec["claimed_at"] = time.strftime("%FT%T")
+        rec["host"] = os.environ.get("SLURMD_NODENAME") or socket.gethostname()
+        rec["slurm_job_id"] = os.environ.get("SLURM_JOB_ID")
         save_json(dst, rec)
         return dst, rec
     if budget is not None:

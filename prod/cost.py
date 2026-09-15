@@ -13,7 +13,8 @@
                         + k * [attention quadratic term over FULL-ATTENTION layers only]
                         + 2 * V * d * (T + R)                  (output head once per generated token)
    with the quadratic term the MEAN OVER PROBLEMS of (P + T)^2, not the square of the mean; suffix
-   and answer tokens counted as generated; prefill and decode stored separately.
+   and answer tokens counted as generated; prefill and decode stored separately (prefill carries the
+   P^2 part of the quadratic term, decode the rest: the total is the same either way).
    The four defects this corrects, from KB09-09 section 1 (S27): attention not multiplied by k for a
    looped model, dense attention assumed for hybrid models, the square of the mean length, suffix
    tokens excluded. `--old` also prints S27's original formula so G4 can show the old-vs-new table.
@@ -125,6 +126,10 @@ def flops_t5(sh, k, P, T, R=0.0, sq_lengths=None, attn_layers=None, split=False)
                 flagged `mean_of_squares: False`.
     attn_layers: the number of FULL-ATTENTION layers the quadratic term runs over; defaults to the
                 model's own count (all layers for the three looped families).
+    split: also return flops_prefill and flops_decode. The quadratic term splits with the LENGTHS --
+                prefill attends over the prompt alone (its P^2 share), decode over the prompt plus
+                what it has generated (the rest of the mean squared length) -- and the total is the
+                same number either way.
     """
     S = float(P) + float(T) + float(R)
     gen = float(T) + float(R)
@@ -142,11 +147,20 @@ def flops_t5(sh, k, P, T, R=0.0, sq_lengths=None, attn_layers=None, split=False)
            "mean_of_squares": sq_lengths is not None, "k": int(k), "P": float(P), "T": float(T),
            "R": float(R), "attn_layers": La}
     if split:
-        # prefill = the prompt pass; decode = every generated token's pass
+        # prefill = the prompt pass; decode = every generated token's pass.
+        # The quadratic term splits with the lengths, not entirely onto prefill: prefill attends over
+        # the prompt alone (P^2), decode attends over the prompt AND what has been generated so far,
+        # which is the rest of the mean squared length. Charging the whole quadratic term to prefill
+        # put every generated token's attention in the prefill column, which on these grids is the
+        # larger half. The TOTAL is untouched: decode is still total minus prefill.
+        sq_prefill = min(float(P) ** 2, sq)
+        attn_prefill = (attn_loop + attn_fixed) * (sq_prefill / sq) if sq > 0 else 0.0
         out["flops_prefill"] = (2.0 * (sh.get("n_nonembed_fixed", 0)
                                        + int(k) * sh["n_nonembed_per_loop"]) * float(P)
-                                + attn_loop + attn_fixed)
+                                + attn_prefill)
         out["flops_decode"] = out["flops"] - out["flops_prefill"]
+        out["attention_prefill"] = attn_prefill
+        out["attention_decode"] = (attn_loop + attn_fixed) - attn_prefill
     return out
 
 

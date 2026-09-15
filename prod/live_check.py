@@ -11,7 +11,8 @@ is not the thing the paper claims a user would do. This script does the thing it
   1. read the calibration rows out of the cells files and rank the cells by calibration accuracy,
      ties broken by cost at the task's median prompt length   (allocate.rank_from_cal, verbatim)
   2. for each EVALUATION prompt, compute feasibility from ITS OWN token count
-     (allocate.per_prompt_cost: k L (p_i + B + r_i) <= X) and take the first feasible ranked cell
+     (allocate.per_prompt_cost: (L_fixed + k L) (p_i + B + r_i) <= X, the family's own passes per
+     token) and take the first feasible ranked cell
   3. GENERATE ONCE at that loop count and cap, with the forced read-out, and score protocol v2
   4. compare the live accuracy with the offline policy value from the grid at the same budget
 
@@ -23,6 +24,11 @@ analysis.
 
 The generation reuses `prod.generate`'s own machinery through a subprocess per distinct chosen cell,
 so the live path is byte-for-byte the production path -- there is no second decoder to keep in sync.
+
+The ranking grid must be COMPLETE. A missing cell is NaN, and NaN is not a small number: it can be
+ranked first by `rank_from_cal` (a mean over a calibration column that is partly NaN) and it scores
+as neither right nor wrong, so an incomplete grid silently produces a policy nobody measured.
+`choose` refuses to rank on one unless `--allow-incomplete` says the caller knows.
 """
 import argparse
 import json
@@ -42,21 +48,32 @@ from .score import load_grid
 
 
 def choose(cells_dir, model, task, budget=None, budget_index=None, promptfree=False,
-           label="v2", n_budgets=None, budget_fraction=None):
+           label="v2", n_budgets=None, budget_fraction=None, allow_incomplete=False):
     """Steps 1 and 2: the ranked cells, the budget, and the cell chosen for every eval prompt.
 
     `budget_fraction` (decision 7, config.yaml's `budget_fractions`, e.g. 0.25/0.5/1.0) is an
     alternative to `budget`/`budget_index`: it names X as a fraction of the DEFAULT cost -- the MEAN
     REALISED layer-pass cost of the default operating point (allocate.default_cost: the max measured
     depth, at each problem's own natural stop, uncapped, read off the cells) -- not the grid's
-    largest (k, B) CAP cell at the median prompt, which is a synthetic k*L*(P+B) number no row is
-    guaranteed to ever actually realise. 1.0 is that mean cost exactly; 0.25 a quarter of it.
+    largest (k, B) CAP cell at the median prompt, which is a synthetic (L_fixed + k L)(P+B) number
+    no row is guaranteed to ever actually realise. 1.0 is that mean cost exactly; 0.25 a quarter.
+
+    The grid must be complete: `allow_incomplete` is the only way to rank on one that is not, and it
+    is there for a deliberate smoke run, never for a result.
     """
     cells, paths = load_grid(cells_dir, model, task, "natural", label)
+    miss = cells.missing()
+    if miss and not allow_incomplete:
+        raise SystemExit("%s/%s: the ranking grid has %d missing cell(s) (first %s); a missing cell "
+                         "is NaN, which can rank first and scores as neither right nor wrong. "
+                         "Finish the grid, or pass --allow-incomplete to rank on what is there."
+                         % (model, task, len(miss), miss[:3]))
     sh = model_shapes(model)
+    # passes per token are layers_fixed + k * layers_per_loop (cost.model_shapes): 0 fixed layers
+    # for Ouro, prelude + coda for a raven family
     grid = Grid("%s/%s" % (model, task), cells.ks, cells.Bs, cells.idx, cells.acc, cells.ptok,
-                sh["layers_per_loop"], cells.reserve, list(cells.split))
-    cost = per_prompt_cost(grid.L, promptfree)
+                sh["layers_per_loop"], cells.reserve, list(cells.split), sh["layers_fixed"])
+    cost = per_prompt_cost(grid.L, promptfree, grid.L_fixed)
     ev, cal = grid.select("eval"), grid.select("cal")
     if len(cal) == 0:
         raise SystemExit("%s/%s has no calibration rows; the allocator has nothing to read"
@@ -160,6 +177,9 @@ def main(argv=None):
     p.add_argument("--out-dir", dest="out_dir", default=None)
     p.add_argument("--no-generate", dest="generate", action="store_false", default=True,
                    help="rank and choose, report the plan, run nothing on the GPU")
+    p.add_argument("--allow-incomplete", dest="allow_incomplete", action="store_true",
+                   help="rank on a grid with missing cells (a smoke run only: a missing cell is "
+                        "NaN, which can rank first and scores as neither right nor wrong)")
     p.add_argument("--extra", default="")
     cfgmod.add_args(p)
     a = p.parse_args(argv)
@@ -168,7 +188,7 @@ def main(argv=None):
 
     grid, cells, order, X, Xs, chosen, ev, cost, Pm, Rm, paths, dc = choose(
         cells_dir, a.model, a.task, a.budget, a.budget_index, a.promptfree, a.label,
-        budget_fraction=a.budget_fraction)
+        budget_fraction=a.budget_fraction, allow_incomplete=a.allow_incomplete)
     print("default cost (k=%s, n=%d, promptfree=%s): %s" % (dc["k"], dc["n"], dc["promptfree"],
                                                              dc["mean"]), flush=True)
     row_ids = [int(grid.idx[n]) for n in ev]
@@ -182,6 +202,9 @@ def main(argv=None):
             hist.get("k%s_B%s" % chosen[rid] if chosen[rid] else "infeasible", 0) + 1
 
     out = {"model": a.model, "task": a.task, "cells": paths, "budget": X,
+           "grid_complete": bool(cells.complete()), "n_missing_cells": len(cells.missing()),
+           "allow_incomplete": bool(a.allow_incomplete),
+           "layers_per_loop": grid.L, "layers_fixed": grid.L_fixed,
            "budget_index": a.budget_index, "budget_fraction": a.budget_fraction,
            "default_cost": dc, "budgets": [float(x) for x in Xs],
            "promptfree": bool(a.promptfree), "n_eval_used": len(row_ids),
