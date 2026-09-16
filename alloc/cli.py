@@ -1,0 +1,155 @@
+"""Read cell JSONL files and write calibration cards, policy statistics, and cost-fraction tables to the output directory."""
+import argparse
+import json
+import os
+
+import numpy as np
+
+from . import cells as C
+from . import evaluate as E
+from . import policy as P
+
+
+def _args(argv=None):
+    p = argparse.ArgumentParser(prog="alloc.cli")
+    p.add_argument("--cells", required=True, help="directory holding the cells jsonl files")
+    p.add_argument("--task", required=True)
+    p.add_argument("--checkpoint", required=True)
+    p.add_argument("--reference", default=None, help="a second checkpoint to contrast against")
+    p.add_argument("--reference-cells", default=None,
+                   help="directory for the reference's cells (default: --cells)")
+    p.add_argument("--reference-bbh-base", action="store_true",
+                   help="the reference file holds raw multiple-choice rows: re-parse the "
+                        "answer letter and re-derive the calibration split")
+    p.add_argument("--out", required=True)
+    p.add_argument("--c-gate", type=float, default=P.DEFAULT_C_GATE)
+    p.add_argument("--n-labels", type=int, default=None)
+    p.add_argument("--boot", type=int, default=2000)
+    p.add_argument("--cal-draws", type=int, default=100)
+    p.add_argument("--promptfree", action="store_true")
+    p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--model", default=None,
+                   help="model name to look up in --model-config (default: --checkpoint)")
+    p.add_argument("--model-config", default=None,
+                   help="a production config file to read the checkpoint's layer shape from")
+    p.add_argument("--layers-per-loop", type=int, default=None,
+                   help="transformer layers inside one loop pass")
+    p.add_argument("--fixed-layers", type=int, default=0,
+                   help="transformer layers paid once per token whatever the depth")
+    p.add_argument("--ks", default=None,
+                   help="comma-separated depths to keep; must be a subset of what the rows hold")
+    p.add_argument("--caps", default=None,
+                   help="comma-separated token caps to keep; must be a subset of the rows'")
+    return p.parse_args(argv)
+
+
+def _int_list(s):
+    return None if s is None else [int(x) for x in s.split(",") if x.strip()]
+
+
+def resolve_geometry(a):
+    """Return (layers_per_loop, fixed_layers) for the run, or exit with what is missing.
+
+    Three ways to pin it, in order: the explicit flags; a model config file, which also covers a
+    model with a fixed prelude and coda around a recurrent core; and, only for a checkpoint whose
+    name says it is the 24-layer fully recurrent model, the built-in default. Anything else is
+    refused, because pricing another family at 24 layers per pass would silently misprice
+    every cell.
+    """
+    if a.layers_per_loop is not None:
+        return int(a.layers_per_loop), int(a.fixed_layers)
+    model = a.model or a.checkpoint
+    if a.model_config:
+        try:
+            return C.model_geometry(model, a.model_config)
+        except KeyError as e:
+            raise SystemExit("cannot price %s: %s" % (model, e))
+    low = model.lower()
+    if "ouro" in low and ("1_4b" in low or "1.4b" in low):
+        return C.L_LOOP_DEFAULT, C.L_FIXED_DEFAULT
+    raise SystemExit(
+        "cannot price %r: pass --layers-per-loop (and --fixed-layers), or --model-config with a "
+        "file that holds this model's shape. Only a 24-layer fully recurrent checkpoint has a "
+        "built-in default." % model)
+
+
+def card(cs, n_labels=None):
+    cal = cs.select("cal")
+    cost = P.cost_of(cs)
+    Pm, Rm = P.median_point(cs, cs.select("eval"))
+    A_hat, m = E.surface(cs, cal, n_labels=n_labels)
+    eq, pred = P.rank_equation(cs, A_hat, cost, Pm, Rm)
+    lk, acc = P.rank_lookup(cs, cal, cost, Pm, Rm)
+    key = lambda c: "k%d_T%d" % c
+    return {"checkpoint": cs.name, "task": cs.task, "n_cal": int(len(cal)),
+            "n_eval": int(len(cs.select("eval"))),
+            "ks": cs.ks, "caps": cs.caps,
+            "answer_budget": cs.answer_budget_used(),
+            "reserve_constant_per_task": bool(cs.reserve_is_constant()),
+            "median_prompt_tokens": Pm, "median_reserve": Rm,
+            "G": m["G"], "c": m["c"], "l": m["l"],
+            "A_hat": m["A_hat"], "raw_surface": m["acc_measured"],
+            "reconstruction_rmse_pts": m["rmse_pts"], "noise_floor_pts": m["noise_floor_pts"],
+            "uncommitted_share": m["uncommitted_share"],
+            "ranking_lookup": [key(c) for c in lk],
+            "ranking_equation": [key(c) for c in eq],
+            "cal_accuracy": {key(c): round(acc[c], 4) for c in acc},
+            "predicted_accuracy": {key(c): round(pred[c], 4) for c in pred},
+            "median_cost_layer_passes": {key(c): int(cost(c[0], c[1], Pm, Rm)) for c in acc}}
+
+
+def main(argv=None):
+    a = _args(argv)
+    L, L_fixed = resolve_geometry(a)
+    ks, caps = _int_list(a.ks), _int_list(a.caps)
+    os.makedirs(a.out, exist_ok=True)
+    bbh_base = a.task in C.BBH_TASKS and a.checkpoint in ("base", "A0_base")
+    cs = C.load(a.cells, a.task, a.checkpoint, bbh_base=bbh_base, ks=ks, caps=caps,
+                L=L, L_fixed=L_fixed)
+    cards = {cs.name: card(cs, a.n_labels)}
+    res = {"task": a.task, "checkpoint": a.checkpoint, "reference": a.reference,
+           "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "gain": {}}
+    arms = [("lookup", dict(ranking="lookup", c_gate=0.0)),
+            ("equation", dict(ranking="equation", c_gate=0.0)),
+            ("equation_n30", dict(ranking="equation", n_labels=30, c_gate=0.0)),
+            ("equation_n100", dict(ranking="equation", n_labels=100, c_gate=0.0)),
+            ("gated_equation", dict(ranking="equation", c_gate=a.c_gate))]
+    for name, spec in arms:
+        res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
+                                               n_cal_draws=a.cal_draws, seed=a.seed, **spec)
+    res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
+    t1 = E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed)
+    res["table1"] = t1
+
+    if a.reference:
+        rdir = a.reference_cells or a.cells
+        ref = C.load(rdir, a.task, a.reference, ks=ks, caps=caps, L=L, L_fixed=L_fixed,
+                     bbh_base=a.reference_bbh_base or (a.task in C.BBH_TASKS
+                                                       and a.reference == "base"))
+        cards[ref.name] = card(ref, a.n_labels)
+        E.assert_paired(cs, ref)
+        res["contrasts"] = {
+            w: E.contrast(cs, ref, which=w, promptfree=a.promptfree, n_boot=a.boot, seed=a.seed)
+            for w in ("Bstar", "Blow")}
+        res["noninferiority"] = E.noninferiority(cs, ref, promptfree=a.promptfree,
+                                                 n_boot=a.boot, seed=a.seed)
+        res["reference_default_cost"] = E.default_cost(ref, promptfree=a.promptfree)
+
+    def _j(o):
+        if isinstance(o, (np.floating, np.integer)):
+            return o.item()
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        raise TypeError(repr(o))
+
+    json.dump(cards, open(os.path.join(a.out, "cards.json"), "w"), indent=1, default=_j)
+    json.dump(res, open(os.path.join(a.out, "results.json"), "w"), indent=1, default=_j)
+    open(os.path.join(a.out, "table1.md"), "w", encoding="utf-8").write(E.table1_markdown(t1))
+    print(json.dumps({k: (v.get("gain_mean_pts") if isinstance(v, dict) else v)
+                      for k, v in res["gain"].items()}, indent=1))
+    print("WROTE %s" % a.out)
+    return res
+
+
+if __name__ == "__main__":
+    main()

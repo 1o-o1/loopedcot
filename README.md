@@ -120,7 +120,32 @@ All under `artifacts/`:
 | `manifest.json` | the run list the queue was planned from. |
 | `launcher_plan.json`, `launcher_status.json`, `queue/` | the queue and its state. |
 
-Analysis (`prod.score`, `prod.analyze`) reads the cells files; see the module docstrings.
+## 5b. Analysis
+
+Every command reads the cells files of one (checkpoint, dataset, protocol) grid, shards included, and
+writes under `artifacts/`. `--protocol=forced` selects the forced-continuation grid.
+
+```bash
+source env.sh
+$PROD_PYTHON -m prod.score --cells=$PROD_ART --model=ouro_1_4b_think --task=math500                     # k x cap table, parse rates, commitment mechanism (G, c, l)
+$PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think --task=math500           # heatmap, frontier, card, arrival, gain figures
+$PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think --task=math500 --protocol=forced
+$PROD_PYTHON -m prod.analyze.cards --cells=$PROD_ART --model=ouro_1_4b_think --tasks=gsm8k,math500,aqua  # per-checkpoint card over several datasets
+$PROD_PYTHON -m prod.live_check --model=ouro_1_4b_base --task=gsm8k --cells=$PROD_ART --budget-fraction=0.5 --no-generate   # the allocator's offline pick per prompt
+$PROD_PYTHON -m prod.analyze.table1 --cells=$PROD_ART --models=ouro_1_4b_base,ouro_1_4b_think,ouro_2_6b_base,ouro_2_6b_think --tasks=gsm8k,math500,svamp,aqua,csqa,arc,strategyqa,bbh,mmlu,hellaswag --accounting=both   # Table 1: default vs allocator at 25/50/100% of the default cost
+$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> [--reference <model>] --out $PROD_ART/alloc_<task>_<model>   # the S35 allocator: lookup and equation rankings, gate, Table 1
+```
+
+`prod.score` prints the accuracy table and writes `score_<model>_<task>_<protocol>.json`; the figures
+go to `artifacts/figures/`; `table1` writes `artifacts/table1.md` and `.json` (per prompt the budget is a
+fraction of the cap cost of the default's own uncapped cell, so the 100 percent row reproduces the uncapped
+baseline; realised spend is reported beside every row; `--trained=<model>` adds the trained checkpoint's row).
+`alloc.cli` (package `alloc/`, its README explains the method) writes three files: `cards.json` (the checkpoint's
+calibration card: per-cell accuracy and price, the two rankings), `results.json` (per budget, every policy's paired
+accuracy, gain and bootstrap intervals), `table1.md` (rows default, default-at-budget, lookup, equation, equation-30,
+gated at 25/50/100 percent of the default cost). For a checkpoint other than Ouro-1.4B pass
+`--model-config prod/config.yaml` so its layer shape is priced, never guessed. Run `prod.rescore --cells=$PROD_ART --apply` once before any analysis of
+rows produced by an earlier version of the code.
 
 ## 6. What the queue is
 
