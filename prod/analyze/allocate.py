@@ -240,22 +240,32 @@ def default_cost(cells, promptfree=False, k=None, split="eval"):
     if not ks:
         return {"k": None, "n": 0, "mean": None, "promptfree": bool(promptfree)}
     kk = k if (k is not None and k in ks) else ks[-1]
+    per = default_cost_per_prompt(cells, promptfree, kk, split)
+    vals = [v for v in per.values() if v is not None]
+    return {"k": int(kk), "n": len(vals), "mean": (float(np.mean(vals)) if vals else None),
+            "promptfree": bool(promptfree)}
+
+
+def default_cost_per_prompt(cells, promptfree=False, k=None, split="eval"):
+    """The realised cost of the default operating point for EACH question of `split`: {row position
+    in cells.idx: cost or None}. None when every cap truncated that question's natural stop."""
+    ks = list(cells.ks)
+    kk = k if (k is not None and k in ks) else ks[-1]
     ki = ks.index(kk)
     sel = cells.select(split) if hasattr(cells, "select") else np.arange(len(cells.idx))
     field = cells.passes_pf if promptfree else cells.passes
-    vals = []
+    out = {}
     for n in sel:
         nstop, ncut = cells.nstop[ki, :, n], cells.ncut[ki, :, n]
         ok = [j for j in range(len(cells.Bs))
               if not (np.isnan(nstop[j]) or np.isnan(ncut[j])) and ncut[j] >= nstop[j] - 1e-9]
         if not ok:
+            out[int(n)] = None
             continue
         j = min(ok, key=lambda j: cells.Bs[j])          # the cheapest UNCAPPED realisation
         v = field[ki, j, n]
-        if not np.isnan(v):
-            vals.append(float(v))
-    return {"k": int(kk), "n": len(vals), "mean": (float(np.mean(vals)) if vals else None),
-            "promptfree": bool(promptfree)}
+        out[int(n)] = None if np.isnan(v) else float(v)
+    return out
 
 
 def rank_from_cal(grid, cal_sel, cost, Pm, Rm, boot_sel=None):
