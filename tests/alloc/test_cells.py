@@ -117,8 +117,8 @@ class TestProductionFileNames(unittest.TestCase):
             for k in synth.KS:
                 kr = [r for r in rows if r["k"] == k]
                 half = len(kr) // 2
-                self._write(d, "cells_ouro_1_4b_base_gsm8k_pp3_k%d_s1of2.jsonl" % k, kr[:half])
-                self._write(d, "cells_ouro_1_4b_base_gsm8k_pp3_k%d_s2of2.jsonl" % k, kr[half:])
+                self._write(d, "cells_ouro_1_4b_base_gsm8k_natural_k%d_s1of2.jsonl" % k, kr[:half])
+                self._write(d, "cells_ouro_1_4b_base_gsm8k_natural_k%d_s2of2.jsonl" % k, kr[half:])
             paths = C.cell_paths(d, "gsm8k", "ouro_1_4b_base")
             self.assertEqual(len(paths), 2 * len(synth.KS))
             cs = C.load(d, "gsm8k", "ouro_1_4b_base")
