@@ -4,7 +4,7 @@ import numpy as np
 from . import mechanism as mech
 from . import policy as pol
 
-BUDGET_FRACTIONS = (0.25, 0.5, 1.0)
+BUDGET_FRACTIONS = (0.25, 0.5, 0.75, 1.0)
 NI_MARGIN_PTS = 2.0
 
 
@@ -335,14 +335,51 @@ def default_accuracy(cells, k=None, split="eval"):
 
 
 # ---------------------------------------------------------------- Table 1
-def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAULT_C_GATE,
-           n_labels_grid=(30, 100), seed=7, gate_draws=40):
-    """Return each arm's accuracy in percentage points at budgets set to `fractions` of the default
-    cost (the mean realised layer-token cost of the deepest depth run to its natural stop).
+def default_cap_index(cells, pos):
+    """Per question: the index of the smallest cap that did not truncate the chain at the deepest
+    depth (the default's own uncapped cell), or the last cap for a chain that hit the horizon."""
+    ki = len(cells.ks) - 1
+    out = []
+    for n in pos:
+        nstop, ncut = cells.nstop[ki, :, n], cells.ncut[ki, :, n]
+        ok = [j for j in range(len(cells.caps))
+              if not (np.isnan(nstop[j]) or np.isnan(ncut[j])) and ncut[j] >= nstop[j] - 1e-9]
+        out.append(min(ok, key=lambda j: cells.caps[j]) if ok else len(cells.caps) - 1)
+    return np.array(out, int)
 
-    The `default` row is that same unbudgeted run, so it costs the whole default cost and cannot be
-    bought at a fraction below 1.0; its `feasible` flags say so and its accuracy there is NaN,
-    rather than repeating the unbudgeted number as if it had been affordable.
+
+def realised_price(cells, pos, picks, promptfree=False):
+    """Mean realised layer-pass cost of the chosen cells over the questions where a cell was chosen:
+    the rows' own stored cost (prompt + chain actually generated + read-out), prompt-free when asked."""
+    vals = []
+    for pk, n in zip(picks, pos):
+        if pk is None:
+            continue
+        a, c = pk
+        v = cells.passes[a, c, n]
+        if v != v:
+            continue
+        if promptfree:
+            v -= (cells.L_fixed + cells.ks[a] * cells.L) * cells.ptok[n]
+        vals.append(float(v))
+    return float(np.mean(vals)) if vals else float("nan")
+
+
+def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAULT_C_GATE,
+           n_labels_grid=(30, 100), seed=7, gate_draws=40, basis="prompt"):
+    """Return each arm's accuracy in percentage points at budgets set to `fractions` of the default
+    cost, with the mean realised price of what each arm actually ran.
+
+    basis="prompt" (the default): each question's budget is the fraction of the CAP cost of the
+    default's own uncapped cell for that question (deepest depth, smallest cap that did not truncate
+    its chain), the way every policy is priced. At fraction 1.0 normal operation lands on exactly that
+    cell, so `default_at_budget` equals `default` by construction and anchors the table; below 1.0
+    both arms get the same share of the same question-level spend.
+    basis="mean": one budget per grid, the fraction of the MEAN realised default cost; a question
+    whose chain was longer than average is then starved even at 1.0.
+
+    The `default` row is the unbudgeted run: it costs its whole default cost and cannot be bought at a
+    fraction below 1.0; its `feasible` flags say so and its accuracy there is NaN.
     """
     cost = pol.cost_of(cells, promptfree)
     ev, cal = cells.select("eval"), cells.select("cal")
@@ -350,7 +387,16 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
     dc = default_cost(cells, promptfree)
     if dc["mean"] is None:
         return {"task": cells.task, "grid": cells.name, "empty": True}
-    Xs = [f * dc["mean"] for f in fractions]
+    if basis == "prompt":
+        jdef = default_cap_index(cells, ev)
+        kmax = cells.ks[-1]
+        dpp = np.array([cost(kmax, cells.caps[j], cells.ptok[n], cells.reserve[n])
+                        for j, n in zip(jdef, ev)], float)
+        Xs = [f * dpp for f in fractions]
+        budgets = [{"per_question": True, "mean": float(np.nanmean(x))} for x in Xs]
+    else:
+        Xs = [f * dc["mean"] for f in fractions]
+        budgets = [float(x) for x in Xs]
     dacc = default_accuracy(cells)
 
     arms = [("lookup", dict(ranking="lookup")),
@@ -364,29 +410,36 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
         gate, _ = gate_for(cells, cal, c_gate=c_gate, n_draws=gate_draws, seed=seed)
 
     default_acc_pts = 100 * float(np.nanmean(dacc))
-    default_feasible = [bool(pol.affordable(dc["mean"], X)) for X in Xs]
+    default_feasible = [bool(f >= 1.0 - 1e-9) for f in fractions]
+    dprice = realised_price(cells, ev, [(len(cells.ks) - 1, int(j)) for j in default_cap_index(cells, ev)],
+                            promptfree)
     rows = {"default": {"note": "max depth, natural stop, uncapped",
                         "acc_pts": [default_acc_pts if f else float("nan")
                                     for f in default_feasible],
                         "feasible": default_feasible,
                         "unbudgeted_acc_pts": default_acc_pts,
+                        "price_layer_passes": [dprice if f else float("nan") for f in default_feasible],
                         "cost_layer_passes": [dc["mean"]] * len(fractions)}}
     normal_done = False
     for name, spec in arms:
         order, _ = make_order(cells, cal, cost, Pm, Rm, spec["ranking"], spec.get("n_labels"))
         g = gate if spec.get("gate") else None
-        P, rev = pol.policy_vectors(cells, ev, cost, Xs, order, gate=g)
+        P, rev, picks = pol.policy_vectors(cells, ev, cost, Xs, order, gate=g, with_picks=True)
         rows[name] = {"acc_pts": [100 * _nanmean(P[j][0]) for j in range(len(Xs))],
                       "feasible_frac": [float(np.mean(~np.isnan(P[j][0]))) for j in range(len(Xs))],
+                      "price_layer_passes": [realised_price(cells, ev, [p[0] for p in picks[j]], promptfree)
+                                             for j in range(len(Xs))],
                       "gate_reverted_frac": list(rev)}
         if not normal_done:
             rows["default_at_budget"] = {
                 "note": "normal operation: k_max at its largest affordable cap",
                 "acc_pts": [100 * _nanmean(P[j][1]) for j in range(len(Xs))],
-                "feasible_frac": [float(np.mean(~np.isnan(P[j][1]))) for j in range(len(Xs))]}
+                "feasible_frac": [float(np.mean(~np.isnan(P[j][1]))) for j in range(len(Xs))],
+                "price_layer_passes": [realised_price(cells, ev, [p[1] for p in picks[j]], promptfree)
+                                       for j in range(len(Xs))]}
             normal_done = True
     return {"task": cells.task, "grid": cells.name, "promptfree": bool(promptfree),
-            "fractions": list(fractions), "budgets": [float(x) for x in Xs],
+            "budget_basis": basis, "fractions": list(fractions), "budgets": budgets,
             "default_cost": dc, "n_eval": int(len(ev)), "c_gate": float(c_gate), "rows": rows}
 
 
@@ -436,13 +489,26 @@ def table1_markdown(t1):
     order += [k for k in t1["rows"] if k.startswith("equation_n")]
     order += ["gated_equation"]
     head = " | ".join("%.2f x default" % f for f in t1["fractions"])
-    out = ["# Table 1 -- %s (%s)" % (t1["task"], t1["grid"]), "",
-           "Budget = a fraction of the DEFAULT COST, the mean realised layer-pass cost of the max "
-           "depth at its natural stop, uncapped: %.0f layer passes over %d questions "
-           "(%.1f%% of them counted at the horizon)."
-           % (t1["default_cost"]["mean"], t1["default_cost"]["n"],
-              100 * t1["default_cost"]["horizon_share"]), "",
-           "| arm | %s |" % head, "|---|" + "---|" * len(t1["fractions"])]
+    basis = t1.get("budget_basis", "mean")
+    acct = "prompt-free" if t1.get("promptfree") else "prompt-inclusive"
+    if basis == "prompt":
+        why = ("Budget = a fraction of each question's OWN default cost, the cap cost of the deepest "
+               "depth at the smallest cap that did not truncate its chain; at 1.00 normal operation is "
+               "exactly the default. Mean default cost (realised): %.0f layer passes over %d questions "
+               "(%.1f%% of them counted at the horizon)."
+               % (t1["default_cost"]["mean"], t1["default_cost"]["n"],
+                  100 * t1["default_cost"]["horizon_share"]))
+    else:
+        why = ("Budget = a fraction of the DEFAULT COST, the mean realised layer-pass cost of the max "
+               "depth at its natural stop, uncapped: %.0f layer passes over %d questions "
+               "(%.1f%% of them counted at the horizon)."
+               % (t1["default_cost"]["mean"], t1["default_cost"]["n"],
+                  100 * t1["default_cost"]["horizon_share"]))
+    out = ["# Table 1 -- %s (%s), %s accounting, budget basis: %s" % (t1["task"], t1["grid"], acct, basis),
+           "", why, "",
+           "Each cell: accuracy in points [mean realised price of what that arm ran, in thousands of "
+           "layer passes]; a bracketed percentage is the share of questions that could afford the arm.",
+           "", "| arm | %s |" % head, "|---|" + "---|" * len(t1["fractions"])]
     def cell(r, j):
         feasible = r.get("feasible")
         if feasible is not None and not feasible[j]:
@@ -451,7 +517,10 @@ def table1_markdown(t1):
         if v != v:                     # NaN: no cell of that arm is affordable at that budget
             return "n/a"
         f = r.get("feasible_frac")
-        return "%.1f" % v if f is None or f[j] >= 0.999 else "%.1f (%.0f%%)" % (v, 100 * f[j])
+        pr = (r.get("price_layer_passes") or [float("nan")] * (j + 1))[j]
+        ptxt = " [%.1fk]" % (pr / 1000.0) if pr == pr else ""
+        base = "%.1f" % v if f is None or f[j] >= 0.999 else "%.1f (%.0f%%)" % (v, 100 * f[j])
+        return base + ptxt
 
     for name in order:
         r = t1["rows"].get(name)

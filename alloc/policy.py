@@ -118,16 +118,28 @@ class Gate(object):
 
 
 # ---------------------------------------------------------------- per-prompt policy
-def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None):
-    """Return paired policy/normal accuracy vectors and reversion fractions per layer-token budget; preserve infeasible prompts as NaN."""
+def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None, with_picks=False):
+    """Return paired policy/normal accuracy vectors and reversion fractions per layer-token budget; preserve infeasible prompts as NaN.
+
+    Each entry of `Xs` is one budget for every question, or an array of budgets aligned with
+    `ev_pos` (a per-question budget; NaN = no budget defined there, both arms infeasible).
+    `with_picks=True` also returns, per budget, the chosen (depth index, cap index) of the policy
+    and of normal operation per question (None where infeasible), so a caller can price them.
+    """
     ki = {k: i for i, k in enumerate(cells.ks)}
     bi = {b: i for i, b in enumerate(cells.caps)}
     kmax = cells.ks[-1]
     order_idx = [(ki[k], bi[T], k, T) for k, T in order]
-    out, reverted = [], []
+    out, reverted, picks = [], [], []
     for X in Xs:
-        pv, nv, rev = [], [], 0
-        for n in ev_pos:
+        Xq = np.broadcast_to(np.asarray(X, float), (len(ev_pos),))
+        pv, nv, rev, pk = [], [], 0, []
+        for X, n in zip(Xq, ev_pos):
+            if X != X:                                   # NaN budget
+                pv.append(np.nan)
+                nv.append(np.nan)
+                pk.append((None, None))
+                continue
             p, r = cells.ptok[n], cells.reserve[n]
             nf = [T for T in cells.caps if affordable(cost(kmax, T, p, r), X)]
             normal = (ki[kmax], bi[max(nf)]) if nf else None
@@ -141,6 +153,10 @@ def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None):
                 rev += int(did)
             pv.append(cells.acc[pick[0], pick[1], n] if pick is not None else np.nan)
             nv.append(cells.acc[normal[0], normal[1], n] if normal is not None else np.nan)
+            pk.append((pick, normal))
         out.append((np.array(pv, float), np.array(nv, float)))
         reverted.append(rev / max(1, len(ev_pos)))
+        picks.append(pk)
+    if with_picks:
+        return out, reverted, picks
     return out, reverted

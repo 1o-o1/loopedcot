@@ -27,6 +27,10 @@ def _args(argv=None):
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--cal-draws", type=int, default=100)
     p.add_argument("--promptfree", action="store_true")
+    p.add_argument("--accounting", default="prompt", choices=("prompt", "promptfree", "both"),
+                   help="which cost accounting Table 1 is written for (both = two tables)")
+    p.add_argument("--budget-basis", dest="basis", default="prompt", choices=("prompt", "mean"),
+                   help="fraction of each question's own default cost (default) or of the grid mean")
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--model", default=None,
                    help="model name to look up in --model-config (default: --checkpoint)")
@@ -118,7 +122,10 @@ def main(argv=None):
         res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
                                                n_cal_draws=a.cal_draws, seed=a.seed, **spec)
     res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
-    t1 = E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed)
+    accts = [False, True] if a.accounting == "both" else [a.accounting == "promptfree" or a.promptfree]
+    t1s = [E.table1(cs, promptfree=pf, c_gate=a.c_gate, seed=a.seed, basis=a.basis) for pf in accts]
+    t1 = t1s[0]
+    res["table1_tables"] = t1s
     res["table1"] = t1
 
     if a.reference:
@@ -144,7 +151,8 @@ def main(argv=None):
 
     json.dump(cards, open(os.path.join(a.out, "cards.json"), "w"), indent=1, default=_j)
     json.dump(res, open(os.path.join(a.out, "results.json"), "w"), indent=1, default=_j)
-    open(os.path.join(a.out, "table1.md"), "w", encoding="utf-8").write(E.table1_markdown(t1))
+    open(os.path.join(a.out, "table1.md"), "w", encoding="utf-8").write(
+        "\n".join(E.table1_markdown(t) for t in t1s))
     print(json.dumps({k: (v.get("gain_mean_pts") if isinstance(v, dict) else v)
                       for k, v in res["gain"].items()}, indent=1))
     print("WROTE %s" % a.out)
