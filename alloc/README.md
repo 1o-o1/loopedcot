@@ -117,7 +117,35 @@ noise and order noise come from one plan. `c_gate = 0` demands only a strictly p
 "maximise mean gain over normal subject to a worst-case per-budget loss no worse than -1 point".
 `c = 0` breaks the constraint; `0.5` satisfies it at the highest mean gain and wins every
 leave-one-task-out fold. `evaluate.gate_selection` reruns the sweep, splitting the calibration
-questions in two so no evaluation label picks the constant.
+questions in two so no evaluation label picks the constant. `--one-se` replaces the constant with a
+whole standard error, the conventional conservative reading.
+
+### Where the margin is measured
+
+`s` above cannot be read on the data that chose the cell. The pick is the argmax over the whole
+grid of one set of calibration labels; the maximum of many noisy estimates sits above the truth by
+roughly the noise spread times how many cells were in the running, so a margin read on those same
+labels is optimistic by that bias and `c_gate = 0.5` sd does not cover it. That is the winner's
+curse, and it is what opened the gate on cells that then lost 2 to 5 points while saving 30 to 55
+percent of the cost.
+
+**`--gate-mode split` is the default.** The calibration questions are cut IN ID ORDER: the first
+`--n-select` fit the ranking and the multiplier, the next `--n-verify` measure the margin of what
+was fitted and take no part in choosing it. The margin is the paired accuracy difference over those
+verification questions, its SD a paired bootstrap of 2000 resamples of them, and the selection half
+is bootstrapped in its turn to report how often a refit still clears the same bar. Both halves'
+sizes travel with every gated row. A calibration split shorter than the sum is used entire, keeping
+the requested proportion, and the row says `gate_split_truncated`.
+
+**`--n-select 50 --n-verify 30` is the frozen default**, swept over `{50/50, 100/20, 50/30}` on the
+ten S33 spike grids (five tasks, two checkpoints) at 1.0x of the default cost. `100/20` cannot run
+there at all -- every one of those grids has exactly 100 calibration ids -- and `50/50` closes the
+one true deviation in the set, MATH500 A0 at depth 3, worth +3.3 points for a 21.5 percent saving.
+`50/30` keeps it, opens no deviation that loses beyond its own interval, and spends 8.6 percent
+under budget against the old gate's 8.1 at the same mean accuracy.
+
+`--gate-mode whole` restores the old rule, one set fitting and measuring, so the two can be read
+side by side. It is the only way to reproduce the pre-repair numbers.
 
 ## The average budget
 
@@ -153,15 +181,17 @@ Gain over normal is not defined for these arms -- normal operation is a per-prom
 the two are not priced the same way -- so each row carries two paired differences instead: against
 the uncapped `default` row and against `default_at_budget`.
 
-**`avg_gated_lookup`** fits the same policy and then has to earn the deviation. Where the default
-cell fits the budget on average, the policy's predicted CALIBRATION accuracy -- the mean of `score`
-over the cells it picks for the calibration prompts -- is read against `score` at the default cell,
-and the policy runs only if that margin clears `c_gate` times its SD over the calibration
-resamples, each of which re-scores the cells and refits the multiplier. Otherwise the default cell
-runs for every prompt. It is the same rule as the per-prompt gate (`policy.gate_passes`), measured
-between two whole policies. On GSM8K at 1.0x the margin is noise and the arm reverts, so it lands
-on the default row (79.7) instead of 1 point under it; on MATH500 the margin clears and it keeps
-the 59.7 the policy bought.
+**`avg_gated_lookup`** fits the same policy and then has to earn the deviation. Under the default
+split gate the ranking and the multiplier are fitted on the SELECTION half alone; where the default
+cell fits the budget on average, the policy is then run on the VERIFICATION half and its paired
+accuracy margin over the default cell there decides, against `c_gate` times a paired bootstrap SD
+of that same margin. Otherwise the default cell runs for every prompt. It is the same rule as the
+per-prompt gate (`policy.gate_passes`), measured between two whole policies on held-out labels. On
+GSM8K A0 at 1.0x the cheaper cell is 10 points BEHIND the default cell on questions that did not
+choose it, so the arm reverts and lands on the default row (79.7); on MATH500 A0 depth 3 is 16.7
+points ahead against a 7.0-point SD, so the policy stands and keeps the 59.7 it bought. Under
+`--gate-mode whole` the same two rows read +8.0 and -0.0 against calibration SDs of 4.6 and 1.3,
+which is the biased reading the split replaces.
 
 **Underspending is the claim, not a defect.** Where the multiplier reaches 0 the budget never
 binds: the arm buys its best-scoring cell outright and spends less than it was given. Each row
@@ -197,11 +227,12 @@ row with a bootstrap interval over questions.
 ## Running it
 
     cd work/spikes/s35_allocator
-    python -m unittest discover -s tests -t tests            # 97 tests, CPU, seconds
+    python -m unittest discover -s tests -t tests            # 143 tests, CPU, seconds
 
     python -m alloc.cli --cells DIR --task gsm8k --checkpoint NAME \
                         --model-config PATH | --layers-per-loop N [--fixed-layers M] \
                         [--reference NAME] [--c-gate 0.5] [--n-labels 30] \
+                        [--gate-mode split|whole] [--one-se] [--n-select 50] [--n-verify 30] \
                         [--accounting cap|realised|expected|all] [--avg-budget] \
                         [--ks 1,2,4,8] [--caps 0,64,512,4096] --out OUTDIR
 
@@ -228,9 +259,9 @@ accounting, the first of the list, so `all` tabulates three and prices the rest 
 |---|---|
 | `alloc/cells.py` | both file-name and row shapes, labels, the read-out parse, the reserve, the grid assertions, model geometry, the calibration expected-length table |
 | `alloc/mechanism.py` | arrival, `G`, `c`, `l`, `A_hat`, the reconstruction error and noise floor |
-| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, both rankings, affordability, normal operation, the gate, the average-budget multiplier |
-| `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the gate sweep |
-| `tests/` | a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a reproduction test against frozen real numbers |
+| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, both rankings, affordability, normal operation, the gate, the one-standard-error rule, the paired margin SD, the average-budget multiplier |
+| `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the calibration split, the gate sweep |
+| `tests/` | a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close and a planted cap-0 optimum it must keep, a reproduction test against frozen real numbers |
 
 Rerunning the real grids reproduces 26 frozen numbers to **0.05 points** (tolerance 0.1): headline
 and pooled gain over normal on six tasks under lookup and five under equation at 30 labels, plus

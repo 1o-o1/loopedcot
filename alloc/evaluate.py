@@ -94,6 +94,71 @@ def gate_for(cells, cal_pos, n_labels=None, c_gate=pol.DEFAULT_C_GATE, n_draws=4
     return pol.Gate(A_hat, sd, c_gate), m
 
 
+# ---------------------------------------------------------------- split calibration
+def split_calibration(cells, cal_pos, n_select=pol.DEFAULT_N_SELECT,
+                      n_verify=pol.DEFAULT_N_VERIFY):
+    """Return (selection positions, verification positions, sizes) from the calibration split.
+
+    The calibration questions are taken IN ID ORDER: the first `n_select` ids fit the ranking and
+    the multiplier, the next `n_verify` measure the margin of what was fitted. Id order rather than
+    a seeded shuffle, so the same question is in the same half whatever else the run changes, and
+    two checkpoints of one task verify on the same questions.
+
+    Nothing about the verification half may touch the fit. That is the whole repair: the old gate
+    chose the best of many cells on one set of labels and then measured that cell's margin over the
+    default cell on the SAME labels, so it read the maximum's upward bias as if it were the
+    policy's advantage.
+
+    A calibration split shorter than `n_select + n_verify` is used entire, keeping the requested
+    proportion, and the returned sizes say so with `truncated`. Two verification questions are the
+    minimum: below that the margin has no measurable spread.
+    """
+    cal = np.asarray(cal_pos, dtype=int)
+    ids = np.asarray([cells.idx[int(n)] for n in cal])
+    order = cal[np.argsort(ids, kind="stable")]
+    ns, nv = int(n_select), int(n_verify)
+    if ns < 1 or nv < 2:
+        raise ValueError("the split needs at least 1 selection and 2 verification questions, "
+                         "got %d and %d" % (ns, nv))
+    if len(order) < 3:
+        raise ValueError("a calibration split of %d cannot be halved into a selection and a "
+                         "verification half" % len(order))
+    want = ns + nv
+    truncated = len(order) < want
+    if truncated:
+        ns = min(max(1, int(round(len(order) * ns / float(want)))), len(order) - 2)
+        nv = len(order) - ns
+    sel, ver = order[:ns], order[ns:ns + nv]
+    sizes = {"n_selection": int(len(sel)), "n_verification": int(len(ver)),
+             "n_calibration": int(len(order)), "requested": [int(n_select), int(n_verify)],
+             "truncated": bool(truncated)}
+    return sel, ver, sizes
+
+
+def gate_and_fit(cells, cal_pos, n_labels, c_gate, n_draws, seed,
+                 gate_mode=pol.DEFAULT_GATE_MODE, resamples=None,
+                 n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY):
+    """Return (gate, the positions the ranking may be fitted on, the split sizes).
+
+    `split`  the order is fitted on the selection half and the gate's surface and margin SD come
+             from the verification half alone, so the cells the order chose are scored on labels
+             that had no part in choosing them.
+    `whole`  the old rule, kept for comparison: one set fits and measures.
+    """
+    if gate_mode not in pol.GATE_MODES:
+        raise ValueError("unknown gate mode %r; expected one of %s"
+                         % (gate_mode, ", ".join(pol.GATE_MODES)))
+    cal = np.asarray(cal_pos, dtype=int)
+    if gate_mode == "whole":
+        gate, _m = gate_for(cells, cal, n_labels=n_labels, c_gate=c_gate, n_draws=n_draws,
+                            seed=seed, resamples=resamples)
+        return gate, cal, {"n_selection": int(len(cal)), "n_verification": 0,
+                           "n_calibration": int(len(cal)), "requested": None, "truncated": False}
+    sel, ver, sizes = split_calibration(cells, cal, n_select, n_verify)
+    gate, _m = gate_for(cells, ver, n_labels=n_labels, c_gate=c_gate, n_draws=n_draws, seed=seed)
+    return gate, sel, sizes
+
+
 def _budget_mean(values):
     """Return the equal-weight mean of budget-wise prompt means, retaining missing prompt slots."""
     return _nanmean([_nanmean(row) for row in values])
@@ -102,7 +167,9 @@ def _budget_mean(values):
 # ---------------------------------------------------------------- gain over normal
 def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptfree=False,
                      n_budgets=pol.N_BUDGETS, n_boot=2000, n_cal_draws=100, seed=7,
-                     min_normal_feasible=0.9, gate_draws=40, accounting="cap"):
+                     min_normal_feasible=0.9, gate_draws=40, accounting="cap",
+                     gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
+                     n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY):
     """Return gains in percentage points over the budgets at which normal operation is
     affordable for at least `min_normal_feasible` of the prompts.
 
@@ -123,12 +190,20 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
     Pm, Rm = pol.median_point(cells, ev)
     cmat = pol.cost_matrix(cells, cost, Pm, Rm)
     Xs = pol.budget_grid(cmat, n_budgets)
-    order, extra = make_order(cells, cal, cost, Pm, Rm, ranking, n_labels)
-    resamples = calibration_resamples(cal, n_labels, n_cal_draws, seed)
-    gate = None
-    if c_gate and c_gate > 0:
-        gate, _ = gate_for(cells, cal, n_labels=n_labels, c_gate=c_gate,
-                           resamples=resamples)
+    c = pol.gate_constant(c_gate, one_se)
+    gate, fit_pos, gate_sizes = None, cal, None
+    if c_gate and c_gate > 0 and gate_mode == "split":
+        # Under a split the order is fitted on the selection half and the gate reads the other
+        # half, so the two cannot share one resample plan: the selection draws below resample the
+        # selection half, the gate its own.
+        gate, fit_pos, gate_sizes = gate_and_fit(cells, cal, n_labels, c, gate_draws, seed,
+                                                 gate_mode="split", n_select=n_select,
+                                                 n_verify=n_verify)
+    resamples = calibration_resamples(fit_pos, n_labels, n_cal_draws, seed)
+    if c_gate and c_gate > 0 and gate is None:
+        gate, fit_pos, gate_sizes = gate_and_fit(cells, cal, n_labels, c, gate_draws, seed,
+                                                 gate_mode=gate_mode, resamples=resamples)
+    order, extra = make_order(cells, fit_pos, cost, Pm, Rm, ranking, n_labels)
     P, reverted = pol.policy_vectors(cells, ev, cost, Xs, order, gate=gate)
     bstar, blow, rmeta = pol.budget_ranges(cells, cost, Xs, Pm, Rm)
 
@@ -152,7 +227,9 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
            "median_prompt_tokens": Pm, "median_reserve": Rm,
            "budgets": [float(x) for x in Xs], "per_budget": per_budget,
            "Bstar": bstar, "Blow": blow, "range_meta": rmeta,
-           "order_top5": [list(c) for c in order[:5]]}
+           "gate_mode": gate_mode, "one_se": bool(one_se), "gate_c": float(c),
+           "gate_sizes": gate_sizes,
+           "order_top5": [list(cc) for cc in order[:5]]}
     if extra is not None:
         out["mechanism"] = extra[1]
     if not gains:
@@ -188,13 +265,17 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
                 "n_budgets_with_normal": int(G.shape[0]), "n_eval_in_gain": int(nq)})
 
     draws = []
+    fit = np.asarray(fit_pos, dtype=int)
     for sel, label_sel in resamples:
-        od, _ = make_order(cells, cal, cost, Pm, Rm, ranking, n_labels,
+        od, _ = make_order(cells, fit, cost, Pm, Rm, ranking, n_labels,
                            boot_sel=sel, label_sel=label_sel)
         draw_gate = None
         if gate is not None:
-            draw_hat, _ = surface(cells, cal[sel], label_pos=cal[label_sel])
-            draw_gate = pol.Gate(draw_hat, gate.sd, c_gate)
+            # The gate surface stays the one the VERIFICATION half fitted (or the whole set under
+            # `whole`); only the order is redrawn, which is what this bootstrap measures.
+            draw_gate = (pol.Gate(gate.A_hat, gate.sd, c) if gate_mode == "split" else
+                         pol.Gate(surface(cells, fit[sel], label_pos=fit[label_sel])[0],
+                                  gate.sd, c))
         Pd, _rev = pol.policy_vectors(cells, ev, cost, Xs, od, gate=draw_gate)
         gs = []
         for xi in range(len(Xs)):
@@ -226,7 +307,8 @@ def assert_paired(cells_a, cells_b):
 
 def contrast(cells_a, cells_b, which="Bstar", ranking="lookup", n_labels=None, c_gate=0.0,
              promptfree=False, n_budgets=pol.N_BUDGETS, n_boot=2000, seed=7, gate_draws=40,
-             accounting="cap"):
+             accounting="cap", gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
+             n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY):
     """Return the paired difference cells_a minus cells_b in percentage points.
 
     `cells_b` is the REFERENCE: its median prompt, its own cost function and its cost matrix fix
@@ -248,12 +330,16 @@ def contrast(cells_a, cells_b, which="Bstar", ranking="lookup", n_labels=None, c
     if not rng_idx:
         return {"range": which, "empty": True, "reference": cells_b.name}
     Xr = [Xs[i] for i in rng_idx]
-    oa, _ = make_order(cells_a, cal_a, ca, Pm, Rm, ranking, n_labels)
-    ob, _ = make_order(cells_b, cal_b, cb, Pm, Rm, ranking, n_labels)
     ga = gb = None
+    fa, fb = cal_a, cal_b
     if c_gate and c_gate > 0:
-        ga, _ = gate_for(cells_a, cal_a, n_labels, c_gate, gate_draws, seed)
-        gb, _ = gate_for(cells_b, cal_b, n_labels, c_gate, gate_draws, seed)
+        c = pol.gate_constant(c_gate, one_se)
+        ga, fa, _sa = gate_and_fit(cells_a, cal_a, n_labels, c, gate_draws, seed, gate_mode,
+                                   n_select=n_select, n_verify=n_verify)
+        gb, fb, _sb = gate_and_fit(cells_b, cal_b, n_labels, c, gate_draws, seed, gate_mode,
+                                   n_select=n_select, n_verify=n_verify)
+    oa, _ = make_order(cells_a, fa, ca, Pm, Rm, ranking, n_labels)
+    ob, _ = make_order(cells_b, fb, cb, Pm, Rm, ranking, n_labels)
     Pa, _ra = pol.policy_vectors(cells_a, ev_a, ca, Xr, oa, gate=ga)
     Pb, _rb = pol.policy_vectors(cells_b, ev_b, cb, Xr, ob, gate=gb)
     D = np.stack([Pa[j][0] - Pb[j][0] for j in range(len(rng_idx))])
@@ -277,7 +363,9 @@ def contrast(cells_a, cells_b, which="Bstar", ranking="lookup", n_labels=None, c
 
 def noninferiority(cells_a, cells_b, ranking="lookup", n_labels=None, c_gate=0.0,
                    promptfree=False, n_budgets=pol.N_BUDGETS, n_boot=2000, seed=7,
-                   margin_pts=NI_MARGIN_PTS, gate_draws=40, accounting="cap"):
+                   margin_pts=NI_MARGIN_PTS, gate_draws=40, accounting="cap",
+                   gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
+                   n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY):
     """Return paired top-three-budget differences and one-sided 95% bound in percentage points, with power at zero true effect."""
     assert_paired(cells_a, cells_b)
     rng = np.random.default_rng(seed)
@@ -292,12 +380,16 @@ def noninferiority(cells_a, cells_b, ranking="lookup", n_labels=None, c_gate=0.0
         return {"empty": True}
     top = bstar[-3:]
     Xr = [Xs[i] for i in top]
-    oa, _ = make_order(cells_a, cal_a, ca, Pm, Rm, ranking, n_labels)
-    ob, _ = make_order(cells_b, cal_b, cb, Pm, Rm, ranking, n_labels)
     ga = gb = None
+    fa, fb = cal_a, cal_b
     if c_gate and c_gate > 0:
-        ga, _ = gate_for(cells_a, cal_a, n_labels, c_gate, gate_draws, seed)
-        gb, _ = gate_for(cells_b, cal_b, n_labels, c_gate, gate_draws, seed)
+        c = pol.gate_constant(c_gate, one_se)
+        ga, fa, _sa = gate_and_fit(cells_a, cal_a, n_labels, c, gate_draws, seed, gate_mode,
+                                   n_select=n_select, n_verify=n_verify)
+        gb, fb, _sb = gate_and_fit(cells_b, cal_b, n_labels, c, gate_draws, seed, gate_mode,
+                                   n_select=n_select, n_verify=n_verify)
+    oa, _ = make_order(cells_a, fa, ca, Pm, Rm, ranking, n_labels)
+    ob, _ = make_order(cells_b, fb, cb, Pm, Rm, ranking, n_labels)
     Pa, _ = pol.policy_vectors(cells_a, ev_a, ca, Xr, oa, gate=ga)
     Pb, _ = pol.policy_vectors(cells_b, ev_b, cb, Xr, ob, gate=gb)
     D = np.stack([Pa[j][0] - Pb[j][0] for j in range(len(top))])
@@ -369,6 +461,16 @@ def default_cell(cells):
     return cells.ks[-1], cells.caps[C.natural_stop_cap_index(cells)]
 
 
+def _gate_fields(gate_mode, c, sizes):
+    """Return the gate columns every gated row carries: the mode, the bar, and both half sizes."""
+    sizes = sizes or {"n_selection": 0, "n_verification": 0, "truncated": False}
+    return {"gate_mode": gate_mode, "gate_c": float(c),
+            "gate_n_selection": int(sizes.get("n_selection", 0)),
+            "gate_n_verification": int(sizes.get("n_verification", 0)),
+            "gate_n_calibration": int(sizes.get("n_calibration", 0)),
+            "gate_split_truncated": bool(sizes.get("truncated", False))}
+
+
 def _paired_vs_default(arm, ref, rng, n_boot):
     """Return the paired arm-minus-reference accuracy difference in percentage points with a
     bootstrap interval over prompts; prompts either side cannot afford drop out of the pair.
@@ -388,7 +490,8 @@ def _paired_vs_default(arm, ref, rng, n_boot):
 
 def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAULT_C_GATE,
            n_labels_grid=(30, 100), seed=7, gate_draws=40, accounting="cap", n_boot=400,
-           avg_budget=False):
+           avg_budget=False, gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
+           n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY):
     """Return each arm's accuracy in percentage points at budgets set to `fractions` of the default
     cost (the mean realised layer-token cost of the deepest depth run to its natural stop).
 
@@ -408,6 +511,12 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
     every prompt is itself a feasible policy, so those rows are the like-for-like comparison with
     the `default` row; each carries its realised mean price beside the budget it was fitted to.
     They need a decision-time price and are therefore skipped under `realised` accounting.
+
+    `gate_mode` decides where the two gated arms measure their margin. Under `split` the
+    calibration questions are cut in id order into `n_select` that fit the ranking and the
+    multiplier and `n_verify` that measure the margin of what was fitted; under `whole` one set
+    does both, which is the rule that let the winner curse through. `one_se` raises the bar from
+    c_gate standard errors to one whole standard error.
     """
     rng = np.random.default_rng(seed)
     cost = pol.cost_of(cells, promptfree, accounting=accounting)
@@ -425,9 +534,12 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
     for nl in n_labels_grid:
         arms.insert(-1, ("equation_n%d" % nl, dict(ranking="equation", n_labels=nl)))
 
-    gate = None
+    c = pol.gate_constant(c_gate, one_se)
+    gate, gate_fit, gate_sizes = None, cal, None
     if c_gate and c_gate > 0:
-        gate, _ = gate_for(cells, cal, c_gate=c_gate, n_draws=gate_draws, seed=seed)
+        gate, gate_fit, gate_sizes = gate_and_fit(cells, cal, None, c, gate_draws, seed,
+                                                  gate_mode=gate_mode, n_select=n_select,
+                                                  n_verify=n_verify)
 
     default_acc_pts = 100 * float(np.nanmean(dacc))
     default_feasible = [bool(pol.affordable(dc["mean"], X)) for X in Xs]
@@ -456,14 +568,20 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
 
     normal_done, normal_vecs = False, None
     for name, spec in arms:
-        order, _ = make_order(cells, cal, cost, Pm, Rm, spec["ranking"], spec.get("n_labels"))
-        g = gate if spec.get("gate") else None
+        gated = bool(spec.get("gate")) and gate is not None
+        # A gated arm is fitted on the SELECTION half only, so the cells its order chose are
+        # scored by the gate on labels that had no part in choosing them.
+        fit_pos = gate_fit if gated else cal
+        order, _ = make_order(cells, fit_pos, cost, Pm, Rm, spec["ranking"], spec.get("n_labels"))
+        g = gate if gated else None
         P, rev = pol.policy_vectors(cells, ev, cost, Xs, order, gate=g)
         rows[name] = {"acc_pts": [100 * _nanmean(P[j][0]) for j in range(len(Xs))],
                       "feasible_frac": [float(np.mean(~np.isnan(P[j][0]))) for j in range(len(Xs))],
                       "gate_reverted_frac": list(rev),
                       "vs_default": [_paired_vs_default(P[j][0], dacc, rng, n_boot)
                                      for j in range(len(Xs))]}
+        if gated:
+            rows[name].update(_gate_fields(gate_mode, c, gate_sizes))
         if not normal_done:
             normal_vecs = [P[j][1] for j in range(len(Xs))]
             rows["default_at_budget"] = {
@@ -479,7 +597,8 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
         score = cell_scores(cells, cal, name, cost, Pm, Rm)
         if name == pol.AVG_GATED:
             V = avg_gated_vectors(cells, ev, cal, cost, Xs, score, (dk, dT), c_gate=c_gate,
-                                  n_draws=gate_draws, seed=seed)
+                                  n_draws=gate_draws, seed=seed, gate_mode=gate_mode,
+                                  one_se=one_se, n_select=n_select, n_verify=n_verify)
         else:
             V = pol.avg_budget_vectors(cells, ev, cal, cost, Xs, score)
         rows[name] = {
@@ -502,6 +621,7 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             "gate_reverted": [bool(v.get("gate_reverted", False)) for v in V],
             "gate_margin_pts": [v.get("gate_margin_pts") for v in V],
             "gate_sd_pts": [v.get("gate_sd_pts") for v in V],
+            "gate_draw_frac_positive": [v.get("gate_draw_frac_positive") for v in V],
             # gain over normal is not defined for an average budget: normal operation is a
             # per-prompt cap policy and the two are not priced the same way. The paired
             # differences below are what stands in its place.
@@ -509,43 +629,121 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
                            for j in range(len(Xs))],
             "vs_default_at_budget": [_paired_vs_default(V[j]["acc"], normal_vecs[j], rng, n_boot)
                                      for j in range(len(Xs))]}
+        if name == pol.AVG_GATED:
+            rows[name].update(_gate_fields(gate_mode, c,
+                                           V[0].get("gate_sizes") if V else gate_sizes))
     return {"task": cells.task, "grid": cells.name, "promptfree": bool(promptfree),
             "accounting": accounting, "fractions": list(fractions), "avg_budget": avg_on,
             "budgets": [float(x) for x in Xs],
-            "default_cost": dc, "n_eval": int(len(ev)), "c_gate": float(c_gate), "rows": rows}
+            "default_cost": dc, "n_eval": int(len(ev)), "c_gate": float(c_gate),
+            "gate_mode": gate_mode, "one_se": bool(one_se), "gate_c": float(c),
+            "gate_sizes": gate_sizes, "rows": rows}
 
 
 # ---------------------------------------------------------------- the average budget, gated
+def cell_scores_boot(cells, cal_pos, cost, Pm, Rm, boot_sel):
+    """Return the lookup score surface on one bootstrap resample of the given calibration prompts."""
+    _order, acc = pol.rank_lookup(cells, cal_pos, cost, Pm, Rm, boot_sel=boot_sel)
+    return np.array([[acc[(k, T)] for T in cells.caps] for k in cells.ks], float)
+
+
+def _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X):
+    """Overwrite one record with the fallback: the default cell run for every evaluation prompt."""
+    price = np.array([cost(default_kt[0], default_kt[1], cells.ptok[n], cells.reserve[n], n)
+                      for n in ev], float)
+    mean_price = float(price.mean())
+    rec.update({"acc": cells.acc[ki, bi, ev], "price": price, "mean_price": mean_price,
+                "mean_price_over_X_pct": 100.0 * (mean_price / float(X) - 1.0),
+                "over_budget": bool(mean_price > float(X) * (1.0 + pol.AVG_TOL)),
+                "cells_used": {"k%d_T%d" % default_kt: int(len(ev))},
+                "gate_reverted": True})
+
+
 def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
-                      c_gate=pol.DEFAULT_C_GATE, n_draws=40, seed=7, n_labels=None):
+                      c_gate=pol.DEFAULT_C_GATE, n_draws=40, seed=7, n_labels=None,
+                      gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
+                      n_select=pol.DEFAULT_N_SELECT, n_verify=pol.DEFAULT_N_VERIFY,
+                      gate_boot=pol.GATE_BOOT):
     """Return the records of `avg_gated_lookup`: the average-budget lookup policy, kept only where
-    it is predicted to beat running the DEFAULT CELL for every prompt by more than its own noise.
+    it is measured to beat running the DEFAULT CELL for every prompt by more than its own noise.
 
-    Both sides are read on the calibration prompts, in the units the ranking scores in: the policy
-    is worth the mean of `score` over the cells it picks for those prompts, and the fallback is
-    worth `score` at the default cell. The SD of that margin comes from the same calibration
-    resamples the rest of the package gates on -- each draw re-scores the cells, refits the
-    multiplier on the resampled prompts and remeasures the margin -- and the decision is
-    `policy.gate_passes`, the rule the per-prompt gate uses.
+    Under `split` (the default) the calibration questions are cut in id order into a SELECTION half
+    and a VERIFICATION half. The ranking and the multiplier are fitted on the selection half alone.
+    The margin is then the paired accuracy difference, over the VERIFICATION questions, between the
+    cells that policy picks for them and the default cell, and its SD is a paired bootstrap over
+    those same questions. Neither number can be inflated by the choice of cell, because the labels
+    that chose the cell are in the other half.
 
-    The fallback exists only where the default cell fits the budget ON AVERAGE over the calibration
-    prompts. Below that there is nothing to revert to and the Lagrangian policy stands.
+    Under `whole` the old rule is restored for comparison: the policy is scored, and its margin
+    measured, on all of the calibration questions in the ranking own score units, with the SD taken
+    over calibration resamples that re-score and refit. That margin is the maximum of many noisy
+    cells read on the data that maximised it, so it runs optimistic by roughly the noise spread
+    times how many cells were in the running -- the winner curse this repair removes.
+
+    `one_se` replaces c_gate with a whole standard error. The fallback exists only where the
+    default cell fits the budget ON AVERAGE over the calibration prompts; below that there is
+    nothing to revert to and the Lagrangian policy stands.
     """
+    if gate_mode not in pol.GATE_MODES:
+        raise ValueError("unknown gate mode %r; expected one of %s"
+                         % (gate_mode, ", ".join(pol.GATE_MODES)))
     ev, cal = np.asarray(ev_pos, dtype=int), np.asarray(cal_pos, dtype=int)
     Pm, Rm = pol.median_point(cells, ev)
     ki = list(cells.ks).index(default_kt[0])
     bi = list(cells.caps).index(default_kt[1])
-    S = np.asarray(score, float)
+    c = pol.gate_constant(c_gate, one_se)
     cal_prices = pol.price_tensor(cells, cal, cost)
+    on = bool(c_gate) and float(c_gate) > 0
+
+    if gate_mode == "split":
+        sel, ver, sizes = split_calibration(cells, cal, n_select, n_verify)
+        S = cell_scores(cells, sel, pol.AVG_GATED, cost, Pm, Rm, n_labels=n_labels)
+        sel_prices = pol.price_tensor(cells, sel, cost)
+        ver_prices = pol.price_tensor(cells, ver, cost)
+        ref = np.asarray(cells.acc[ki, bi, ver], float)
+        # The multiplier is fitted on the selection half, so that is the half the arm is fitted
+        # to; the evaluation mean price stays a measurement, as it is for the ungated arms.
+        out = pol.avg_budget_vectors(cells, ev, sel, cost, Xs, S)
+        plan = calibration_resamples(sel, n_labels, n_draws, seed) if on else []
+        for j, X in enumerate(Xs):
+            rec = out[j]
+            rec.update({"gate_mode": "split", "gate_c": c, "gate_margin_pts": None,
+                        "gate_sd_pts": None, "gate_reverted": False,
+                        "gate_draw_frac_positive": None, "gate_sizes": sizes})
+            if not on or not pol.affordable(float(cal_prices[ki, bi, :].mean()), X):
+                continue
+            a, b = pol.avg_picks(S, ver_prices, rec["lambda"])
+            arm = np.asarray(cells.acc[a, b, ver], float)
+            margin = _nanmean(arm - ref)
+            sd = pol.paired_margin_sd(arm, ref, n_boot=gate_boot, seed=seed)
+            # The selection half is bootstrapped in its turn: each draw refits the score and the
+            # multiplier on a resample of it and remeasures the same verification margin, so the
+            # share positive says how much of the verdict is the selection half own luck.
+            pos = []
+            for dsel, _lab in plan:
+                Sd = cell_scores_boot(cells, sel, cost, Pm, Rm, dsel)
+                lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
+                ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
+                pos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
+            rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
+            rec["gate_draw_frac_positive"] = float(np.mean(pos)) if pos else None
+            if pol.gate_passes(margin, sd, c):
+                continue
+            _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X)
+        return out
+
+    S = np.asarray(score, float)
+    sizes = {"n_selection": int(len(cal)), "n_verification": 0, "n_calibration": int(len(cal)),
+             "requested": None, "truncated": False}
     out = pol.avg_budget_vectors(cells, ev, cal, cost, Xs, S)
-    plan = calibration_resamples(cal, n_labels, n_draws, seed) if (c_gate and c_gate > 0) else []
-    draw_scores = [np.array([[acc[(k, T)] for T in cells.caps] for k in cells.ks], float)
-                   for acc in [pol.rank_lookup(cells, cal, cost, Pm, Rm, boot_sel=sel)[1]
-                               for sel, _lab in plan]]
+    plan = calibration_resamples(cal, n_labels, n_draws, seed) if on else []
+    draw_scores = [cell_scores_boot(cells, cal, cost, Pm, Rm, sel) for sel, _lab in plan]
     for j, X in enumerate(Xs):
         rec = out[j]
-        rec["gate_margin_pts"], rec["gate_sd_pts"], rec["gate_reverted"] = None, None, False
-        if not pol.affordable(float(cal_prices[ki, bi, :].mean()), X):
+        rec.update({"gate_mode": "whole", "gate_c": c, "gate_margin_pts": None,
+                    "gate_sd_pts": None, "gate_reverted": False,
+                    "gate_draw_frac_positive": None, "gate_sizes": sizes})
+        if not on or not pol.affordable(float(cal_prices[ki, bi, :].mean()), X):
             continue
         a, b = pol.avg_picks(S, cal_prices, rec["lambda"])
         margin = float(np.nanmean(S[a, b]) - S[ki, bi])
@@ -557,16 +755,11 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
             draws.append(float(np.nanmean(Sd[ad, bd]) - Sd[ki, bi]))
         sd = float(np.std(draws)) if draws else 0.0
         rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
-        if pol.gate_passes(margin, sd, c_gate):
+        rec["gate_draw_frac_positive"] = (float(np.mean([d > 0 for d in draws]))
+                                          if draws else None)
+        if pol.gate_passes(margin, sd, c):
             continue
-        price = np.array([cost(default_kt[0], default_kt[1], cells.ptok[n], cells.reserve[n], n)
-                          for n in ev], float)
-        mean_price = float(price.mean())
-        rec.update({"acc": cells.acc[ki, bi, ev], "price": price, "mean_price": mean_price,
-                    "mean_price_over_X_pct": 100.0 * (mean_price / float(X) - 1.0),
-                    "over_budget": bool(mean_price > float(X) * (1.0 + pol.AVG_TOL)),
-                    "cells_used": {"k%d_T%d" % default_kt: int(len(ev))},
-                    "gate_reverted": True})
+        _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X)
     return out
 
 
@@ -607,6 +800,35 @@ def gate_selection(cells_by_task, c_grid=(0.0, 0.5, 1.0, 1.5, 2.0), worst_floor_
                                if chosen is not None else None),
             "per_task": {"%s|%s" % (t, c): {"mean_pts": per[(t, c)][0],
                                             "worst_pts": per[(t, c)][1]} for (t, c) in per}}
+
+
+def _gate_lines(t1, name, r):
+    """Return the gate note for each budget where the arm had a fallback to deviate from.
+
+    At 1.0x the note carries the VERIFICATION margin and its SD beside the cost saving, so a reader
+    can see what the deviation was measured to be worth and on how many held-out questions, rather
+    than only that the gate opened.
+    """
+    mode = r.get("gate_mode", t1.get("gate_mode", "whole"))
+    c = r.get("gate_c", t1.get("c_gate"))
+    where = ("%d verification questions, the ids after the %d that fit, out of %d calibration"
+             % (r.get("gate_n_verification", 0), r.get("gate_n_selection", 0),
+                r.get("gate_n_calibration", 0))
+             if mode == "split" else
+             "all %d calibration questions, which both fit and measure"
+             % r.get("gate_n_selection", 0))
+    lines = []
+    for j, f in enumerate(t1["fractions"]):
+        m, sd = r["gate_margin_pts"][j], r["gate_sd_pts"][j]
+        if m is None or sd is None:
+            continue                       # no fallback at this budget: nothing to gate against
+        verdict = ("reverted to the default cell for every question"
+                   if r["gate_reverted"][j] else "deviated from the default cell")
+        lines.append("- `%s` at %.2fx: %s. %s margin %+.1f points, sd %.1f, bar %.2f sd (%s); "
+                     "cost saving %.1f%% of the budget, %.1f%% of the default cost."
+                     % (name, f, verdict, "Verification" if mode == "split" else "Calibration",
+                        m, sd, c, where, r["cost_saving_pct"][j], r["pct_of_default_cost"][j]))
+    return lines
 
 
 def table1_markdown(t1):
@@ -676,12 +898,7 @@ def table1_markdown(t1):
                            "under the budget it was given."
                            % (n, f, r["acc_pts"][j], r["pct_of_default_cost"][j],
                               r["cost_saving_pct"][j]))
-        if any(r["gate_reverted"]):
-            out.append("- `%s` reverted to the default cell for every question at %s: the "
-                       "predicted calibration margin did not clear %.2f of its own SD."
-                       % (n, ", ".join("%.2fx" % f for f, g
-                                       in zip(t1["fractions"], r["gate_reverted"]) if g),
-                          t1["c_gate"]))
+        out += _gate_lines(t1, n, r)
     out += ["", "`not feasible` = the arm itself costs more than that budget, so it cannot be run "
             "there at all. `n/a` = the arm could run in principle but no question can afford any "
             "of its cells at that budget. A percentage in brackets is the share of questions that "

@@ -23,6 +23,18 @@ def _args(argv=None):
                         "answer letter and re-derive the calibration split")
     p.add_argument("--out", required=True)
     p.add_argument("--c-gate", type=float, default=P.DEFAULT_C_GATE)
+    p.add_argument("--gate-mode", default=P.DEFAULT_GATE_MODE, choices=list(P.GATE_MODES),
+                   help="where the gated arms measure their margin: `split` fits the ranking and "
+                        "the multiplier on the first --n-select calibration ids and measures the "
+                        "margin on the next --n-verify, which took no part in the fit; `whole` is "
+                        "the old rule, one set fitting and measuring, kept for comparison")
+    p.add_argument("--one-se", action="store_true",
+                   help="the one-standard-error rule: deviate only on a margin above 1.0 sd, "
+                        "whatever --c-gate says")
+    p.add_argument("--n-select", type=int, default=P.DEFAULT_N_SELECT,
+                   help="calibration ids, in id order, that fit the ranking and the multiplier")
+    p.add_argument("--n-verify", type=int, default=P.DEFAULT_N_VERIFY,
+                   help="the ids after those, which measure the gate margin and nothing else")
     p.add_argument("--n-labels", type=int, default=None)
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--cal-draws", type=int, default=100)
@@ -128,8 +140,12 @@ def main(argv=None):
                 L=L, L_fixed=L_fixed)
     cards = {cs.name: card(cs, a.n_labels)}
     accs, primary = accountings_of(a)
+    gate_kw = dict(gate_mode=a.gate_mode, one_se=bool(a.one_se),
+                   n_select=a.n_select, n_verify=a.n_verify)
     res = {"task": a.task, "checkpoint": a.checkpoint, "reference": a.reference,
            "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
+           "gate_mode": a.gate_mode, "one_se": bool(a.one_se),
+           "n_select": a.n_select, "n_verify": a.n_verify,
            "accounting": a.accounting, "accounting_priced": primary,
            "accountings_tabulated": accs, "gain": {}}
     arms = [("lookup", dict(ranking="lookup", c_gate=0.0)),
@@ -140,10 +156,10 @@ def main(argv=None):
     for name, spec in arms:
         res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
                                                n_cal_draws=a.cal_draws, seed=a.seed,
-                                               accounting=primary, **spec)
+                                               accounting=primary, **dict(gate_kw, **spec))
     res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
     tables = {acc: E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed,
-                            accounting=acc, avg_budget=a.avg_budget) for acc in accs}
+                            accounting=acc, avg_budget=a.avg_budget, **gate_kw) for acc in accs}
     t1 = tables[primary]
     res["table1"] = t1
     res["table1_by_accounting"] = tables

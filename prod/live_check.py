@@ -179,6 +179,12 @@ def run_live(model, task, chosen, row_ids, out_dir, python=None, adapter=None, h
                      "cmd": " ".join(cmd)})
         print("[live] k=%d B=%d n=%d rc=%d %.0fs" % (k, B, len(ids), rc, runs[-1]["seconds"]),
               flush=True)
+    bad = [r for r in runs if r["rc"] != 0]
+    if bad:
+        print("live check FAILED: %d of %d generations exited non-zero (first: k=%d B=%d rc=%d); the "
+              "result would be partial, so none is written" % (len(bad), len(runs), bad[0]["k"],
+                                                                 bad[0]["B"], bad[0]["rc"]), flush=True)
+        sys.exit(2)
     return runs
 
 
@@ -277,6 +283,10 @@ def main(argv=None):
                     cfg["horizon"], [x for x in a.extra.split() if x])
     live = collect_live(runs, chosen)
     have = [r for r in row_ids if r in live]
+    if row_ids and not have:
+        print("live check FAILED: no live row was generated (every generation exited non-zero; see the "
+              "[live] lines above, rc != 0)", flush=True)
+        sys.exit(2)
     # the grid's own label for the SAME rows and the SAME cells, so the comparison is paired
     ki = {k: i for i, k in enumerate(grid.ks)}
     bi = {b: i for i, b in enumerate(grid.Bs)}
@@ -354,6 +364,10 @@ def main_avg(a, cfg, cells_dir):
                     live[rid] = bool(row["correct_v2"])
                     live_price[rid] = float(row.get("layer_passes") or float("nan"))
     have = [r for r in row_ids if r in live]
+    if row_ids and not have:
+        print("live check FAILED: no live row was generated (every generation exited non-zero; see the "
+              "[live] lines above, rc != 0)", flush=True)
+        sys.exit(2)
     live_acc = float(np.mean([live[r] for r in have])) if have else None
     grid_acc = float(np.mean([grid_lab[r] for r in have])) if have else None
     grid_price = float(np.nanmean([cs.passes[ki[chosen[r][0]], bi[chosen[r][1]], ni[r]] for r in have])) if have else None

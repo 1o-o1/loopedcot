@@ -320,7 +320,8 @@ class TestRealGrids(unittest.TestCase):
     # over or under X is decided by how the prompts either side of the threshold split between the
     # two halves; at 0.25x on MATH500 the two cells in play are 24 and 48 layers per token with a
     # 512-token chain between them, so one prompt crossing moves the mean by about a percent.
-    OVER_TWO_PERCENT = {("math500", "avg_equation", 0.25): 2.30}
+    OVER_TWO_PERCENT = {("math500", "avg_equation", 0.25): 2.30,
+                        ("math500", "avg_gated_lookup", 0.25): 2.30}
 
     def test_the_mean_price_holds_within_two_percent_or_is_flagged(self):
         for task in self.TASKS:
@@ -366,17 +367,24 @@ class TestRealGrids(unittest.TestCase):
             self.assertGreaterEqual(row["acc_pts"][ONE], default - 1e-9, task)
 
     def test_the_gate_reverts_where_the_margin_is_noise_and_not_where_it_is_not(self):
-        """GSM8K: the policy's cheaper cell ties the default cell on the calibration prompts, so
-        the margin is zero and the arm goes back to the default. MATH500: an 8-point predicted
-        margin against a 4-to-5-point SD clears 0.5 SD, so the policy stands."""
+        """Measured on the VERIFICATION half, the 30 calibration ids after the 50 that fit.
+
+        GSM8K: the policy's cheaper cell is 10 points BEHIND the default cell on questions that
+        took no part in choosing it, so the arm goes back to the default. MATH500: depth 3 is 16.7
+        points ahead of the default cell there against a 7-point SD, so the policy stands and the
+        row keeps the accuracy it bought.
+        """
         gsm = real_table("gsm8k")["rows"][P.AVG_GATED]
         self.assertTrue(gsm["gate_reverted"][ONE])
-        self.assertLess(abs(gsm["gate_margin_pts"][ONE]), 0.5 * gsm["gate_sd_pts"][ONE])
+        self.assertLessEqual(gsm["gate_margin_pts"][ONE], 0.5 * gsm["gate_sd_pts"][ONE])
         math = real_table("math500")["rows"][P.AVG_GATED]
         self.assertFalse(math["gate_reverted"][ONE])
         self.assertGreater(math["gate_margin_pts"][ONE], 0.5 * math["gate_sd_pts"][ONE])
         self.assertGreater(math["acc_pts"][ONE], real_table("math500")["rows"]["default"]
                            ["acc_pts"][ONE])
+        for row in (gsm, math):
+            self.assertEqual((row["gate_n_selection"], row["gate_n_verification"]),
+                             (P.DEFAULT_N_SELECT, P.DEFAULT_N_VERIFY))
 
     def test_the_underspend_at_one_times_is_a_saving_not_a_shortfall(self):
         for task in self.TASKS:
@@ -409,9 +417,15 @@ class TestTheGatedArm(unittest.TestCase):
     constant large enough sends every deviation back to the default cell.
     """
 
+    # These two read the gate CONSTANT at its ends, so they hold the fit fixed and use the
+    # whole-set gate. The planted rows make correctness a function of `i % 100`, so the first 50
+    # calibration ids saturate every cell scoring 0.5 or better and an id-ordered half of THIS
+    # fixture is not representative of it; the split rule is exercised on the independent-noise
+    # grids in tests/test_split_gate.py instead.
     def _table(self, c_gate):
         return E.table1(planted(BEAT), accounting="expected", avg_budget=True,
-                        n_labels_grid=(10,), gate_draws=8, n_boot=30, c_gate=c_gate)
+                        n_labels_grid=(10,), gate_draws=8, n_boot=30, c_gate=c_gate,
+                        gate_mode="whole")
 
     def test_a_zero_gate_keeps_the_policy_and_a_large_one_reverts(self):
         keep = self._table(0.0)

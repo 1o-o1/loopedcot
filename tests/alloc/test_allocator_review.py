@@ -86,6 +86,8 @@ class ReviewTests(unittest.TestCase):
         self.assertIsNotNone(got["pooled_gain_ci95_pts"])
 
     def test_gate_and_calibration_reranking_share_draws(self):
+        """Under the WHOLE-set gate one resample plan serves both; a split gate cannot share one,
+        because the order is fitted on the selection half and the gate reads the other half."""
         cs = synth.cells(n=40, n_cal=20)
         cal = cs.select("cal")
         plan = E.calibration_resamples(cal, 5, 8, 4)
@@ -101,7 +103,8 @@ class ReviewTests(unittest.TestCase):
             return original(*args, **kwargs)
         with patch.object(E, "make_order", side_effect=record), patch.object(E, "gate_for", wraps=E.gate_for) as fitted:
             E.gain_over_normal(cs, ranking="equation", n_labels=5, c_gate=.5,
-                               n_cal_draws=8, gate_draws=2, n_boot=3, seed=4)
+                               n_cal_draws=8, gate_draws=2, n_boot=3, seed=4,
+                               gate_mode="whole")
         supplied = fitted.call_args.kwargs["resamples"]
         self.assertEqual(len(seen), 8)
         for actual, expected in zip(seen, supplied):

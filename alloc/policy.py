@@ -8,6 +8,33 @@ DEFAULT_C_GATE = 0.5
 N_BUDGETS = 16
 BUDGET_TOL = 1e-9
 
+# How the gate measures its margin.
+#   `split`  the calibration questions are halved once, by seed: the SELECTION half fits the
+#            ranking and the multiplier, the VERIFICATION half measures the margin of what was
+#            fitted. The two halves are independent, so the margin is unbiased.
+#   `whole`  the old rule: fit and measure on all of the calibration questions. The policy is the
+#            argmax over many cells of the same labels the margin is then read on, so the margin
+#            carries the maximum's upward bias -- the winner's curse -- and c_gate * sd does not
+#            cover it. Kept under a flag so the two can be compared.
+GATE_MODES = ("split", "whole")
+DEFAULT_GATE_MODE = "split"
+# The one-standard-error rule: demand a whole SD of margin instead of c_gate of one.
+ONE_SE_C_GATE = 1.0
+# The split is by COUNT, not by fraction, and it is taken in id order: the first N_SELECT
+# calibration ids fit, the next N_VERIFY verify. A count keeps the verification half the same size
+# whatever the task's calibration split happens to be, so the margin's SD is comparable across
+# tasks; a fraction would not be.
+#
+# 50/30 is the FROZEN default, swept over {50/50, 100/20, 50/30} on the ten S33 spike grids (five
+# tasks, two checkpoints) at 1.0x of the default cost. 100/20 is unreachable there -- every one of
+# those grids has exactly 100 calibration ids -- and 50/50 closes the one true deviation in the
+# set, MATH500 A0 at depth 3, which is worth +3.3 points for a 21.5 percent saving. 50/30 keeps it,
+# opens no deviation that loses beyond its interval, and spends 8.6 percent under budget against
+# the old whole-set gate's 8.1 at the same mean accuracy.
+DEFAULT_N_SELECT = 50
+DEFAULT_N_VERIFY = 30
+GATE_BOOT = 2000                # resamples of the verification questions behind the margin SD
+
 # The three ways to price a cell. `cap` and `expected` are decision-time prices; `realised` needs
 # the generation it is pricing and is an audit number only (see Cost).
 ACCOUNTINGS = ("cap", "realised", "expected")
@@ -190,12 +217,42 @@ class Gate(object):
 
 
 def gate_passes(margin, sd, c_gate=DEFAULT_C_GATE):
-    """Return whether a predicted accuracy margin clears c_gate times its own calibration SD.
+    """Return whether a predicted accuracy margin clears c_gate times its own SD.
 
     One rule, shared by the per-prompt gate above and by the average-budget gate, which measures
-    its margin between two whole policies rather than between two cells.
+    its margin between two whole policies rather than between two cells. A margin or an SD that is
+    not a number never passes, so a margin the data cannot support leaves normal operation alone.
     """
-    return bool(float(margin) > float(c_gate) * float(sd))
+    m, s = float(margin), float(sd)
+    if np.isnan(m) or np.isnan(s):
+        return False
+    return bool(m > float(c_gate) * s)
+
+
+def gate_constant(c_gate=DEFAULT_C_GATE, one_se=False):
+    """Return the number of SDs of margin the gate demands: c_gate, or 1.0 under one_se.
+
+    The one-standard-error rule is the conventional conservative choice: it asks the deviation to
+    be a whole standard error clear of the fallback before it is taken, rather than half of one.
+    """
+    return ONE_SE_C_GATE if one_se else float(c_gate)
+
+
+def paired_margin_sd(arm, ref, n_boot=GATE_BOOT, seed=7):
+    """Return the bootstrap SD of the PAIRED mean accuracy margin arm - ref, in accuracy fractions.
+
+    The questions are resampled with replacement and both arms are read on the same resample, so
+    the spread is the spread of the difference and not the sum of two independent spreads. A pair
+    with fewer than two defined differences has no measurable spread and comes back NaN, which
+    `gate_passes` refuses.
+    """
+    d = np.asarray(arm, float) - np.asarray(ref, float)
+    d = d[~np.isnan(d)]
+    if len(d) < 2:
+        return float("nan")
+    rng = np.random.default_rng(int(seed))
+    idx = rng.integers(0, len(d), (int(n_boot), len(d)))
+    return float(d[idx].mean(axis=1).std())
 
 
 # ---------------------------------------------------------------- per-prompt policy

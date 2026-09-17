@@ -150,6 +150,8 @@ realised at that cell, the decision-time price the average-budget arms are fitte
 charged what their rows actually generated, an audit price). `prod.live_check --arm avg_gated_lookup` regenerates every
 evaluation prompt at that arm's pick and prints n, live accuracy, grid accuracy at the same picks, live minus grid in
 points, and the mean realised price against the budget; `--arm lookup` (default) is the per-prompt cap rule as before.
+The allocator's gate verifies every deviation from the default on held-out calibration questions (50 to select, 30 to
+verify, the default split), and Table 1 prints the verified margin beside each deviation.
 
 ## 6. What the queue is
 
