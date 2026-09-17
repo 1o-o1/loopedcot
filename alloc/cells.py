@@ -299,8 +299,11 @@ class Cells(object):
 
 
 # ---------------------------------------------------------------- directory loading
-def cell_paths(cells_dir, task, checkpoint):
+def cell_paths(cells_dir, task, checkpoint, protocol="natural"):
     """Return every existing JSONL path holding cells for one task and one checkpoint, sorted.
+
+    Only the `protocol` grid (natural stop by default): a forced-continuation grid of the same
+    checkpoint and task shares every (depth, cap, question) key and must never be unioned with it.
 
     Production files are named `cells_<model>_<task>_<protocol>_k<K>[_s<I>of<N>].jsonl`: the model
     comes first and one depth may be split over shards, so EVERY shard of EVERY depth is returned
@@ -308,7 +311,7 @@ def cell_paths(cells_dir, task, checkpoint):
     never returned. The older task-first names are kept as a fallback, and the first family of
     names that matches anything wins, so a directory holding one shape is never mixed with another.
     """
-    pats = ["cells_%s_%s_*_k*.jsonl" % (checkpoint, task),   # model, task, protocol, depth, shards
+    pats = ["cells_%s_%s_%s_k*.jsonl" % (checkpoint, task, protocol),   # model, task, protocol, depth, shards
             "cells_%s_%s_k*.jsonl" % (checkpoint, task),     # model first, no protocol segment
             "cells_%s_%s_k*.jsonl" % (task, checkpoint),     # task first
             "cells_%s_%s_fixed_k*.jsonl" % (task, checkpoint),
@@ -323,7 +326,8 @@ def cell_paths(cells_dir, task, checkpoint):
     return []
 
 
-def load(cells_dir, task, checkpoint, name=None, ks=None, caps=None, bbh_base=False, **kw):
+def load(cells_dir, task, checkpoint, name=None, ks=None, caps=None, bbh_base=False,
+         protocol="natural", **kw):
     """Return Cells built from every cell file of one task and checkpoint in `cells_dir`.
 
     The depth set and the cap set come from the rows themselves; `ks` and `caps` are optional
@@ -332,7 +336,7 @@ def load(cells_dir, task, checkpoint, name=None, ks=None, caps=None, bbh_base=Fa
     of raw multiple-choice rows. Unparseable lines are counted and reported as a warning, and the
     totals are left on the result as `read_stats`.
     """
-    paths = cell_paths(cells_dir, task, checkpoint)
+    paths = cell_paths(cells_dir, task, checkpoint, protocol)
     if not paths:
         raise FileNotFoundError("no cell files for %s/%s in %s" % (task, checkpoint, cells_dir))
     rows, stats = [], {}
