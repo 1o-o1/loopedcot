@@ -14,7 +14,7 @@ L_LOOP_DEFAULT = 24
 L_FIXED_DEFAULT = 0
 
 # Reserve the task's answer allowance independently of the generated read-out length.
-ANSWER_BUDGET = {"numeric": 8, "math": 32, "letter": 8, "yesno": 8, "freeform": 48}
+ANSWER_BUDGET = {"numeric": 8, "math": 32, "letter": 8, "yesno": 8, "boolean": 8, "freeform": 48}
 ANSWER_BUDGET_TASK = {"gsm8k": 12}          # numeric, but 12 on GSM8K
 
 # Fallback only: a production row carries its own `kind`, and this table answers for a row that
