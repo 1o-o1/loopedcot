@@ -75,7 +75,8 @@ since no GPU is visible there (96 for a 96 GB device):
 $PROD_PYTHON -m prod.launcher --plan --gpus=8 --workers-per-gpu=2 --device-gb=96 --placement-horizon=2048
 ```
 
-The three `slurm/*.sbatch` files are templates. Copy each to `<name>.slurm` at the repository root,
+The five `slurm/*.sbatch` files are templates (`plan`, `run`, `gpu_check`, `alloc` for the allocator on every
+finished grid on CPU, `live` for the live allocator check on one GPU). Copy each to `<name>.slurm` at the repository root,
 put your partition, account, mail and environment lines there, and submit those: `*.slurm` and
 `slurm_script.sh` are git-ignored, so `git pull` never touches them. The install record
 (`artifacts/model_install.json`) is local too; the pins file in `prod/tasks/data/` is only read.
