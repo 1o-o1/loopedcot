@@ -134,19 +134,22 @@ $PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think -
 $PROD_PYTHON -m prod.analyze.cards --cells=$PROD_ART --model=ouro_1_4b_think --tasks=gsm8k,math500,aqua  # per-checkpoint card over several datasets
 $PROD_PYTHON -m prod.live_check --model=ouro_1_4b_base --task=gsm8k --cells=$PROD_ART --budget-fraction=0.5 --no-generate   # the allocator's offline pick per prompt
 $PROD_PYTHON -m prod.analyze.table1 --cells=$PROD_ART --models=ouro_1_4b_base,ouro_1_4b_think,ouro_2_6b_base,ouro_2_6b_think --tasks=gsm8k,math500,svamp,aqua,csqa,arc,strategyqa,bbh,mmlu,hellaswag --accounting=both   # Table 1: default vs allocator at 25/50/100% of the default cost
-$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> [--reference <model>] --out $PROD_ART/alloc_<task>_<model>   # the S35 allocator: lookup and equation rankings, gate, Table 1
+$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> --model-config prod/config.yaml --accounting all --avg-budget --out $PROD_ART/alloc_v2_<task>_<model>   # the S35 allocator: lookup, equation, gated and average-budget arms under the cap, expected and realised accountings
+$PROD_PYTHON -m prod.live_check --model=<model> --task=<task> --cells=$PROD_ART --budget-fraction=0.5 --arm avg_gated_lookup   # live check of the average-budget gated arm (--arm lookup is the per-prompt cap rule)
 ```
 
 `prod.score` prints the accuracy table and writes `score_<model>_<task>_<protocol>.json`; the figures
 go to `artifacts/figures/`; `table1` writes `artifacts/table1.md` and `.json` (per prompt the budget is a
 fraction of the cap cost of the default's own uncapped cell, so the 100 percent row reproduces the uncapped
 baseline; realised spend is reported beside every row; `--trained=<model>` adds the trained checkpoint's row).
-`alloc.cli` (package `alloc/`, its README explains the method) writes three files: `cards.json` (the checkpoint's
-calibration card: per-cell accuracy and price, the two rankings), `results.json` (per budget, every policy's paired
-accuracy, gain and bootstrap intervals), `table1.md` (rows default, default-at-budget, lookup, equation, equation-30,
-gated at 25/50/100 percent of the default cost). For a checkpoint other than Ouro-1.4B pass
-`--model-config prod/config.yaml` so its layer shape is priced, never guessed. Run `prod.rescore --cells=$PROD_ART --apply` once before any analysis of
-rows produced by an earlier version of the code.
+`alloc.cli` (package `alloc/`, its README explains the method) writes: `cards.json` (the checkpoint's calibration
+card: per-cell accuracy and price, the two rankings, the label-free commitment curve); `results.json` (per budget, every
+arm's paired accuracy, gain and bootstrap intervals, under the accounting the gains are priced in); `table1_cap.md` (arms
+charged the whole cap they commit to); `table1_expected.md` (arms charged the mean chain length the calibration prompts
+realised at that cell, the decision-time price the average-budget arms are fitted under); `table1_realised.md` (arms
+charged what their rows actually generated, an audit price). `prod.live_check --arm avg_gated_lookup` regenerates every
+evaluation prompt at that arm's pick and prints n, live accuracy, grid accuracy at the same picks, live minus grid in
+points, and the mean realised price against the budget; `--arm lookup` (default) is the per-prompt cap rule as before.
 
 ## 6. What the queue is
 

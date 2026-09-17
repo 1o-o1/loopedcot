@@ -1,12 +1,13 @@
 #!/bin/bash
-# The allocator on every finished natural-stop grid (CPU only). From the repository root:
-#   sbatch slurm/alloc.sbatch
-# Writes artifacts/alloc_<task>_<model>/{cards.json, results.json, table1.md} and the collected
-# artifacts/alloc_all_tables.md. A pair whose grid is incomplete prints SKIP; re-run later.
+# The allocator on every finished natural-stop grid, CPU only, pairs run in parallel.
+#   sbatch slurm/alloc.sbatch                       (MODELS, TASKS, JOBS can be exported before submitting)
+# Writes artifacts/alloc_v2_<task>_<model>/{cards.json, results.json, table1_cap.md, table1_expected.md,
+# table1_realised.md} and the collected artifacts/alloc_v2_all_tables_expected.md. A pair whose grid is
+# incomplete prints SKIP in this job's log; its own output is in logs/alloc_<task>_<model>.log.
 #SBATCH --job-name=loopedcot_alloc
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32gb
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128gb
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/alloc_%j.out
 # add --partition=... / --account=... as your cluster requires
@@ -18,11 +19,18 @@ mkdir -p logs
 source env.sh
 MODELS="${MODELS:-ouro_1_4b_base ouro_1_4b_think ouro_2_6b_base ouro_2_6b_think huginn_0125 mcleish_llama32_r32}"
 TASKS="${TASKS:-gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag}"
-for M in $MODELS; do
-  for T in $TASKS; do
-    $PROD_PYTHON -m alloc.cli --cells "$PROD_ART" --task "$T" --checkpoint "$M" --model-config prod/config.yaml --accounting "${ACCOUNTING:-both}" --budget-basis "${BASIS:-prompt}" \
-        --out "$PROD_ART/alloc_${T}_${M}" || echo "SKIP $T $M"
-  done
-done
-for d in "$PROD_ART"/alloc_*/; do echo "## $(basename "$d")"; cat "$d/table1.md"; echo; done > "$PROD_ART/alloc_all_tables.md"
-echo DONE
+JOBS="${JOBS:-16}"                       # pairs run at once; each pair is one process
+
+run_pair() {
+  $PROD_PYTHON -m alloc.cli --cells "$PROD_ART" --task "$2" --checkpoint "$1" --model-config prod/config.yaml \
+      --accounting all --avg-budget --out "$PROD_ART/alloc_v2_${2}_${1}" > "logs/alloc_${2}_${1}.log" 2>&1 \
+      && echo "DONE $2 $1" || echo "SKIP $2 $1 (see logs/alloc_${2}_${1}.log)"
+}
+export -f run_pair
+export PROD_PYTHON PROD_ART
+for M in $MODELS; do for T in $TASKS; do echo "$M $T"; done; done | xargs -P "$JOBS" -n 2 bash -c 'run_pair "$0" "$1"'
+
+for d in "$PROD_ART"/alloc_v2_*/; do
+  [ -f "$d/table1_expected.md" ] && { echo "## $(basename "$d")"; cat "$d/table1_expected.md"; echo; }
+done > "$PROD_ART/alloc_v2_all_tables_expected.md"
+echo ALL_DONE

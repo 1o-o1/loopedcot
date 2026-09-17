@@ -27,10 +27,15 @@ def _args(argv=None):
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--cal-draws", type=int, default=100)
     p.add_argument("--promptfree", action="store_true")
-    p.add_argument("--accounting", default="prompt", choices=("prompt", "promptfree", "both"),
-                   help="which cost accounting Table 1 is written for (both = two tables)")
-    p.add_argument("--budget-basis", dest="basis", default="prompt", choices=("prompt", "mean"),
-                   help="fraction of each question's own default cost (default) or of the grid mean")
+    p.add_argument("--accounting", default="cap", choices=list(P.ACCOUNTINGS) + ["all"],
+                   help="how a cell is charged: `cap` the whole cap, `expected` the calibration "
+                        "mean realised length at that cell, `realised` the prompt's own measured "
+                        "cost (an audit price, not available at decision time), `all` writes one "
+                        "Table 1 per accounting")
+    p.add_argument("--avg-budget", action="store_true",
+                   help="add the average-budget arms `avg_lookup` and `avg_equation` to Table 1: "
+                        "a multiplier fitted on the calibration prompts holds their MEAN price at "
+                        "or below the budget, in place of a cap on every prompt")
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--model", default=None,
                    help="model name to look up in --model-config (default: --checkpoint)")
@@ -77,10 +82,18 @@ def resolve_geometry(a):
         "built-in default." % model)
 
 
+def accountings_of(a):
+    """Return the accountings to tabulate and the one the gains and contrasts are priced under."""
+    if a.accounting == "all":
+        return list(P.ACCOUNTINGS), P.ACCOUNTINGS[0]
+    return [a.accounting], a.accounting
+
+
 def card(cs, n_labels=None):
     cal = cs.select("cal")
     cost = P.cost_of(cs)
     Pm, Rm = P.median_point(cs, cs.select("eval"))
+    elen = C.expected_lengths(cs)
     A_hat, m = E.surface(cs, cal, n_labels=n_labels)
     eq, pred = P.rank_equation(cs, A_hat, cost, Pm, Rm)
     lk, acc = P.rank_lookup(cs, cal, cost, Pm, Rm)
@@ -99,7 +112,10 @@ def card(cs, n_labels=None):
             "ranking_equation": [key(c) for c in eq],
             "cal_accuracy": {key(c): round(acc[c], 4) for c in acc},
             "predicted_accuracy": {key(c): round(pred[c], 4) for c in pred},
-            "median_cost_layer_passes": {key(c): int(cost(c[0], c[1], Pm, Rm)) for c in acc}}
+            "median_cost_layer_passes": {key(c): int(cost(c[0], c[1], Pm, Rm)) for c in acc},
+            "expected_length_tokens": {key(c): round(float(elen[cs.ks.index(c[0]),
+                                                           cs.caps.index(c[1])]), 3)
+                                       for c in acc}}
 
 
 def main(argv=None):
@@ -111,8 +127,11 @@ def main(argv=None):
     cs = C.load(a.cells, a.task, a.checkpoint, bbh_base=bbh_base, ks=ks, caps=caps,
                 L=L, L_fixed=L_fixed)
     cards = {cs.name: card(cs, a.n_labels)}
+    accs, primary = accountings_of(a)
     res = {"task": a.task, "checkpoint": a.checkpoint, "reference": a.reference,
-           "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "gain": {}}
+           "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
+           "accounting": a.accounting, "accounting_priced": primary,
+           "accountings_tabulated": accs, "gain": {}}
     arms = [("lookup", dict(ranking="lookup", c_gate=0.0)),
             ("equation", dict(ranking="equation", c_gate=0.0)),
             ("equation_n30", dict(ranking="equation", n_labels=30, c_gate=0.0)),
@@ -120,13 +139,14 @@ def main(argv=None):
             ("gated_equation", dict(ranking="equation", c_gate=a.c_gate))]
     for name, spec in arms:
         res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
-                                               n_cal_draws=a.cal_draws, seed=a.seed, **spec)
+                                               n_cal_draws=a.cal_draws, seed=a.seed,
+                                               accounting=primary, **spec)
     res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
-    accts = [False, True] if a.accounting == "both" else [a.accounting == "promptfree" or a.promptfree]
-    t1s = [E.table1(cs, promptfree=pf, c_gate=a.c_gate, seed=a.seed, basis=a.basis) for pf in accts]
-    t1 = t1s[0]
-    res["table1_tables"] = t1s
+    tables = {acc: E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed,
+                            accounting=acc, avg_budget=a.avg_budget) for acc in accs}
+    t1 = tables[primary]
     res["table1"] = t1
+    res["table1_by_accounting"] = tables
 
     if a.reference:
         rdir = a.reference_cells or a.cells
@@ -136,10 +156,11 @@ def main(argv=None):
         cards[ref.name] = card(ref, a.n_labels)
         E.assert_paired(cs, ref)
         res["contrasts"] = {
-            w: E.contrast(cs, ref, which=w, promptfree=a.promptfree, n_boot=a.boot, seed=a.seed)
+            w: E.contrast(cs, ref, which=w, promptfree=a.promptfree, n_boot=a.boot, seed=a.seed,
+                          accounting=primary)
             for w in ("Bstar", "Blow")}
         res["noninferiority"] = E.noninferiority(cs, ref, promptfree=a.promptfree,
-                                                 n_boot=a.boot, seed=a.seed)
+                                                 n_boot=a.boot, seed=a.seed, accounting=primary)
         res["reference_default_cost"] = E.default_cost(ref, promptfree=a.promptfree)
 
     def _j(o):
@@ -149,10 +170,15 @@ def main(argv=None):
             return o.tolist()
         raise TypeError(repr(o))
 
-    json.dump(cards, open(os.path.join(a.out, "cards.json"), "w"), indent=1, default=_j)
-    json.dump(res, open(os.path.join(a.out, "results.json"), "w"), indent=1, default=_j)
-    open(os.path.join(a.out, "table1.md"), "w", encoding="utf-8").write(
-        "\n".join(E.table1_markdown(t) for t in t1s))
+    with open(os.path.join(a.out, "cards.json"), "w") as fh:
+        json.dump(cards, fh, indent=1, default=_j)
+    with open(os.path.join(a.out, "results.json"), "w") as fh:
+        json.dump(res, fh, indent=1, default=_j)
+    for acc, table in tables.items():
+        with open(os.path.join(a.out, "table1_%s.md" % acc), "w", encoding="utf-8") as fh:
+            fh.write(E.table1_markdown(table))
+    with open(os.path.join(a.out, "table1.md"), "w", encoding="utf-8") as fh:
+        fh.write(E.table1_markdown(t1))
     print(json.dumps({k: (v.get("gain_mean_pts") if isinstance(v, dict) else v)
                       for k, v in res["gain"].items()}, indent=1))
     print("WROTE %s" % a.out)

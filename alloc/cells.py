@@ -405,3 +405,75 @@ def model_geometry(model, config_path):
     if "layers" in s:
         return int(s["layers"]), 0
     raise KeyError("%r states neither `layers` nor `core` in %s" % (model, config_path))
+
+
+# ---------------------------------------------------------------- realised chain lengths
+def natural_stop_cap_index(cells):
+    """Return the index of the cap that stands for natural stop.
+
+    A grid may mark "no cap at all" with a negative cap; that marker is natural stop outright.
+    Otherwise the largest measured cap stands for it: a chain is either finished by then or is at
+    the horizon, which is exactly how `evaluate.default_cost` counts the same prompts.
+    """
+    nocap = [i for i, T in enumerate(cells.caps) if T < 0]
+    return nocap[0] if nocap else len(cells.caps) - 1
+
+
+def cap_limits(cells):
+    """Return each cap as a token limit; a negative cap marks "no cap" and limits nothing."""
+    return np.array([np.inf if T < 0 else float(T) for T in cells.caps])
+
+
+def natural_lengths(cells, pos=None):
+    """Return the (depth, prompt) generated chain length in tokens when the chain is not cut.
+
+    Read from `natural_stop` at the cap that stands for natural stop, falling back to that cap's
+    `n_cut` and then to the largest `n_cut` measured at that depth. A chain that never stops inside
+    the grid is counted at the horizon rather than dropped, so the table below and the default cost
+    treat those prompts alike.
+    """
+    pos = np.arange(len(cells.idx)) if pos is None else np.asarray(pos, dtype=int)
+    j = natural_stop_cap_index(cells)
+    horizon = cap_limits(cells)[j]
+    out = np.full((len(cells.ks), len(pos)), np.nan)
+    for a in range(len(cells.ks)):
+        for ii, n in enumerate(pos):
+            v = cells.nstop[a, j, n]
+            if np.isnan(v):
+                v = cells.ncut[a, j, n]
+            if np.isnan(v):
+                row = cells.ncut[a, :, n]
+                v = np.nanmax(row) if np.isfinite(row).any() else np.nan
+            out[a, ii] = min(v, horizon) if not np.isnan(v) else np.nan
+    return out
+
+
+def expected_lengths(cells, pos=None):
+    """Return the (depth, cap) table E_cal[min(len_k, T)] in tokens.
+
+    `len_k` is the prompt's own generated length at depth k run to its natural stop, and the mean
+    is over the CALIBRATION prompts only, so the number is known before any evaluation prompt is
+    generated. The evaluation prompt's own realised length never enters its price: that length is
+    not known at decision time, and using it would price a cell with the answer it is buying.
+    The largest cap (or an explicit no-cap marker) stands for natural stop, so the table's last
+    column is the mean natural length itself.
+    """
+    if pos is None:
+        pos = cells.select("cal")
+    pos = np.asarray(pos, dtype=int)
+    if not len(pos):
+        raise ValueError("%s/%s: the expected-length table needs calibration prompts"
+                         % (cells.name, cells.task))
+    if any(cells.split[n] != "cal" for n in pos):
+        raise ValueError("the expected-length table is a calibration statistic: "
+                         "evaluation prompts must not enter it")
+    lens = natural_lengths(cells, pos)
+    lim = cap_limits(cells)
+    out = np.full((len(cells.ks), len(cells.caps)), np.nan)
+    for a in range(len(cells.ks)):
+        row = lens[a][np.isfinite(lens[a])]
+        if not len(row):
+            continue
+        for c, T in enumerate(lim):
+            out[a, c] = float(np.minimum(row, T).mean())
+    return out

@@ -46,6 +46,44 @@ from .common import ART, load_json, read_jsonl, save_json
 from .cost import model_shapes
 from .score import load_grid
 
+CONFIG_YAML = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "prod", "config.yaml")
+
+
+# ---------------------------------------------------------------- the average-budget gated arm
+def avg_gated_picks(cells_dir, model, task, budget_fraction, c_gate=0.5, gate_draws=40, seed=7,
+                    protocol="natural"):
+    """The `avg_gated_lookup` arm exactly as `alloc.cli --accounting expected --avg-budget` picks
+    it: cells loaded by alloc.cells.load (geometry from prod/config.yaml), budget = fraction x
+    alloc.evaluate.default_cost, the lookup score on the calibration rows, the multiplier fitted on
+    the calibration prompts (alloc.policy.avg_budget_vectors), the gate (c_gate) fitted on the
+    calibration resamples (alloc.evaluate.avg_gated_vectors). Returns (cells, X, record,
+    {row_idx: (k, B)}, eval positions), where the record is alloc's own for this budget.
+    """
+    from alloc import cells as C, evaluate as E, policy as P
+    L, L_fixed = C.model_geometry(model, CONFIG_YAML)
+    cs = C.load(cells_dir, task, model, L=L, L_fixed=L_fixed, protocol=protocol)
+    cost = P.cost_of(cs, promptfree=False, accounting="expected")
+    ev, cal = cs.select("eval"), cs.select("cal")
+    if not len(ev) or not len(cal):
+        raise SystemExit("%s/%s: need both splits (eval %d, cal %d)" % (model, task, len(ev), len(cal)))
+    Pm, Rm = P.median_point(cs, ev)
+    dc = E.default_cost(cs, promptfree=False)
+    if dc["mean"] is None:
+        raise SystemExit("%s/%s: no uncapped realisation of the default point" % (model, task))
+    X = float(budget_fraction) * float(dc["mean"])
+    score = E.cell_scores(cs, cal, P.AVG_GATED, cost, Pm, Rm)
+    dk, dT = E.default_cell(cs)
+    rec = E.avg_gated_vectors(cs, ev, cal, cost, [X], score, (dk, dT), c_gate=c_gate,
+                              n_draws=gate_draws, seed=seed)[0]
+    if rec.get("gate_reverted"):
+        a = np.full(len(ev), list(cs.ks).index(dk), int)
+        b = np.full(len(ev), list(cs.caps).index(dT), int)
+    else:
+        a, b = P.avg_picks(np.asarray(score, float), P.price_tensor(cs, ev, cost), rec["lambda"])
+    chosen = {int(cs.idx[n]): (int(cs.ks[i]), int(cs.caps[j])) for n, i, j in zip(ev, a, b)}
+    return cs, X, rec, chosen, ev, dc
+
 
 def choose(cells_dir, model, task, budget=None, budget_index=None, promptfree=False,
            label="v2", n_budgets=None, budget_fraction=None, allow_incomplete=False):
@@ -181,10 +219,17 @@ def main(argv=None):
                    help="rank on a grid with missing cells (a smoke run only: a missing cell is "
                         "NaN, which can rank first and scores as neither right nor wrong)")
     p.add_argument("--extra", default="")
+    p.add_argument("--arm", default="lookup", choices=("lookup", "avg_gated_lookup"),
+                   help="lookup: the calibration-ranked first affordable cell per prompt (unchanged); "
+                        "avg_gated_lookup: alloc's average-budget lookup policy with the gate, under "
+                        "the expected accounting, budget = --budget-fraction x the default cost")
+    p.add_argument("--c-gate", dest="c_gate", type=float, default=0.5)
     cfgmod.add_args(p)
     a = p.parse_args(argv)
     cfg = cfgmod.from_args(a)
     cells_dir = a.cells or ART
+    if a.arm == "avg_gated_lookup":
+        return main_avg(a, cfg, cells_dir)
 
     grid, cells, order, X, Xs, chosen, ev, cost, Pm, Rm, paths, dc = choose(
         cells_dir, a.model, a.task, a.budget, a.budget_index, a.promptfree, a.label,
@@ -253,6 +298,86 @@ def main(argv=None):
     save_json(dest, out)
     print("live %.4f vs offline %.4f on %d rows -> delta %.2f pp (%d flips)"
           % (live_acc or 0, grid_acc or 0, len(have), out["delta_pp"] or 0.0, len(flips)))
+    print("wrote", dest)
+    return out
+
+
+def main_avg(a, cfg, cells_dir):
+    """The avg_gated_lookup arm end to end: alloc's picks, one generation per chosen cell, protocol
+    v2, live against the grid at the same picks, realised price against the budget."""
+    if a.budget_fraction is None:
+        raise SystemExit("--arm avg_gated_lookup needs --budget-fraction")
+    cs, X, rec, chosen, ev, dc = avg_gated_picks(cells_dir, a.model, a.task, a.budget_fraction,
+                                                 c_gate=a.c_gate)
+    row_ids = [int(cs.idx[n]) for n in ev]
+    if a.n:
+        row_ids = row_ids[:a.n]
+    hist = {}
+    for rid in row_ids:
+        key = "k%d_B%d" % chosen[rid]
+        hist[key] = hist.get(key, 0) + 1
+    ki = {k: i for i, k in enumerate(cs.ks)}
+    bi = {b: i for i, b in enumerate(cs.caps)}
+    ni = {int(v): i for i, v in enumerate(cs.idx)}
+    out = {"model": a.model, "task": a.task, "arm": "avg_gated_lookup", "accounting": "expected",
+           "budget_fraction": a.budget_fraction, "budget": X, "default_cost": dc,
+           "c_gate": a.c_gate, "lambda": rec["lambda"], "gate_reverted": bool(rec.get("gate_reverted")),
+           "gate_margin_pts": rec.get("gate_margin_pts"), "gate_sd_pts": rec.get("gate_sd_pts"),
+           "grid_mean_price_layer_passes": rec["mean_price"],
+           "n_eval_used": len(row_ids), "n_cal": int(len(cs.select("cal"))),
+           "chosen_histogram": hist, "layers_per_loop": cs.L, "layers_fixed": cs.L_fixed,
+           "config": cfg, "config_sha256": cfgmod.digest(cfg)}
+    grid_lab = {r: bool(cs.acc[ki[chosen[r][0]], bi[chosen[r][1]], ni[r]]) for r in row_ids}
+    out["grid_acc_at_picks"] = float(np.mean([grid_lab[r] for r in row_ids]))
+    if not a.generate:
+        out["live"] = "skipped (--no-generate)"
+        dest = a.out or os.path.join(cells_dir, "live_check_%s_%s_avg.json"
+                                     % (a.model.replace("+", "-"), a.task))
+        save_json(dest, out)
+        print(json.dumps({k: out[k] for k in ("budget", "lambda", "gate_reverted",
+                                              "chosen_histogram", "grid_acc_at_picks")}, indent=2))
+        print("wrote", dest)
+        return out
+    out_dir = a.out_dir or os.path.join(cells_dir, "live_check_%s_%s_avg"
+                                        % (a.model.replace("+", "-"), a.task))
+    os.makedirs(out_dir, exist_ok=True)
+    runs = run_live(a.model, a.task, chosen, row_ids, out_dir, a.python, a.adapter,
+                    cfg["horizon"], [x for x in a.extra.split() if x])
+    live, live_price = {}, {}
+    for r in runs:
+        for fn in sorted(os.listdir(r["dir"])):
+            if not (fn.startswith("cells_") and fn.endswith(".jsonl")):
+                continue
+            for row in read_jsonl(os.path.join(r["dir"], fn)):
+                rid = int(row.get("row_idx", row["idx"]))
+                if chosen.get(rid) == (int(row["k"]), int(row["B"])):
+                    live[rid] = bool(row["correct_v2"])
+                    live_price[rid] = float(row.get("layer_passes") or float("nan"))
+    have = [r for r in row_ids if r in live]
+    live_acc = float(np.mean([live[r] for r in have])) if have else None
+    grid_acc = float(np.mean([grid_lab[r] for r in have])) if have else None
+    grid_price = float(np.nanmean([cs.passes[ki[chosen[r][0]], bi[chosen[r][1]], ni[r]] for r in have])) if have else None
+    mean_live_price = float(np.nanmean([live_price[r] for r in have])) if have else None
+    flips = [{"row_idx": r, "cell": list(chosen[r]), "grid": grid_lab[r], "live": live[r]}
+             for r in have if grid_lab[r] != live[r]]
+    out.update({"runs": runs, "n_live_rows": len(have), "live_acc": live_acc,
+                "grid_acc_same_rows": grid_acc,
+                "delta_pp": (None if live_acc is None or grid_acc is None
+                             else round(100.0 * (live_acc - grid_acc), 3)),
+                "live_mean_price_layer_passes": mean_live_price,
+                "grid_mean_price_same_rows": grid_price,
+                "price_over_budget_pct": (None if mean_live_price is None
+                                          else round(100.0 * (mean_live_price / X - 1.0), 2)),
+                "n_flips": len(flips), "flips": flips[:50],
+                "missing_rows": [r for r in row_ids if r not in live]})
+    dest = a.out or os.path.join(cells_dir, "live_check_%s_%s_avg.json"
+                                 % (a.model.replace("+", "-"), a.task))
+    save_json(dest, out)
+    print("%s %s avg_gated_lookup @%.2f: n=%d live %.4f grid %.4f delta %+.2f pp | realised price "
+          "%.0f vs budget %.0f (%+.1f%%)%s"
+          % (a.model, a.task, a.budget_fraction, len(have), live_acc or 0, grid_acc or 0,
+             out["delta_pp"] or 0.0, mean_live_price or 0, X, out["price_over_budget_pct"] or 0.0,
+             " [gate reverted to the default cell]" if out["gate_reverted"] else ""))
     print("wrote", dest)
     return out
 

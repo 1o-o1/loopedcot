@@ -64,28 +64,12 @@ class TestTable1(unittest.TestCase):
         for name in ("default", "default_at_budget", "lookup", "equation", "equation_n10",
                      "gated_equation"):
             self.assertIn(name, t1["rows"], name)
-            self.assertEqual(len(t1["rows"][name]["acc_pts"]), 4)
+            self.assertEqual(len(t1["rows"][name]["acc_pts"]), len(E.BUDGET_FRACTIONS))
         self.assertEqual(t1["fractions"], [0.25, 0.5, 0.75, 1.0])
-        t1m = E.table1(cs, n_labels_grid=(10,), gate_draws=5, basis="mean")
-        self.assertAlmostEqual(t1m["budgets"][3] / t1m["default_cost"]["mean"], 1.0)
+        self.assertAlmostEqual(t1["budgets"][-1] / t1["default_cost"]["mean"], 1.0)
         md = E.table1_markdown(t1)
         self.assertIn("| lookup |", md)
         self.assertIn("| gated_equation |", md)
-
-    def test_prompt_basis_anchors_at_one_and_prices_every_arm(self):
-        """basis="prompt": at 1.00 normal operation IS the default (same accuracy, same realised
-        price), and every arm carries a realised price wherever it is feasible."""
-        cs = synth.cells(n=80, n_cal=30)
-        t1 = E.table1(cs, n_labels_grid=(10,), gate_draws=3)
-        d, nb = t1["rows"]["default"], t1["rows"]["default_at_budget"]
-        self.assertAlmostEqual(nb["acc_pts"][3], d["acc_pts"][3], places=9)
-        self.assertAlmostEqual(nb["price_layer_passes"][3], d["price_layer_passes"][3], places=6)
-        self.assertEqual(nb["feasible_frac"][3], 1.0)
-        for name in ("lookup", "equation", "gated_equation"):
-            r = t1["rows"][name]
-            for j in range(4):
-                if r["feasible_frac"][j] > 0:
-                    self.assertFalse(np.isnan(r["price_layer_passes"][j]), (name, j))
 
 
 class TestNonInferiority(unittest.TestCase):

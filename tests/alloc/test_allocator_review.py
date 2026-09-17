@@ -139,11 +139,12 @@ class SecondPassTests(unittest.TestCase):
         cs = synth.cells(n=80, n_cal=30)
         t1 = E.table1(cs, n_labels_grid=(10,), gate_draws=3)
         row = t1["rows"]["default"]
-        self.assertEqual(row["feasible"], [False, False, False, True])
-        self.assertTrue(all(np.isnan(row["acc_pts"][k]) for k in range(3)))
-        self.assertFalse(np.isnan(row["acc_pts"][3]))
+        one = E.BUDGET_FRACTIONS.index(1.0)
+        self.assertEqual(row["feasible"], [f == 1.0 for f in E.BUDGET_FRACTIONS])
+        self.assertTrue(all(np.isnan(row["acc_pts"][j]) for j in range(one)))
+        self.assertFalse(np.isnan(row["acc_pts"][one]))
         line = [l for l in E.table1_markdown(t1).split("\n") if l.startswith("| default |")][0]
-        self.assertEqual(line.count("not feasible"), 3)
+        self.assertEqual(line.count("not feasible"), one)
 
     def test_contrast_prices_the_budget_grid_from_the_reference(self):
         """The second grid is the reference: it supplies the median prompt, the cost function and
