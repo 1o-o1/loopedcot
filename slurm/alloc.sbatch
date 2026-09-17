@@ -16,11 +16,11 @@ mkdir -p logs
 # conda instead of .venv: uncomment and adapt, so env.sh keeps your interpreter
 # source /opt/conda/etc/profile.d/conda.sh && conda activate loopedcot && export PROD_PYTHON=$(which python)
 source env.sh
-MODELS="${MODELS:-ouro_1_4b_base ouro_1_4b_think ouro_2_6b_base ouro_2_6b_think}"
+MODELS="${MODELS:-ouro_1_4b_base ouro_1_4b_think ouro_2_6b_base ouro_2_6b_think huginn_0125 mcleish_llama32_r32}"
 TASKS="${TASKS:-gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag}"
 for M in $MODELS; do
   for T in $TASKS; do
-    $PROD_PYTHON -m alloc.cli --cells "$PROD_ART" --task "$T" --checkpoint "$M" --model-config prod/config.yaml \
+    $PROD_PYTHON -m alloc.cli --cells "$PROD_ART" --task "$T" --checkpoint "$M" --model-config prod/config.yaml --accounting "${ACCOUNTING:-both}" --budget-basis "${BASIS:-prompt}" \
         --out "$PROD_ART/alloc_${T}_${M}" || echo "SKIP $T $M"
   done
 done
