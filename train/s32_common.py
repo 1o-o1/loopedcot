@@ -135,8 +135,32 @@ def split_rows(task):
 
 
 # ------------------------------------------------------------------ few-shot prefix per task
+def _harness_prefix(task):
+    """The evaluation harness's own exemplar block for `task`, or None outside the checkout.
+
+    prod/tasks/data/prompt_<task>.txt is the frozen, sha-pinned block every production grid was
+    generated with (prod.tasks.prompt_prefix plus the task's separator). Reading it is what
+    "byte-identical to evaluation" means, and it needs no network: the rebuilds below fetch
+    openai/gsm8k and MATH-500 from the Hub, which a compute node in offline mode cannot.
+    """
+    repo = os.path.dirname(HERE)
+    if repo not in sys.path:
+        sys.path.insert(0, repo)
+    try:
+        from prod import tasks as PT
+        return PT.prompt_prefix(task, None) + PT.task_cfg(task)["sep"]
+    except Exception:                      # noqa: BLE001 -- not inside the loopedcot checkout
+        return None
+
+
 def few_shot_prefix(tok, task):
-    """The task's exemplar block, ending exactly where the tag line is inserted."""
+    """The task's exemplar block, ending exactly where the tag line is inserted: the evaluation
+    harness's frozen file when the package sits inside the checkout, else the S9a/S13/S28 rebuild
+    (byte-identical for csqa and aqua, checked; the frozen gsm8k and math500 files are those
+    rebuilds' output, frozen)."""
+    blk = _harness_prefix(task)
+    if blk is not None:
+        return blk
     if task == "gsm8k":                       # S9a / S13 verbatim
         from datasets import load_dataset
         d = load_dataset("openai/gsm8k", "main", split="train")
