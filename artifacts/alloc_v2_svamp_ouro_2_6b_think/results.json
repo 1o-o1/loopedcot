@@ -1,0 +1,4826 @@
+{
+ "task": "svamp",
+ "checkpoint": "ouro_2_6b_think",
+ "reference": null,
+ "promptfree": false,
+ "c_gate": 0.5,
+ "avg_budget": true,
+ "accounting": "all",
+ "accounting_priced": "cap",
+ "accountings_tabulated": [
+  "cap",
+  "realised",
+  "expected"
+ ],
+ "gain": {
+  "lookup": {
+   "grid": "ouro_2_6b_think",
+   "task": "svamp",
+   "ranking": "lookup",
+   "n_labels": null,
+   "c_gate": 0.0,
+   "promptfree": false,
+   "accounting": "cap",
+   "n_eval": 200,
+   "n_cal": 100,
+   "median_prompt_tokens": 636.0,
+   "median_reserve": 14.0,
+   "budgets": [
+    31199.99999999999,
+    39070.85231210713,
+    48927.29167931049,
+    61270.223949799,
+    76726.91894462571,
+    96082.88841181046,
+    120321.80586084991,
+    150675.49701010558,
+    188686.5413697172,
+    236286.6663826447,
+    295894.918126809,
+    370540.59762934514,
+    464017.21043641225,
+    581075.2531806731,
+    727663.6345911009,
+    911231.9999999999
+   ],
+   "per_budget": [
+    {
+     "X": 31199.99999999999,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.24752475247524752,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": false
+    },
+    {
+     "X": 39070.85231210713,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.355,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 48927.29167931049,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.525,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 61270.223949799,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 76726.91894462571,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 96082.88841181046,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 120321.80586084991,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 150675.49701010558,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 188686.5413697172,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 236286.6663826447,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 295894.918126809,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 370540.59762934514,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 464017.21043641225,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 581075.2531806731,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 727663.6345911009,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 911231.9999999999,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    }
+   ],
+   "Bstar": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "Blow": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "range_meta": {
+    "k2": 2,
+    "kmax": 4,
+    "T": 64,
+    "L": 48,
+    "L_fixed": 0
+   },
+   "order_top5": [
+    [
+     1,
+     1024
+    ],
+    [
+     1,
+     2048
+    ],
+    [
+     1,
+     512
+    ],
+    [
+     1,
+     4096
+    ],
+    [
+     1,
+     256
+    ]
+   ],
+   "gain_mean_pts": 60.16666666666668,
+   "gain_aggregation": "equal weight per budget",
+   "gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666667
+   ],
+   "pooled_gain_mean_pts": 60.16666666666667,
+   "pooled_gain_aggregation": "every feasible prompt-budget pair",
+   "pooled_gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666665
+   ],
+   "gain_worst_budget_pts": 56.00000000000001,
+   "gain_per_budget_pts": [
+    56.00000000000001,
+    56.00000000000001,
+    61.5,
+    61.5,
+    60.5,
+    60.5,
+    62.0,
+    62.0,
+    61.5
+   ],
+   "n_budgets_with_normal": 9,
+   "n_eval_in_gain": 200,
+   "gain_cal_draw_mean_pts": 58.47666666666665,
+   "gain_cal_draw_sd_pts": 5.259172938780398,
+   "gain_cal_draw_frac_positive": 1.0
+  },
+  "equation": {
+   "grid": "ouro_2_6b_think",
+   "task": "svamp",
+   "ranking": "equation",
+   "n_labels": null,
+   "c_gate": 0.0,
+   "promptfree": false,
+   "accounting": "cap",
+   "n_eval": 200,
+   "n_cal": 100,
+   "median_prompt_tokens": 636.0,
+   "median_reserve": 14.0,
+   "budgets": [
+    31199.99999999999,
+    39070.85231210713,
+    48927.29167931049,
+    61270.223949799,
+    76726.91894462571,
+    96082.88841181046,
+    120321.80586084991,
+    150675.49701010558,
+    188686.5413697172,
+    236286.6663826447,
+    295894.918126809,
+    370540.59762934514,
+    464017.21043641225,
+    581075.2531806731,
+    727663.6345911009,
+    911231.9999999999
+   ],
+   "per_budget": [
+    {
+     "X": 31199.99999999999,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.24752475247524752,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": false
+    },
+    {
+     "X": 39070.85231210713,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.355,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 48927.29167931049,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.525,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 61270.223949799,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 76726.91894462571,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 96082.88841181046,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 120321.80586084991,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 150675.49701010558,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 188686.5413697172,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 236286.6663826447,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 295894.918126809,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 370540.59762934514,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 464017.21043641225,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 581075.2531806731,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 727663.6345911009,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 911231.9999999999,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    }
+   ],
+   "Bstar": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "Blow": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "range_meta": {
+    "k2": 2,
+    "kmax": 4,
+    "T": 64,
+    "L": 48,
+    "L_fixed": 0
+   },
+   "order_top5": [
+    [
+     1,
+     4096
+    ],
+    [
+     1,
+     2048
+    ],
+    [
+     1,
+     1024
+    ],
+    [
+     1,
+     512
+    ],
+    [
+     1,
+     256
+    ]
+   ],
+   "mechanism": {
+    "ks": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "caps": [
+     0,
+     16,
+     32,
+     64,
+     128,
+     256,
+     512,
+     1024,
+     2048,
+     4096
+    ],
+    "G": [
+     [
+      0.04,
+      0.05,
+      0.1,
+      0.13,
+      0.27,
+      0.63,
+      0.77,
+      0.82,
+      0.85,
+      0.96
+     ],
+     [
+      0.13,
+      0.17,
+      0.19,
+      0.21,
+      0.36,
+      0.51,
+      0.7,
+      0.76,
+      0.78,
+      0.81
+     ],
+     [
+      0.2,
+      0.21,
+      0.26,
+      0.28,
+      0.36,
+      0.62,
+      0.82,
+      0.89,
+      0.9,
+      0.91
+     ],
+     [
+      0.25,
+      0.27,
+      0.28,
+      0.35,
+      0.43,
+      0.59,
+      0.72,
+      0.79,
+      0.83,
+      0.85
+     ]
+    ],
+    "c": [
+     0.7077922077922078,
+     0.3333333333333333,
+     0.09174311926605505,
+     0.08395522388059702
+    ],
+    "l": [
+     0.09479553903345725,
+     0.20446096654275092,
+     0.13626373626373625,
+     0.08189655172413793
+    ],
+    "A_hat": [
+     [
+      0.11931540578380727,
+      0.12544537247139476,
+      0.1560952059093323,
+      0.17448510597209482,
+      0.2603046395983199,
+      0.48098344035147006,
+      0.5668029739776951,
+      0.5974528074156327,
+      0.6158427074783952,
+      0.6832723410418577
+     ],
+     [
+      0.22121437422552664,
+      0.22636926889714992,
+      0.2289467162329616,
+      0.23152416356877326,
+      0.2508550185873606,
+      0.2701858736059479,
+      0.2946716232961586,
+      0.30240396530359354,
+      0.3049814126394052,
+      0.3088475836431227
+     ],
+     [
+      0.1273596128642,
+      0.12691440669422321,
+      0.12468837584433914,
+      0.12379796350438552,
+      0.12023631414457102,
+      0.1086609537251739,
+      0.09975683032563767,
+      0.09664038713579998,
+      0.09619518096582316,
+      0.09574997479584635
+     ],
+     [
+      0.0824112197632527,
+      0.08245239320638188,
+      0.08247297992794647,
+      0.08261708697889861,
+      0.08278178075141535,
+      0.0831111682964488,
+      0.08337879567678846,
+      0.0835229027277406,
+      0.08360524961399898,
+      0.08364642305712816
+     ]
+    ],
+    "acc_measured": [
+     [
+      0.15,
+      0.13,
+      0.21,
+      0.22,
+      0.27,
+      0.52,
+      0.56,
+      0.58,
+      0.58,
+      0.56
+     ],
+     [
+      0.04,
+      0.22,
+      0.22,
+      0.21,
+      0.47,
+      0.4,
+      0.26,
+      0.26,
+      0.27,
+      0.29
+     ],
+     [
+      0.03,
+      0.14,
+      0.09,
+      0.09,
+      0.19,
+      0.13,
+      0.12,
+      0.11,
+      0.11,
+      0.11
+     ],
+     [
+      0.05,
+      0.05,
+      0.02,
+      0.07,
+      0.1,
+      0.12,
+      0.11,
+      0.1,
+      0.11,
+      0.1
+     ]
+    ],
+    "rmse_pts": 6.231627026169689,
+    "noise_floor_pts": 3.7282368486993955,
+    "rmse_over_noise_floor": 1.6714675808066237,
+    "n_g": 100,
+    "n_labels": 100,
+    "uncommitted_cells": [
+     538,
+     538,
+     455,
+     464
+    ],
+    "cells_per_depth": 1000,
+    "uncommitted_share": [
+     0.538,
+     0.538,
+     0.455,
+     0.464
+    ]
+   },
+   "gain_mean_pts": 60.16666666666668,
+   "gain_aggregation": "equal weight per budget",
+   "gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666667
+   ],
+   "pooled_gain_mean_pts": 60.16666666666667,
+   "pooled_gain_aggregation": "every feasible prompt-budget pair",
+   "pooled_gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666665
+   ],
+   "gain_worst_budget_pts": 56.00000000000001,
+   "gain_per_budget_pts": [
+    56.00000000000001,
+    56.00000000000001,
+    61.5,
+    61.5,
+    60.5,
+    60.5,
+    62.0,
+    62.0,
+    61.5
+   ],
+   "n_budgets_with_normal": 9,
+   "n_eval_in_gain": 200,
+   "gain_cal_draw_mean_pts": 60.16666666666667,
+   "gain_cal_draw_sd_pts": 1.1102230246251565e-14,
+   "gain_cal_draw_frac_positive": 1.0
+  },
+  "equation_n30": {
+   "grid": "ouro_2_6b_think",
+   "task": "svamp",
+   "ranking": "equation",
+   "n_labels": 30,
+   "c_gate": 0.0,
+   "promptfree": false,
+   "accounting": "cap",
+   "n_eval": 200,
+   "n_cal": 100,
+   "median_prompt_tokens": 636.0,
+   "median_reserve": 14.0,
+   "budgets": [
+    31199.99999999999,
+    39070.85231210713,
+    48927.29167931049,
+    61270.223949799,
+    76726.91894462571,
+    96082.88841181046,
+    120321.80586084991,
+    150675.49701010558,
+    188686.5413697172,
+    236286.6663826447,
+    295894.918126809,
+    370540.59762934514,
+    464017.21043641225,
+    581075.2531806731,
+    727663.6345911009,
+    911231.9999999999
+   ],
+   "per_budget": [
+    {
+     "X": 31199.99999999999,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.24752475247524752,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": false
+    },
+    {
+     "X": 39070.85231210713,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.355,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 48927.29167931049,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.525,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 61270.223949799,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 76726.91894462571,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 96082.88841181046,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 120321.80586084991,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 150675.49701010558,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 188686.5413697172,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 236286.6663826447,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 295894.918126809,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 370540.59762934514,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 464017.21043641225,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 581075.2531806731,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 727663.6345911009,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 911231.9999999999,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    }
+   ],
+   "Bstar": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "Blow": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "range_meta": {
+    "k2": 2,
+    "kmax": 4,
+    "T": 64,
+    "L": 48,
+    "L_fixed": 0
+   },
+   "order_top5": [
+    [
+     1,
+     4096
+    ],
+    [
+     1,
+     2048
+    ],
+    [
+     1,
+     1024
+    ],
+    [
+     1,
+     512
+    ],
+    [
+     1,
+     256
+    ]
+   ],
+   "mechanism": {
+    "ks": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "caps": [
+     0,
+     16,
+     32,
+     64,
+     128,
+     256,
+     512,
+     1024,
+     2048,
+     4096
+    ],
+    "G": [
+     [
+      0.04,
+      0.05,
+      0.1,
+      0.13,
+      0.27,
+      0.63,
+      0.77,
+      0.82,
+      0.85,
+      0.96
+     ],
+     [
+      0.13,
+      0.17,
+      0.19,
+      0.21,
+      0.36,
+      0.51,
+      0.7,
+      0.76,
+      0.78,
+      0.81
+     ],
+     [
+      0.2,
+      0.21,
+      0.26,
+      0.28,
+      0.36,
+      0.62,
+      0.82,
+      0.89,
+      0.9,
+      0.91
+     ],
+     [
+      0.25,
+      0.27,
+      0.28,
+      0.35,
+      0.43,
+      0.59,
+      0.72,
+      0.79,
+      0.83,
+      0.85
+     ]
+    ],
+    "c": [
+     0.7692307692307693,
+     0.2975206611570248,
+     0.05421686746987952,
+     0.04046242774566474
+    ],
+    "l": [
+     0.11176470588235295,
+     0.24022346368715083,
+     0.1417910447761194,
+     0.07086614173228346
+    ],
+    "A_hat": [
+     [
+      0.1380633484162896,
+      0.14463800904977375,
+      0.17751131221719457,
+      0.19723529411764706,
+      0.28928054298642536,
+      0.5259683257918553,
+      0.6180135746606334,
+      0.6508868778280543,
+      0.6706108597285068,
+      0.7429321266968326
+     ],
+     [
+      0.24767209935823442,
+      0.2499639872570294,
+      0.2511099312064269,
+      0.25225587515582437,
+      0.2608504547763055,
+      0.2694450343967866,
+      0.2803315019160626,
+      0.28376933376425506,
+      0.28491527771365255,
+      0.2866341936377488
+     ],
+     [
+      0.12427620931487143,
+      0.12340046754180903,
+      0.11902175867649703,
+      0.11727027513037223,
+      0.11026434094587304,
+      0.08749505484625067,
+      0.0699802193850027,
+      0.0638500269735659,
+      0.06297428520050351,
+      0.06209854342744111
+     ],
+     [
+      0.06326521323562878,
+      0.06265713895589642,
+      0.062353101816030224,
+      0.060224841836966914,
+      0.05779254471803742,
+      0.05292795048017841,
+      0.04897546766191799,
+      0.04684720768285468,
+      0.045631059123389925,
+      0.04502298484365755
+     ]
+    ],
+    "acc_measured": [
+     [
+      0.1,
+      0.1,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.26666666666666666,
+      0.5666666666666667,
+      0.6333333333333333,
+      0.6666666666666666,
+      0.6666666666666666,
+      0.6333333333333333
+     ],
+     [
+      0.06666666666666667,
+      0.2,
+      0.26666666666666666,
+      0.2,
+      0.5666666666666667,
+      0.4,
+      0.23333333333333334,
+      0.23333333333333334,
+      0.23333333333333334,
+      0.23333333333333334
+     ],
+     [
+      0.1,
+      0.16666666666666666,
+      0.1,
+      0.03333333333333333,
+      0.2,
+      0.06666666666666667,
+      0.06666666666666667,
+      0.06666666666666667,
+      0.06666666666666667,
+      0.06666666666666667
+     ],
+     [
+      0.06666666666666667,
+      0.06666666666666667,
+      0.06666666666666667,
+      0.03333333333333333,
+      0.06666666666666667,
+      0.03333333333333333,
+      0.03333333333333333,
+      0.03333333333333333,
+      0.06666666666666667,
+      0.06666666666666667
+     ]
+    ],
+    "rmse_pts": 7.057007654714194,
+    "noise_floor_pts": 6.397337409104348,
+    "rmse_over_noise_floor": 1.103116375364388,
+    "n_g": 100,
+    "n_labels": 30,
+    "uncommitted_cells": [
+     170,
+     179,
+     134,
+     127
+    ],
+    "cells_per_depth": 300,
+    "uncommitted_share": [
+     0.5667,
+     0.5967,
+     0.4467,
+     0.4233
+    ]
+   },
+   "gain_mean_pts": 60.16666666666668,
+   "gain_aggregation": "equal weight per budget",
+   "gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666667
+   ],
+   "pooled_gain_mean_pts": 60.16666666666667,
+   "pooled_gain_aggregation": "every feasible prompt-budget pair",
+   "pooled_gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666665
+   ],
+   "gain_worst_budget_pts": 56.00000000000001,
+   "gain_per_budget_pts": [
+    56.00000000000001,
+    56.00000000000001,
+    61.5,
+    61.5,
+    60.5,
+    60.5,
+    62.0,
+    62.0,
+    61.5
+   ],
+   "n_budgets_with_normal": 9,
+   "n_eval_in_gain": 200,
+   "gain_cal_draw_mean_pts": 60.16666666666667,
+   "gain_cal_draw_sd_pts": 1.1102230246251565e-14,
+   "gain_cal_draw_frac_positive": 1.0
+  },
+  "equation_n100": {
+   "grid": "ouro_2_6b_think",
+   "task": "svamp",
+   "ranking": "equation",
+   "n_labels": 100,
+   "c_gate": 0.0,
+   "promptfree": false,
+   "accounting": "cap",
+   "n_eval": 200,
+   "n_cal": 100,
+   "median_prompt_tokens": 636.0,
+   "median_reserve": 14.0,
+   "budgets": [
+    31199.99999999999,
+    39070.85231210713,
+    48927.29167931049,
+    61270.223949799,
+    76726.91894462571,
+    96082.88841181046,
+    120321.80586084991,
+    150675.49701010558,
+    188686.5413697172,
+    236286.6663826447,
+    295894.918126809,
+    370540.59762934514,
+    464017.21043641225,
+    581075.2531806731,
+    727663.6345911009,
+    911231.9999999999
+   ],
+   "per_budget": [
+    {
+     "X": 31199.99999999999,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.24752475247524752,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": false
+    },
+    {
+     "X": 39070.85231210713,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.355,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 48927.29167931049,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.525,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 61270.223949799,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 76726.91894462571,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 96082.88841181046,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 120321.80586084991,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 150675.49701010558,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 188686.5413697172,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 236286.6663826447,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 295894.918126809,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 370540.59762934514,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 464017.21043641225,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 581075.2531806731,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 727663.6345911009,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 911231.9999999999,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    }
+   ],
+   "Bstar": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "Blow": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "range_meta": {
+    "k2": 2,
+    "kmax": 4,
+    "T": 64,
+    "L": 48,
+    "L_fixed": 0
+   },
+   "order_top5": [
+    [
+     1,
+     4096
+    ],
+    [
+     1,
+     2048
+    ],
+    [
+     1,
+     1024
+    ],
+    [
+     1,
+     512
+    ],
+    [
+     1,
+     256
+    ]
+   ],
+   "mechanism": {
+    "ks": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "caps": [
+     0,
+     16,
+     32,
+     64,
+     128,
+     256,
+     512,
+     1024,
+     2048,
+     4096
+    ],
+    "G": [
+     [
+      0.04,
+      0.05,
+      0.1,
+      0.13,
+      0.27,
+      0.63,
+      0.77,
+      0.82,
+      0.85,
+      0.96
+     ],
+     [
+      0.13,
+      0.17,
+      0.19,
+      0.21,
+      0.36,
+      0.51,
+      0.7,
+      0.76,
+      0.78,
+      0.81
+     ],
+     [
+      0.2,
+      0.21,
+      0.26,
+      0.28,
+      0.36,
+      0.62,
+      0.82,
+      0.89,
+      0.9,
+      0.91
+     ],
+     [
+      0.25,
+      0.27,
+      0.28,
+      0.35,
+      0.43,
+      0.59,
+      0.72,
+      0.79,
+      0.83,
+      0.85
+     ]
+    ],
+    "c": [
+     0.7077922077922078,
+     0.3333333333333333,
+     0.09174311926605505,
+     0.08395522388059702
+    ],
+    "l": [
+     0.09479553903345725,
+     0.20446096654275092,
+     0.13626373626373625,
+     0.08189655172413793
+    ],
+    "A_hat": [
+     [
+      0.11931540578380727,
+      0.12544537247139476,
+      0.1560952059093323,
+      0.17448510597209482,
+      0.2603046395983199,
+      0.48098344035147006,
+      0.5668029739776951,
+      0.5974528074156327,
+      0.6158427074783952,
+      0.6832723410418577
+     ],
+     [
+      0.22121437422552664,
+      0.22636926889714992,
+      0.2289467162329616,
+      0.23152416356877326,
+      0.2508550185873606,
+      0.2701858736059479,
+      0.2946716232961586,
+      0.30240396530359354,
+      0.3049814126394052,
+      0.3088475836431227
+     ],
+     [
+      0.1273596128642,
+      0.12691440669422321,
+      0.12468837584433914,
+      0.12379796350438552,
+      0.12023631414457102,
+      0.1086609537251739,
+      0.09975683032563767,
+      0.09664038713579998,
+      0.09619518096582316,
+      0.09574997479584635
+     ],
+     [
+      0.0824112197632527,
+      0.08245239320638188,
+      0.08247297992794647,
+      0.08261708697889861,
+      0.08278178075141535,
+      0.0831111682964488,
+      0.08337879567678846,
+      0.0835229027277406,
+      0.08360524961399898,
+      0.08364642305712816
+     ]
+    ],
+    "acc_measured": [
+     [
+      0.15,
+      0.13,
+      0.21,
+      0.22,
+      0.27,
+      0.52,
+      0.56,
+      0.58,
+      0.58,
+      0.56
+     ],
+     [
+      0.04,
+      0.22,
+      0.22,
+      0.21,
+      0.47,
+      0.4,
+      0.26,
+      0.26,
+      0.27,
+      0.29
+     ],
+     [
+      0.03,
+      0.14,
+      0.09,
+      0.09,
+      0.19,
+      0.13,
+      0.12,
+      0.11,
+      0.11,
+      0.11
+     ],
+     [
+      0.05,
+      0.05,
+      0.02,
+      0.07,
+      0.1,
+      0.12,
+      0.11,
+      0.1,
+      0.11,
+      0.1
+     ]
+    ],
+    "rmse_pts": 6.231627026169689,
+    "noise_floor_pts": 3.7282368486993955,
+    "rmse_over_noise_floor": 1.6714675808066237,
+    "n_g": 100,
+    "n_labels": 100,
+    "uncommitted_cells": [
+     538,
+     538,
+     455,
+     464
+    ],
+    "cells_per_depth": 1000,
+    "uncommitted_share": [
+     0.538,
+     0.538,
+     0.455,
+     0.464
+    ]
+   },
+   "gain_mean_pts": 60.16666666666668,
+   "gain_aggregation": "equal weight per budget",
+   "gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666667
+   ],
+   "pooled_gain_mean_pts": 60.16666666666667,
+   "pooled_gain_aggregation": "every feasible prompt-budget pair",
+   "pooled_gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666665
+   ],
+   "gain_worst_budget_pts": 56.00000000000001,
+   "gain_per_budget_pts": [
+    56.00000000000001,
+    56.00000000000001,
+    61.5,
+    61.5,
+    60.5,
+    60.5,
+    62.0,
+    62.0,
+    61.5
+   ],
+   "n_budgets_with_normal": 9,
+   "n_eval_in_gain": 200,
+   "gain_cal_draw_mean_pts": 60.16666666666667,
+   "gain_cal_draw_sd_pts": 1.1102230246251565e-14,
+   "gain_cal_draw_frac_positive": 1.0
+  },
+  "gated_equation": {
+   "grid": "ouro_2_6b_think",
+   "task": "svamp",
+   "ranking": "equation",
+   "n_labels": null,
+   "c_gate": 0.5,
+   "promptfree": false,
+   "accounting": "cap",
+   "n_eval": 200,
+   "n_cal": 100,
+   "median_prompt_tokens": 636.0,
+   "median_reserve": 14.0,
+   "budgets": [
+    31199.99999999999,
+    39070.85231210713,
+    48927.29167931049,
+    61270.223949799,
+    76726.91894462571,
+    96082.88841181046,
+    120321.80586084991,
+    150675.49701010558,
+    188686.5413697172,
+    236286.6663826447,
+    295894.918126809,
+    370540.59762934514,
+    464017.21043641225,
+    581075.2531806731,
+    727663.6345911009,
+    911231.9999999999
+   ],
+   "per_budget": [
+    {
+     "X": 31199.99999999999,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.24752475247524752,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": false
+    },
+    {
+     "X": 39070.85231210713,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.355,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 48927.29167931049,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.525,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 61270.223949799,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 76726.91894462571,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.68,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 96082.88841181046,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 120321.80586084991,
+     "normal_feasible_frac": 0.0,
+     "policy_acc": 0.685,
+     "normal_acc": NaN,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": false,
+     "in_Blow": true
+    },
+    {
+     "X": 150675.49701010558,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 188686.5413697172,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.125,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.56
+    },
+    {
+     "X": 236286.6663826447,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 295894.918126809,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    },
+    {
+     "X": 370540.59762934514,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 464017.21043641225,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.08,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.605
+    },
+    {
+     "X": 581075.2531806731,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 727663.6345911009,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.065,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.62
+    },
+    {
+     "X": 911231.9999999999,
+     "normal_feasible_frac": 1.0,
+     "policy_acc": 0.685,
+     "normal_acc": 0.07,
+     "gate_reverted_frac": 0.0,
+     "in_Bstar": true,
+     "in_Blow": false,
+     "gain": 0.615
+    }
+   ],
+   "Bstar": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "Blow": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "range_meta": {
+    "k2": 2,
+    "kmax": 4,
+    "T": 64,
+    "L": 48,
+    "L_fixed": 0
+   },
+   "order_top5": [
+    [
+     1,
+     4096
+    ],
+    [
+     1,
+     2048
+    ],
+    [
+     1,
+     1024
+    ],
+    [
+     1,
+     512
+    ],
+    [
+     1,
+     256
+    ]
+   ],
+   "mechanism": {
+    "ks": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "caps": [
+     0,
+     16,
+     32,
+     64,
+     128,
+     256,
+     512,
+     1024,
+     2048,
+     4096
+    ],
+    "G": [
+     [
+      0.04,
+      0.05,
+      0.1,
+      0.13,
+      0.27,
+      0.63,
+      0.77,
+      0.82,
+      0.85,
+      0.96
+     ],
+     [
+      0.13,
+      0.17,
+      0.19,
+      0.21,
+      0.36,
+      0.51,
+      0.7,
+      0.76,
+      0.78,
+      0.81
+     ],
+     [
+      0.2,
+      0.21,
+      0.26,
+      0.28,
+      0.36,
+      0.62,
+      0.82,
+      0.89,
+      0.9,
+      0.91
+     ],
+     [
+      0.25,
+      0.27,
+      0.28,
+      0.35,
+      0.43,
+      0.59,
+      0.72,
+      0.79,
+      0.83,
+      0.85
+     ]
+    ],
+    "c": [
+     0.7077922077922078,
+     0.3333333333333333,
+     0.09174311926605505,
+     0.08395522388059702
+    ],
+    "l": [
+     0.09479553903345725,
+     0.20446096654275092,
+     0.13626373626373625,
+     0.08189655172413793
+    ],
+    "A_hat": [
+     [
+      0.11931540578380727,
+      0.12544537247139476,
+      0.1560952059093323,
+      0.17448510597209482,
+      0.2603046395983199,
+      0.48098344035147006,
+      0.5668029739776951,
+      0.5974528074156327,
+      0.6158427074783952,
+      0.6832723410418577
+     ],
+     [
+      0.22121437422552664,
+      0.22636926889714992,
+      0.2289467162329616,
+      0.23152416356877326,
+      0.2508550185873606,
+      0.2701858736059479,
+      0.2946716232961586,
+      0.30240396530359354,
+      0.3049814126394052,
+      0.3088475836431227
+     ],
+     [
+      0.1273596128642,
+      0.12691440669422321,
+      0.12468837584433914,
+      0.12379796350438552,
+      0.12023631414457102,
+      0.1086609537251739,
+      0.09975683032563767,
+      0.09664038713579998,
+      0.09619518096582316,
+      0.09574997479584635
+     ],
+     [
+      0.0824112197632527,
+      0.08245239320638188,
+      0.08247297992794647,
+      0.08261708697889861,
+      0.08278178075141535,
+      0.0831111682964488,
+      0.08337879567678846,
+      0.0835229027277406,
+      0.08360524961399898,
+      0.08364642305712816
+     ]
+    ],
+    "acc_measured": [
+     [
+      0.15,
+      0.13,
+      0.21,
+      0.22,
+      0.27,
+      0.52,
+      0.56,
+      0.58,
+      0.58,
+      0.56
+     ],
+     [
+      0.04,
+      0.22,
+      0.22,
+      0.21,
+      0.47,
+      0.4,
+      0.26,
+      0.26,
+      0.27,
+      0.29
+     ],
+     [
+      0.03,
+      0.14,
+      0.09,
+      0.09,
+      0.19,
+      0.13,
+      0.12,
+      0.11,
+      0.11,
+      0.11
+     ],
+     [
+      0.05,
+      0.05,
+      0.02,
+      0.07,
+      0.1,
+      0.12,
+      0.11,
+      0.1,
+      0.11,
+      0.1
+     ]
+    ],
+    "rmse_pts": 6.231627026169689,
+    "noise_floor_pts": 3.7282368486993955,
+    "rmse_over_noise_floor": 1.6714675808066237,
+    "n_g": 100,
+    "n_labels": 100,
+    "uncommitted_cells": [
+     538,
+     538,
+     455,
+     464
+    ],
+    "cells_per_depth": 1000,
+    "uncommitted_share": [
+     0.538,
+     0.538,
+     0.455,
+     0.464
+    ]
+   },
+   "gain_mean_pts": 60.16666666666668,
+   "gain_aggregation": "equal weight per budget",
+   "gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666667
+   ],
+   "pooled_gain_mean_pts": 60.16666666666667,
+   "pooled_gain_aggregation": "every feasible prompt-budget pair",
+   "pooled_gain_ci95_pts": [
+    52.77361111111111,
+    67.39166666666665
+   ],
+   "gain_worst_budget_pts": 56.00000000000001,
+   "gain_per_budget_pts": [
+    56.00000000000001,
+    56.00000000000001,
+    61.5,
+    61.5,
+    60.5,
+    60.5,
+    62.0,
+    62.0,
+    61.5
+   ],
+   "n_budgets_with_normal": 9,
+   "n_eval_in_gain": 200,
+   "gain_cal_draw_mean_pts": 60.16666666666667,
+   "gain_cal_draw_sd_pts": 1.1102230246251565e-14,
+   "gain_cal_draw_frac_positive": 1.0
+  }
+ },
+ "default_cost": {
+  "k": 4,
+  "n": 200,
+  "mean": 249393.6,
+  "promptfree": false,
+  "n_at_horizon": 0,
+  "horizon_share": 0.0
+ },
+ "table1": {
+  "task": "svamp",
+  "grid": "ouro_2_6b_think",
+  "promptfree": false,
+  "accounting": "cap",
+  "fractions": [
+   0.25,
+   0.5,
+   0.75,
+   1.0
+  ],
+  "avg_budget": true,
+  "budgets": [
+   62348.4,
+   124696.8,
+   187045.2,
+   249393.6
+  ],
+  "default_cost": {
+   "k": 4,
+   "n": 200,
+   "mean": 249393.6,
+   "promptfree": false,
+   "n_at_horizon": 0,
+   "horizon_share": 0.0
+  },
+  "n_eval": 200,
+  "c_gate": 0.5,
+  "rows": {
+   "default": {
+    "note": "max depth, natural stop, uncapped",
+    "acc_pts": [
+     NaN,
+     NaN,
+     NaN,
+     7.000000000000001
+    ],
+    "feasible": [
+     false,
+     false,
+     false,
+     true
+    ],
+    "unbudgeted_acc_pts": 7.000000000000001,
+    "cost_layer_passes": [
+     249393.6,
+     249393.6,
+     249393.6,
+     249393.6
+    ]
+   },
+   "default_cell": {
+    "note": "the default operating point priced as a cell of the grid: depth 4 at cap 4096, per prompt, under cap accounting",
+    "cell": [
+     4,
+     4096
+    ],
+    "acc_pts": [
+     NaN,
+     NaN,
+     NaN,
+     NaN
+    ],
+    "feasible_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "median_price_layer_passes": 911232.0,
+    "mean_price_layer_passes": 911665.92,
+    "affordable_on_average": [
+     false,
+     false,
+     false,
+     false
+    ]
+   },
+   "lookup": {
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "feasible_frac": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "gate_reverted_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 53.4875,
+      "hi95_pts": 68.0125,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.0,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.9875,
+      "hi95_pts": 69.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.4875,
+      "hi95_pts": 68.5,
+      "n": 200
+     }
+    ]
+   },
+   "default_at_budget": {
+    "note": "normal operation: k_max at its largest affordable cap",
+    "acc_pts": [
+     NaN,
+     5.555555555555555,
+     12.5,
+     7.000000000000001
+    ],
+    "feasible_frac": [
+     0.0,
+     0.45,
+     1.0,
+     1.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": null,
+      "lo95_pts": null,
+      "hi95_pts": null,
+      "n": 0
+     },
+     {
+      "mean_pts": 1.1111111111111112,
+      "lo95_pts": -3.3333333333333335,
+      "hi95_pts": 5.583333333333307,
+      "n": 90
+     },
+     {
+      "mean_pts": 5.5,
+      "lo95_pts": 1.5,
+      "hi95_pts": 10.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 0.0,
+      "lo95_pts": -3.0,
+      "hi95_pts": 2.5,
+      "n": 200
+     }
+    ]
+   },
+   "equation": {
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "feasible_frac": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "gate_reverted_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.0,
+      "hi95_pts": 68.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.9875,
+      "hi95_pts": 68.52499999999998,
+      "n": 200
+     }
+    ]
+   },
+   "equation_n30": {
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "feasible_frac": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "gate_reverted_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 53.9875,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.4875,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.9875,
+      "hi95_pts": 68.5,
+      "n": 200
+     }
+    ]
+   },
+   "equation_n100": {
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "feasible_frac": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "gate_reverted_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 54.0,
+      "hi95_pts": 68.5125,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.9875,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.4875,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.9875,
+      "hi95_pts": 68.0,
+      "n": 200
+     }
+    ]
+   },
+   "gated_equation": {
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "feasible_frac": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "gate_reverted_frac": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.9875,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 55.00000000000001,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.4875,
+      "hi95_pts": 69.5,
+      "n": 200
+     }
+    ]
+   },
+   "avg_lookup": {
+    "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+    "acc_pts": [
+     68.5,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "lambda": [
+     8.138020832926386e-07,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_price_layer_passes": [
+     62765.76,
+     80460.48,
+     80460.48,
+     80460.48
+    ],
+    "cal_mean_price_layer_passes": [
+     61931.04,
+     80608.8,
+     80608.8,
+     80608.8
+    ],
+    "mean_price_over_X_pct": [
+     0.669399695902384,
+     -35.47510441326482,
+     -56.98340294217654,
+     -67.73755220663242
+    ],
+    "over_budget": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "constraint_met_on_calibration": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "cells_used": [
+     {
+      "k1_T512": 144,
+      "k1_T1024": 56
+     },
+     {
+      "k1_T1024": 200
+     },
+     {
+      "k1_T1024": 200
+     },
+     {
+      "k1_T1024": 200
+     }
+    ],
+    "cost_saving_pct": [
+     -0.669399695902384,
+     35.47510441326482,
+     56.98340294217654,
+     67.73755220663242
+    ],
+    "pct_of_default_cost": [
+     25.167349923975596,
+     32.26244779336759,
+     32.26244779336759,
+     32.26244779336759
+    ],
+    "gate_reverted": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "gate_margin_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "gate_sd_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.5,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.9875,
+      "hi95_pts": 69.01249999999999,
+      "n": 200
+     }
+    ],
+    "vs_default_at_budget": [
+     {
+      "mean_pts": null,
+      "lo95_pts": null,
+      "hi95_pts": null,
+      "n": 0
+     },
+     {
+      "mean_pts": 73.33333333333333,
+      "lo95_pts": 62.22222222222222,
+      "hi95_pts": 82.24999999999997,
+      "n": 90
+     },
+     {
+      "mean_pts": 56.00000000000001,
+      "lo95_pts": 47.4875,
+      "hi95_pts": 63.512499999999996,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.5125,
+      "n": 200
+     }
+    ]
+   },
+   "avg_equation": {
+    "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+    "acc_pts": [
+     68.0,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "lambda": [
+     1.247144915239974e-06,
+     5.820009604575267e-07,
+     5.820009604575267e-07,
+     0.0
+    ],
+    "mean_price_layer_passes": [
+     60062.4,
+     104053.44,
+     104053.44,
+     227916.48
+    ],
+    "cal_mean_price_layer_passes": [
+     58981.92,
+     114523.68,
+     114523.68,
+     228064.8
+    ],
+    "mean_price_over_X_pct": [
+     -3.666493446503838,
+     -16.554843428219492,
+     -44.36989561881299,
+     -8.611736628365762
+    ],
+    "over_budget": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "constraint_met_on_calibration": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "cells_used": [
+     {
+      "k1_T1024": 34,
+      "k1_T512": 166
+     },
+     {
+      "k1_T1024": 168,
+      "k1_T4096": 32
+     },
+     {
+      "k1_T1024": 168,
+      "k1_T4096": 32
+     },
+     {
+      "k1_T4096": 200
+     }
+    ],
+    "cost_saving_pct": [
+     3.666493446503838,
+     16.554843428219492,
+     44.36989561881299,
+     8.611736628365762
+    ],
+    "pct_of_default_cost": [
+     24.08337663837404,
+     41.72257828589026,
+     41.72257828589026,
+     91.38826337163424
+    ],
+    "gate_reverted": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "gate_margin_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "gate_sd_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.0,
+      "lo95_pts": 53.5,
+      "hi95_pts": 68.5,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.9875,
+      "hi95_pts": 69.01249999999999,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 68.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.0,
+      "hi95_pts": 69.0,
+      "n": 200
+     }
+    ],
+    "vs_default_at_budget": [
+     {
+      "mean_pts": null,
+      "lo95_pts": null,
+      "hi95_pts": null,
+      "n": 0
+     },
+     {
+      "mean_pts": 73.33333333333333,
+      "lo95_pts": 63.33333333333333,
+      "hi95_pts": 83.33333333333334,
+      "n": 90
+     },
+     {
+      "mean_pts": 56.00000000000001,
+      "lo95_pts": 47.4875,
+      "hi95_pts": 64.01249999999999,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.4875,
+      "hi95_pts": 69.0,
+      "n": 200
+     }
+    ]
+   },
+   "avg_gated_lookup": {
+    "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+    "acc_pts": [
+     68.5,
+     68.5,
+     68.5,
+     68.5
+    ],
+    "lambda": [
+     8.138020832926386e-07,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_price_layer_passes": [
+     62765.76,
+     80460.48,
+     80460.48,
+     80460.48
+    ],
+    "cal_mean_price_layer_passes": [
+     61931.04,
+     80608.8,
+     80608.8,
+     80608.8
+    ],
+    "mean_price_over_X_pct": [
+     0.669399695902384,
+     -35.47510441326482,
+     -56.98340294217654,
+     -67.73755220663242
+    ],
+    "over_budget": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "constraint_met_on_calibration": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "cells_used": [
+     {
+      "k1_T512": 144,
+      "k1_T1024": 56
+     },
+     {
+      "k1_T1024": 200
+     },
+     {
+      "k1_T1024": 200
+     },
+     {
+      "k1_T1024": 200
+     }
+    ],
+    "cost_saving_pct": [
+     -0.669399695902384,
+     35.47510441326482,
+     56.98340294217654,
+     67.73755220663242
+    ],
+    "pct_of_default_cost": [
+     25.167349923975596,
+     32.26244779336759,
+     32.26244779336759,
+     32.26244779336759
+    ],
+    "gate_reverted": [
+     false,
+     false,
+     false,
+     false
+    ],
+    "gate_margin_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "gate_sd_pts": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "vs_default": [
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 53.5,
+      "hi95_pts": 69.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.4875,
+      "hi95_pts": 69.0,
+      "n": 200
+     }
+    ],
+    "vs_default_at_budget": [
+     {
+      "mean_pts": null,
+      "lo95_pts": null,
+      "hi95_pts": null,
+      "n": 0
+     },
+     {
+      "mean_pts": 73.33333333333333,
+      "lo95_pts": 62.22222222222222,
+      "hi95_pts": 83.33333333333334,
+      "n": 90
+     },
+     {
+      "mean_pts": 56.00000000000001,
+      "lo95_pts": 48.9875,
+      "hi95_pts": 64.0,
+      "n": 200
+     },
+     {
+      "mean_pts": 61.5,
+      "lo95_pts": 54.50000000000001,
+      "hi95_pts": 69.5,
+      "n": 200
+     }
+    ]
+   }
+  }
+ },
+ "table1_by_accounting": {
+  "cap": {
+   "task": "svamp",
+   "grid": "ouro_2_6b_think",
+   "promptfree": false,
+   "accounting": "cap",
+   "fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "avg_budget": true,
+   "budgets": [
+    62348.4,
+    124696.8,
+    187045.2,
+    249393.6
+   ],
+   "default_cost": {
+    "k": 4,
+    "n": 200,
+    "mean": 249393.6,
+    "promptfree": false,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+   },
+   "n_eval": 200,
+   "c_gate": 0.5,
+   "rows": {
+    "default": {
+     "note": "max depth, natural stop, uncapped",
+     "acc_pts": [
+      NaN,
+      NaN,
+      NaN,
+      7.000000000000001
+     ],
+     "feasible": [
+      false,
+      false,
+      false,
+      true
+     ],
+     "unbudgeted_acc_pts": 7.000000000000001,
+     "cost_layer_passes": [
+      249393.6,
+      249393.6,
+      249393.6,
+      249393.6
+     ]
+    },
+    "default_cell": {
+     "note": "the default operating point priced as a cell of the grid: depth 4 at cap 4096, per prompt, under cap accounting",
+     "cell": [
+      4,
+      4096
+     ],
+     "acc_pts": [
+      NaN,
+      NaN,
+      NaN,
+      NaN
+     ],
+     "feasible_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "median_price_layer_passes": 911232.0,
+     "mean_price_layer_passes": 911665.92,
+     "affordable_on_average": [
+      false,
+      false,
+      false,
+      false
+     ]
+    },
+    "lookup": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.4875,
+       "hi95_pts": 68.0125,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.0,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "default_at_budget": {
+     "note": "normal operation: k_max at its largest affordable cap",
+     "acc_pts": [
+      NaN,
+      5.555555555555555,
+      12.5,
+      7.000000000000001
+     ],
+     "feasible_frac": [
+      0.0,
+      0.45,
+      1.0,
+      1.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 1.1111111111111112,
+       "lo95_pts": -3.3333333333333335,
+       "hi95_pts": 5.583333333333307,
+       "n": 90
+      },
+      {
+       "mean_pts": 5.5,
+       "lo95_pts": 1.5,
+       "hi95_pts": 10.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 0.0,
+       "lo95_pts": -3.0,
+       "hi95_pts": 2.5,
+       "n": 200
+      }
+     ]
+    },
+    "equation": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.52499999999998,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n30": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n100": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.5125,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.0,
+       "n": 200
+      }
+     ]
+    },
+    "gated_equation": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 55.00000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.4875,
+       "hi95_pts": 69.5,
+       "n": 200
+      }
+     ]
+    },
+    "avg_lookup": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      8.138020832926386e-07,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      62765.76,
+      80460.48,
+      80460.48,
+      80460.48
+     ],
+     "cal_mean_price_layer_passes": [
+      61931.04,
+      80608.8,
+      80608.8,
+      80608.8
+     ],
+     "mean_price_over_X_pct": [
+      0.669399695902384,
+      -35.47510441326482,
+      -56.98340294217654,
+      -67.73755220663242
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T512": 144,
+       "k1_T1024": 56
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      }
+     ],
+     "cost_saving_pct": [
+      -0.669399695902384,
+      35.47510441326482,
+      56.98340294217654,
+      67.73755220663242
+     ],
+     "pct_of_default_cost": [
+      25.167349923975596,
+      32.26244779336759,
+      32.26244779336759,
+      32.26244779336759
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 69.01249999999999,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 62.22222222222222,
+       "hi95_pts": 82.24999999999997,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 47.4875,
+       "hi95_pts": 63.512499999999996,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5125,
+       "n": 200
+      }
+     ]
+    },
+    "avg_equation": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      1.247144915239974e-06,
+      5.820009604575267e-07,
+      5.820009604575267e-07,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      60062.4,
+      104053.44,
+      104053.44,
+      227916.48
+     ],
+     "cal_mean_price_layer_passes": [
+      58981.92,
+      114523.68,
+      114523.68,
+      228064.8
+     ],
+     "mean_price_over_X_pct": [
+      -3.666493446503838,
+      -16.554843428219492,
+      -44.36989561881299,
+      -8.611736628365762
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T1024": 34,
+       "k1_T512": 166
+      },
+      {
+       "k1_T1024": 168,
+       "k1_T4096": 32
+      },
+      {
+       "k1_T1024": 168,
+       "k1_T4096": 32
+      },
+      {
+       "k1_T4096": 200
+      }
+     ],
+     "cost_saving_pct": [
+      3.666493446503838,
+      16.554843428219492,
+      44.36989561881299,
+      8.611736628365762
+     ],
+     "pct_of_default_cost": [
+      24.08337663837404,
+      41.72257828589026,
+      41.72257828589026,
+      91.38826337163424
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.01249999999999,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 69.0,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 63.33333333333333,
+       "hi95_pts": 83.33333333333334,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 47.4875,
+       "hi95_pts": 64.01249999999999,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      }
+     ]
+    },
+    "avg_gated_lookup": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      8.138020832926386e-07,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      62765.76,
+      80460.48,
+      80460.48,
+      80460.48
+     ],
+     "cal_mean_price_layer_passes": [
+      61931.04,
+      80608.8,
+      80608.8,
+      80608.8
+     ],
+     "mean_price_over_X_pct": [
+      0.669399695902384,
+      -35.47510441326482,
+      -56.98340294217654,
+      -67.73755220663242
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T512": 144,
+       "k1_T1024": 56
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      }
+     ],
+     "cost_saving_pct": [
+      -0.669399695902384,
+      35.47510441326482,
+      56.98340294217654,
+      67.73755220663242
+     ],
+     "pct_of_default_cost": [
+      25.167349923975596,
+      32.26244779336759,
+      32.26244779336759,
+      32.26244779336759
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 62.22222222222222,
+       "hi95_pts": 83.33333333333334,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 48.9875,
+       "hi95_pts": 64.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.5,
+       "n": 200
+      }
+     ]
+    }
+   }
+  },
+  "realised": {
+   "task": "svamp",
+   "grid": "ouro_2_6b_think",
+   "promptfree": false,
+   "accounting": "realised",
+   "fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "avg_budget": false,
+   "budgets": [
+    62348.4,
+    124696.8,
+    187045.2,
+    249393.6
+   ],
+   "default_cost": {
+    "k": 4,
+    "n": 200,
+    "mean": 249393.6,
+    "promptfree": false,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+   },
+   "n_eval": 200,
+   "c_gate": 0.5,
+   "rows": {
+    "default": {
+     "note": "max depth, natural stop, uncapped",
+     "acc_pts": [
+      NaN,
+      NaN,
+      NaN,
+      7.000000000000001
+     ],
+     "feasible": [
+      false,
+      false,
+      false,
+      true
+     ],
+     "unbudgeted_acc_pts": 7.000000000000001,
+     "cost_layer_passes": [
+      249393.6,
+      249393.6,
+      249393.6,
+      249393.6
+     ]
+    },
+    "default_cell": {
+     "note": "the default operating point priced as a cell of the grid: depth 4 at cap 4096, per prompt, under realised accounting",
+     "cell": [
+      4,
+      4096
+     ],
+     "acc_pts": [
+      NaN,
+      NaN,
+      2.7027027027027026,
+      4.790419161676647
+     ],
+     "feasible_frac": [
+      0.0,
+      0.0,
+      0.555,
+      0.835
+     ],
+     "median_price_layer_passes": 184416.0,
+     "mean_price_layer_passes": 249393.6,
+     "affordable_on_average": [
+      false,
+      false,
+      false,
+      true
+     ]
+    },
+    "lookup": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.4875,
+       "hi95_pts": 68.0125,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.0,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "default_at_budget": {
+     "note": "normal operation: k_max at its largest affordable cap",
+     "acc_pts": [
+      NaN,
+      5.555555555555555,
+      11.5,
+      6.5
+     ],
+     "feasible_frac": [
+      0.0,
+      0.45,
+      1.0,
+      1.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 1.1111111111111112,
+       "lo95_pts": -3.3333333333333335,
+       "hi95_pts": 5.583333333333307,
+       "n": 90
+      },
+      {
+       "mean_pts": 4.5,
+       "lo95_pts": 1.0,
+       "hi95_pts": 9.0,
+       "n": 200
+      },
+      {
+       "mean_pts": -0.5,
+       "lo95_pts": -3.5000000000000004,
+       "hi95_pts": 2.0,
+       "n": 200
+      }
+     ]
+    },
+    "equation": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.52499999999998,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n30": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n100": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.5125,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.0,
+       "n": 200
+      }
+     ]
+    },
+    "gated_equation": {
+     "acc_pts": [
+      68.0,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.0,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 55.00000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.4875,
+       "hi95_pts": 69.5,
+       "n": 200
+      }
+     ]
+    }
+   }
+  },
+  "expected": {
+   "task": "svamp",
+   "grid": "ouro_2_6b_think",
+   "promptfree": false,
+   "accounting": "expected",
+   "fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "avg_budget": true,
+   "budgets": [
+    62348.4,
+    124696.8,
+    187045.2,
+    249393.6
+   ],
+   "default_cost": {
+    "k": 4,
+    "n": 200,
+    "mean": 249393.6,
+    "promptfree": false,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+   },
+   "n_eval": 200,
+   "c_gate": 0.5,
+   "rows": {
+    "default": {
+     "note": "max depth, natural stop, uncapped",
+     "acc_pts": [
+      NaN,
+      NaN,
+      NaN,
+      7.000000000000001
+     ],
+     "feasible": [
+      false,
+      false,
+      false,
+      true
+     ],
+     "unbudgeted_acc_pts": 7.000000000000001,
+     "cost_layer_passes": [
+      249393.6,
+      249393.6,
+      249393.6,
+      249393.6
+     ]
+    },
+    "default_cell": {
+     "note": "the default operating point priced as a cell of the grid: depth 4 at cap 4096, per prompt, under expected accounting",
+     "cell": [
+      4,
+      4096
+     ],
+     "acc_pts": [
+      NaN,
+      NaN,
+      NaN,
+      NaN
+     ],
+     "feasible_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "median_price_layer_passes": 277920.0,
+     "mean_price_layer_passes": 278353.92,
+     "affordable_on_average": [
+      false,
+      false,
+      false,
+      false
+     ]
+    },
+    "lookup": {
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.0,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "default_at_budget": {
+     "note": "normal operation: k_max at its largest affordable cap",
+     "acc_pts": [
+      NaN,
+      5.555555555555555,
+      12.5,
+      6.5
+     ],
+     "feasible_frac": [
+      0.0,
+      0.45,
+      1.0,
+      1.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 1.1111111111111112,
+       "lo95_pts": -3.3333333333333335,
+       "hi95_pts": 5.583333333333307,
+       "n": 90
+      },
+      {
+       "mean_pts": 5.5,
+       "lo95_pts": 1.5,
+       "hi95_pts": 10.0,
+       "n": 200
+      },
+      {
+       "mean_pts": -0.5,
+       "lo95_pts": -2.5,
+       "hi95_pts": 1.0,
+       "n": 200
+      }
+     ]
+    },
+    "equation": {
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.0125,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.52499999999998,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n30": {
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      }
+     ]
+    },
+    "equation_n100": {
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.02499999999996,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 68.0,
+       "n": 200
+      }
+     ]
+    },
+    "gated_equation": {
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "feasible_frac": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "gate_reverted_frac": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 55.00000000000001,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.4875,
+       "hi95_pts": 69.5,
+       "n": 200
+      }
+     ]
+    },
+    "avg_lookup": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      56160.48,
+      56160.48,
+      56160.48,
+      56160.48
+     ],
+     "cal_mean_price_layer_passes": [
+      56308.8,
+      56308.8,
+      56308.8,
+      56308.8
+     ],
+     "mean_price_over_X_pct": [
+      -9.924745462594064,
+      -54.96237273129702,
+      -69.97491515419803,
+      -77.48118636564851
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      }
+     ],
+     "cost_saving_pct": [
+      9.924745462594064,
+      54.96237273129702,
+      69.97491515419803,
+      77.48118636564851
+     ],
+     "pct_of_default_cost": [
+      22.51881363435148,
+      22.51881363435148,
+      22.51881363435148,
+      22.51881363435148
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.5,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.9875,
+       "hi95_pts": 69.01249999999999,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 62.22222222222222,
+       "hi95_pts": 82.24999999999997,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 47.4875,
+       "hi95_pts": 63.512499999999996,
+       "n": 200
+      },
+      {
+       "mean_pts": 62.0,
+       "lo95_pts": 54.0,
+       "hi95_pts": 68.5125,
+       "n": 200
+      }
+     ]
+    },
+    "avg_equation": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      2.0633187353154263e-06,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      59279.95199999999,
+      97753.43999999999,
+      97753.43999999999,
+      97753.43999999999
+     ],
+     "cal_mean_price_layer_passes": [
+      58804.3776,
+      97901.76000000002,
+      97901.76000000002,
+      97901.76000000002
+     ],
+     "mean_price_over_X_pct": [
+      -4.92145427950037,
+      -21.60709817733897,
+      -47.73806545155931,
+      -60.803549088669484
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T1024": 185,
+       "k1_T4096": 15
+      },
+      {
+       "k1_T4096": 200
+      },
+      {
+       "k1_T4096": 200
+      },
+      {
+       "k1_T4096": 200
+      }
+     ],
+     "cost_saving_pct": [
+      4.92145427950037,
+      21.60709817733897,
+      47.73806545155931,
+      60.803549088669484
+     ],
+     "pct_of_default_cost": [
+      23.76963643012491,
+      39.196450911330516,
+      39.196450911330516,
+      39.196450911330516
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.9875,
+       "hi95_pts": 69.01249999999999,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 68.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 69.0,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 63.33333333333333,
+       "hi95_pts": 83.33333333333334,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 47.4875,
+       "hi95_pts": 64.01249999999999,
+       "n": 200
+      },
+      {
+       "mean_pts": 62.0,
+       "lo95_pts": 55.00000000000001,
+       "hi95_pts": 69.01249999999999,
+       "n": 200
+      }
+     ]
+    },
+    "avg_gated_lookup": {
+     "note": "average budget: every prompt takes the cell maximising score - lambda * price, lambda fitted on the calibration prompts so that THEIR mean price is at most X, then applied unchanged; no per-prompt cap",
+     "acc_pts": [
+      68.5,
+      68.5,
+      68.5,
+      68.5
+     ],
+     "lambda": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "mean_price_layer_passes": [
+      56160.48,
+      56160.48,
+      56160.48,
+      56160.48
+     ],
+     "cal_mean_price_layer_passes": [
+      56308.8,
+      56308.8,
+      56308.8,
+      56308.8
+     ],
+     "mean_price_over_X_pct": [
+      -9.924745462594064,
+      -54.96237273129702,
+      -69.97491515419803,
+      -77.48118636564851
+     ],
+     "over_budget": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "constraint_met_on_calibration": [
+      true,
+      true,
+      true,
+      true
+     ],
+     "cells_used": [
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      },
+      {
+       "k1_T1024": 200
+      }
+     ],
+     "cost_saving_pct": [
+      9.924745462594064,
+      54.96237273129702,
+      69.97491515419803,
+      77.48118636564851
+     ],
+     "pct_of_default_cost": [
+      22.51881363435148,
+      22.51881363435148,
+      22.51881363435148,
+      22.51881363435148
+     ],
+     "gate_reverted": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "gate_margin_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "gate_sd_pts": [
+      null,
+      null,
+      null,
+      null
+     ],
+     "vs_default": [
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.0,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.50000000000001,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 53.5,
+       "hi95_pts": 69.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 61.5,
+       "lo95_pts": 54.4875,
+       "hi95_pts": 69.0,
+       "n": 200
+      }
+     ],
+     "vs_default_at_budget": [
+      {
+       "mean_pts": null,
+       "lo95_pts": null,
+       "hi95_pts": null,
+       "n": 0
+      },
+      {
+       "mean_pts": 73.33333333333333,
+       "lo95_pts": 62.22222222222222,
+       "hi95_pts": 83.33333333333334,
+       "n": 90
+      },
+      {
+       "mean_pts": 56.00000000000001,
+       "lo95_pts": 48.9875,
+       "hi95_pts": 64.0,
+       "n": 200
+      },
+      {
+       "mean_pts": 62.0,
+       "lo95_pts": 55.00000000000001,
+       "hi95_pts": 69.51249999999999,
+       "n": 200
+      }
+     ]
+    }
+   }
+  }
+ }
+}

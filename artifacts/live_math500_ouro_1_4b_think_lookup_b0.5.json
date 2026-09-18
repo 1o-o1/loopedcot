@@ -1,0 +1,617 @@
+{
+  "model": "ouro_1_4b_think",
+  "task": "math500",
+  "cells": [
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_math500_natural_k1.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_math500_natural_k2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_math500_natural_k3.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_math500_natural_k4.jsonl"
+  ],
+  "budget": 139290.24,
+  "grid_complete": true,
+  "n_missing_cells": 0,
+  "allow_incomplete": false,
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "budget_index": null,
+  "budget_fraction": 0.5,
+  "default_cost": {
+    "k": 4,
+    "n": 400,
+    "mean": 278580.48,
+    "promptfree": false
+  },
+  "budgets": [
+    23856.000023856024,
+    29175.863547566983,
+    35682.051177691756,
+    43639.111972526014,
+    53370.589158878516,
+    65272.17577110843,
+    79827.80398416708,
+    97629.32235139735,
+    119400.56104616777,
+    146026.76362769597,
+    178590.58206044626,
+    218416.0985859157,
+    267122.66442664864,
+    326690.7444659995,
+    399542.4452239086,
+    488640.0004886404
+  ],
+  "promptfree": false,
+  "n_eval_used": 400,
+  "n_cal": 100,
+  "median_prompt_tokens": 980.0,
+  "median_reserve": 14.0,
+  "ranked_top5": [
+    [
+      4,
+      4096
+    ],
+    [
+      3,
+      4096
+    ],
+    [
+      4,
+      2048
+    ],
+    [
+      3,
+      2048
+    ],
+    [
+      2,
+      2048
+    ]
+  ],
+  "chosen_histogram": {
+    "k2_B1024": 400
+  },
+  "offline_policy_acc": 0.6675,
+  "offline_normal_acc": 0.3686868686868687,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "runs": [
+    {
+      "k": 2,
+      "B": 1024,
+      "n": 400,
+      "rc": 0,
+      "seconds": 1768.1,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_math500/live_k2_B1024",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=math500 --k=2 --caps=1024 --no-extra-caps --horizon=1024 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_math500/live_k2_B1024 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_math500/live_k2_B1024/row_ids.json"
+    }
+  ],
+  "n_live_rows": 400,
+  "live_acc": 0.6825,
+  "grid_acc_same_rows": 0.6675,
+  "offline_policy_acc_same_rows": 0.6675,
+  "delta_pp": 1.5,
+  "n_flips": 42,
+  "flips": [
+    {
+      "row_idx": 4,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 6,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 19,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 24,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 30,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 51,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 59,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 105,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 111,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 112,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 120,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 128,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 139,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 151,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 172,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 176,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 177,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 217,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 255,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 267,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 271,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 279,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 294,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 296,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 302,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 317,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 323,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 332,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 358,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 359,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 360,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 364,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 367,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 377,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 390,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 391,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 400,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 402,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 403,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 459,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 473,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 480,
+      "cell": [
+        2,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}

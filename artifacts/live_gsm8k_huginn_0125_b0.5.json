@@ -1,0 +1,341 @@
+{
+  "model": "huginn_0125",
+  "task": "gsm8k",
+  "cells": [
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k1.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k16.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k32.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k4.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_huginn_0125_gsm8k_natural_k8.jsonl"
+  ],
+  "budget": 52290.02953240361,
+  "grid_complete": true,
+  "n_missing_cells": 0,
+  "allow_incomplete": false,
+  "layers_per_loop": 4,
+  "layers_fixed": 4,
+  "budget_index": null,
+  "budget_fraction": 0.5,
+  "default_cost": {
+    "k": 32,
+    "n": 1219,
+    "mean": 104580.05906480722,
+    "promptfree": false
+  },
+  "budgets": [
+    4912.000004912001,
+    6782.879846090285,
+    9366.339364920648,
+    12933.785514338675,
+    17859.998577185248,
+    24662.50494284376,
+    34055.946165234964,
+    47027.156077506224,
+    64938.83323657961,
+    89672.70007095713,
+    123827.18840544659,
+    170990.419339052,
+    236117.1555475518,
+    326049.32697029714,
+    450234.8140322827,
+    621720.00062172
+  ],
+  "promptfree": false,
+  "n_eval_used": 1219,
+  "n_cal": 100,
+  "median_prompt_tokens": 598.0,
+  "median_reserve": 16.0,
+  "ranked_top5": [
+    [
+      32,
+      256
+    ],
+    [
+      32,
+      512
+    ],
+    [
+      32,
+      1024
+    ],
+    [
+      32,
+      2048
+    ],
+    [
+      32,
+      4096
+    ]
+  ],
+  "chosen_histogram": {
+    "k16_B128": 1046,
+    "k8_B128": 173
+  },
+  "offline_policy_acc": 0.18867924528301888,
+  "offline_normal_acc": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "runs": [
+    {
+      "k": 8,
+      "B": 128,
+      "n": 173,
+      "rc": 0,
+      "seconds": 248.2,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k8_B128",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=huginn_0125 --task=gsm8k --k=8 --caps=128 --no-extra-caps --horizon=128 --out=/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k8_B128 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k8_B128/row_ids.json"
+    },
+    {
+      "k": 16,
+      "B": 128,
+      "n": 1046,
+      "rc": 0,
+      "seconds": 1980.7,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k16_B128",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=huginn_0125 --task=gsm8k --k=16 --caps=128 --no-extra-caps --horizon=128 --out=/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k16_B128 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_huginn_0125_gsm8k/live_k16_B128/row_ids.json"
+    }
+  ],
+  "n_live_rows": 1219,
+  "live_acc": 0.1903199343724364,
+  "grid_acc_same_rows": 0.18867924528301888,
+  "offline_policy_acc_same_rows": 0.18867924528301888,
+  "delta_pp": 0.164,
+  "n_flips": 10,
+  "flips": [
+    {
+      "row_idx": 9,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 251,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 300,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 415,
+      "cell": [
+        8,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 459,
+      "cell": [
+        8,
+        128
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 575,
+      "cell": [
+        8,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 900,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1055,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1131,
+      "cell": [
+        16,
+        128
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1176,
+      "cell": [
+        8,
+        128
+      ],
+      "grid": true,
+      "live": false
+    }
+  ],
+  "missing_rows": []
+}

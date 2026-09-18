@@ -1,0 +1,341 @@
+{
+  "model": "ouro_2_6b_base",
+  "task": "gsm8k",
+  "arm": "avg_gated_lookup",
+  "accounting": "expected",
+  "budget_fraction": 1.0,
+  "budget": 151459.96390484003,
+  "default_cost": {
+    "k": 4,
+    "n": 1219,
+    "mean": 151459.96390484003,
+    "promptfree": false,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "c_gate": 0.5,
+  "lambda": 0.0,
+  "gate_reverted": true,
+  "gate_margin_pts": -4.440892098500626e-14,
+  "gate_sd_pts": 0.46837484987987416,
+  "grid_mean_price_layer_passes": 146700.54694011481,
+  "n_eval_used": 1219,
+  "n_cal": 100,
+  "chosen_histogram": {
+    "k4_B4096": 1219
+  },
+  "layers_per_loop": 48,
+  "layers_fixed": 0,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "grid_acc_at_picks": 0.8269073010664479,
+  "runs": [
+    {
+      "k": 4,
+      "B": 4096,
+      "n": 1219,
+      "rc": 0,
+      "seconds": 7108.0,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_gsm8k_avg/live_k4_B4096",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_2_6b_base --task=gsm8k --k=4 --caps=4096 --no-extra-caps --horizon=4096 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_gsm8k_avg/live_k4_B4096 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_gsm8k_avg/live_k4_B4096/row_ids.json"
+    }
+  ],
+  "n_live_rows": 1219,
+  "live_acc": 0.8252666119770303,
+  "grid_acc_same_rows": 0.8269073010664479,
+  "delta_pp": -0.164,
+  "live_mean_price_layer_passes": 149553.98195242003,
+  "grid_mean_price_same_rows": 151459.96390484003,
+  "price_over_budget_pct": -1.26,
+  "n_flips": 16,
+  "flips": [
+    {
+      "row_idx": 129,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 153,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 214,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 279,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 331,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 369,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 439,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 540,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 583,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 713,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 901,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1030,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1129,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1137,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1176,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1204,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    }
+  ],
+  "missing_rows": []
+}

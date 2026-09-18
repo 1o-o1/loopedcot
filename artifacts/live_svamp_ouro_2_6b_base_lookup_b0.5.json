@@ -1,0 +1,267 @@
+{
+  "model": "ouro_2_6b_base",
+  "task": "svamp",
+  "cells": [
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_base_svamp_natural_k1.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_base_svamp_natural_k2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_base_svamp_natural_k3.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_base_svamp_natural_k4.jsonl"
+  ],
+  "budget": 65617.92,
+  "grid_complete": true,
+  "n_missing_cells": 0,
+  "allow_incomplete": false,
+  "layers_per_loop": 48,
+  "layers_fixed": 0,
+  "budget_index": null,
+  "budget_fraction": 0.5,
+  "default_cost": {
+    "k": 4,
+    "n": 200,
+    "mean": 131235.84,
+    "promptfree": false
+  },
+  "budgets": [
+    30144.00003014399,
+    37823.48694896919,
+    47459.40033002345,
+    59550.15947430555,
+    74721.16100826155,
+    93757.12763341267,
+    117642.69804501734,
+    147613.3575403924,
+    185219.343711495,
+    232405.83275486762,
+    291613.55404981604,
+    365905.03731143515,
+    459123.02247450076,
+    576089.2260871131,
+    722853.7454404853,
+    907008.0009070081
+  ],
+  "promptfree": false,
+  "n_eval_used": 200,
+  "n_cal": 100,
+  "median_prompt_tokens": 617.0,
+  "median_reserve": 11.0,
+  "ranked_top5": [
+    [
+      3,
+      128
+    ],
+    [
+      3,
+      256
+    ],
+    [
+      3,
+      512
+    ],
+    [
+      3,
+      1024
+    ],
+    [
+      3,
+      2048
+    ]
+  ],
+  "chosen_histogram": {
+    "k1_B128": 175,
+    "k2_B64": 25
+  },
+  "offline_policy_acc": 0.515,
+  "offline_normal_acc": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "runs": [
+    {
+      "k": 1,
+      "B": 128,
+      "n": 175,
+      "rc": 0,
+      "seconds": 103.4,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k1_B128",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_2_6b_base --task=svamp --k=1 --caps=128 --no-extra-caps --horizon=128 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k1_B128 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k1_B128/row_ids.json"
+    },
+    {
+      "k": 2,
+      "B": 64,
+      "n": 25,
+      "rc": 0,
+      "seconds": 26.9,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k2_B64",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_2_6b_base --task=svamp --k=2 --caps=64 --no-extra-caps --horizon=64 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k2_B64 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_base_svamp/live_k2_B64/row_ids.json"
+    }
+  ],
+  "n_live_rows": 200,
+  "live_acc": 0.515,
+  "grid_acc_same_rows": 0.515,
+  "offline_policy_acc_same_rows": 0.515,
+  "delta_pp": 0.0,
+  "n_flips": 2,
+  "flips": [
+    {
+      "row_idx": 8,
+      "cell": [
+        1,
+        128
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 46,
+      "cell": [
+        1,
+        128
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}

@@ -1,0 +1,183 @@
+{
+  "files": [
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k1_s0of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k1_s1of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k2_s0of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k3_s0of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k3_s1of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k4_s0of2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_2_6b_think_csqa_forced_k4_s1of2.jsonl"
+  ],
+  "complete": true,
+  "n_missing": 0,
+  "table": {
+    "model": "ouro_2_6b_think",
+    "task": "csqa",
+    "protocol": "forced",
+    "label": "v2",
+    "split": "eval",
+    "n": 562,
+    "ks": [
+      4
+    ],
+    "Bs": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "acc": [
+      [
+        0.795374,
+        0.793594,
+        0.798932,
+        0.822064,
+        0.811388,
+        0.809609,
+        0.807829,
+        0.811388,
+        0.80427,
+        0.80605
+      ]
+    ],
+    "parse_rate_forced": [
+      [
+        1.0,
+        0.998221,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "own_rate": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.02847,
+        0.288256,
+        0.635231,
+        0.717082,
+        0.720641
+      ]
+    ],
+    "natural_stop_mean": [
+      [
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604,
+        503.604
+      ]
+    ],
+    "mean_layer_passes": [
+      [
+        121118.5,
+        124176.2,
+        127258.8,
+        133408.2,
+        145651.5,
+        170058.0,
+        219233.6,
+        317570.4,
+        514199.6,
+        907376.3
+      ]
+    ],
+    "mean_layer_passes_promptfree": [
+      [
+        2684.9,
+        5742.6,
+        8825.2,
+        14974.6,
+        27217.9,
+        51624.4,
+        100800.0,
+        199136.8,
+        395766.0,
+        788942.7
+      ]
+    ],
+    "median_prompt_tokens": 616.0,
+    "median_reserve_tokens": 13.0
+  },
+  "mechanism": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "ks": [
+      4
+    ],
+    "n": 562,
+    "G": [
+      [
+        0.7758007117437722,
+        0.7793594306049823,
+        0.7900355871886121,
+        0.8238434163701067,
+        0.8398576512455516,
+        0.896797153024911,
+        0.9501779359430605,
+        0.9697508896797153,
+        0.9839857651245552,
+        1.0
+      ]
+    ],
+    "c": [
+      0.852757018784084
+    ],
+    "l": [
+      0.46038863976083705
+    ],
+    "acc": [
+      [
+        0.7953736654804271,
+        0.7935943060498221,
+        0.798932384341637,
+        0.8220640569395018,
+        0.8113879003558719,
+        0.8096085409252669,
+        0.8078291814946619,
+        0.8113879003558719,
+        0.8042704626334519,
+        0.806049822064057
+      ]
+    ],
+    "rmse_commitment": 3.150193976934658,
+    "noise_floor": 1.6675054586117737,
+    "arrival_cap_median": [
+      0.0
+    ],
+    "arrival_cap_never_frac": [
+      0.0
+    ],
+    "strict": false
+  }
+}

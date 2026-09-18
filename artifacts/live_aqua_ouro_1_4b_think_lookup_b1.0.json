@@ -1,0 +1,320 @@
+{
+  "model": "ouro_1_4b_think",
+  "task": "aqua",
+  "cells": [
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_aqua_natural_k1.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_aqua_natural_k2.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_aqua_natural_k3.jsonl",
+    "/home/mzaoad/loopedcot/artifacts/cells_ouro_1_4b_think_aqua_natural_k4.jsonl"
+  ],
+  "budget": 223282.9090909091,
+  "grid_complete": true,
+  "n_missing_cells": 0,
+  "allow_incomplete": false,
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "budget_index": null,
+  "budget_fraction": 1.0,
+  "default_cost": {
+    "k": 4,
+    "n": 154,
+    "mean": 223282.9090909091,
+    "promptfree": false
+  },
+  "budgets": [
+    15720.000015720007,
+    19677.025884443927,
+    24630.11114948415,
+    30829.983087817043,
+    38590.4818466477,
+    48304.44716477761,
+    60463.604086806285,
+    75683.454293455,
+    94734.43305771117,
+    118580.9090051279,
+    148430.000862689,
+    185792.68232076993,
+    232560.26816222706,
+    291100.1534189106,
+    364375.6519123101,
+    456096.0004560956
+  ],
+  "promptfree": false,
+  "n_eval_used": 154,
+  "n_cal": 100,
+  "median_prompt_tokens": 642.0,
+  "median_reserve": 13.0,
+  "ranked_top5": [
+    [
+      4,
+      4096
+    ],
+    [
+      4,
+      2048
+    ],
+    [
+      3,
+      4096
+    ],
+    [
+      3,
+      2048
+    ],
+    [
+      3,
+      1024
+    ]
+  ],
+  "chosen_histogram": {
+    "k3_B2048": 154
+  },
+  "offline_policy_acc": 0.8441558441558441,
+  "offline_normal_acc": 0.7857142857142857,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "runs": [
+    {
+      "k": 3,
+      "B": 2048,
+      "n": 154,
+      "rc": 0,
+      "seconds": 1379.0,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_aqua/live_k3_B2048",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=aqua --k=3 --caps=2048 --no-extra-caps --horizon=2048 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_aqua/live_k3_B2048 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_aqua/live_k3_B2048/row_ids.json"
+    }
+  ],
+  "n_live_rows": 154,
+  "live_acc": 0.8376623376623377,
+  "grid_acc_same_rows": 0.8441558441558441,
+  "offline_policy_acc_same_rows": 0.8441558441558441,
+  "delta_pp": -0.649,
+  "n_flips": 9,
+  "flips": [
+    {
+      "row_idx": 16,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 22,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 26,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 54,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 59,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 67,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 97,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 185,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 244,
+      "cell": [
+        3,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    }
+  ],
+  "missing_rows": []
+}

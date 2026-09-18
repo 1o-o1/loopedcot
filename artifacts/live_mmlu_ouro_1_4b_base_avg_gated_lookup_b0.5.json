@@ -1,0 +1,333 @@
+{
+  "model": "ouro_1_4b_base",
+  "task": "mmlu",
+  "arm": "avg_gated_lookup",
+  "accounting": "expected",
+  "budget_fraction": 0.5,
+  "budget": 29147.545263157896,
+  "default_cost": {
+    "k": 4,
+    "n": 1900,
+    "mean": 58295.09052631579,
+    "promptfree": false,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "c_gate": 0.5,
+  "lambda": 7.995735607587065e-06,
+  "gate_reverted": false,
+  "gate_margin_pts": null,
+  "gate_sd_pts": null,
+  "grid_mean_price_layer_passes": 28833.953684210526,
+  "n_eval_used": 1900,
+  "n_cal": 100,
+  "chosen_histogram": {
+    "k2_B0": 1012,
+    "k3_B0": 888
+  },
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "forced_block": {
+      "enabled": true,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "csqa"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "d44dbd005a74ee19ba60ec101f078ac0f8966426a476685eaa4cc9a12dc82254",
+  "grid_acc_at_picks": 0.6142105263157894,
+  "runs": [
+    {
+      "k": 2,
+      "B": 0,
+      "n": 1012,
+      "rc": 0,
+      "seconds": 162.6,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k2_B0",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_base --task=mmlu --k=2 --caps=0 --no-extra-caps --horizon=1 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k2_B0 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k2_B0/row_ids.json"
+    },
+    {
+      "k": 3,
+      "B": 0,
+      "n": 888,
+      "rc": 0,
+      "seconds": 151.4,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k3_B0",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_base --task=mmlu --k=3 --caps=0 --no-extra-caps --horizon=1 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k3_B0 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_mmlu_avg/live_k3_B0/row_ids.json"
+    }
+  ],
+  "n_live_rows": 1900,
+  "live_acc": 0.6152631578947368,
+  "grid_acc_same_rows": 0.6142105263157894,
+  "delta_pp": 0.105,
+  "live_mean_price_layer_passes": 28829.91157894737,
+  "grid_mean_price_same_rows": 28829.81052631579,
+  "price_over_budget_pct": -1.09,
+  "n_flips": 14,
+  "flips": [
+    {
+      "row_idx": 41,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 65,
+      "cell": [
+        3,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 168,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 206,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 455,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 642,
+      "cell": [
+        3,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 726,
+      "cell": [
+        3,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 833,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 859,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 928,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 998,
+      "cell": [
+        3,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1310,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1617,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1887,
+      "cell": [
+        2,
+        0
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}
