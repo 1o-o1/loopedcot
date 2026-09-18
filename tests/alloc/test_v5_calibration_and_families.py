@@ -279,9 +279,12 @@ class TestTheFamiliesStillRefuseANoiseWinner(unittest.TestCase):
             self.assertGreater(table["rows"][arm]["acc_pts"][ONE], fallback - 8.0, arm)
 
     def test_the_average_budget_arm_reverts_on_the_null_surface(self):
+        """It reverts to its reference: the deepest depth, at natural stop or at the largest cap
+        each question affords, whichever of the two reads better on the calibration half."""
         row = t1("null", True)["rows"][P.AVG_GATED]
         self.assertTrue(row["gate_reverted"][ONE])
-        self.assertEqual(list(row["cells_used"][ONE]), ["k%d_T%d" % DEFAULT_CELL])
+        self.assertEqual(row["reference_k"][ONE], DEFAULT_CELL[0])
+        self.assertEqual(row["cells_used"][ONE], row["reference_cells"][ONE])
 
 
 class TestNoFamilyOpensOnALosingSurface(unittest.TestCase):

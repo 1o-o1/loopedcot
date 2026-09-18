@@ -320,6 +320,24 @@ points ahead against a 7.0-point SD, so the policy stands and keeps the 59.7 it 
 `--gate-mode whole` the same two rows read +8.0 and -0.0 against calibration SDs of 4.6 and 1.3,
 which is the biased reading the split replaces.
 
+**What the gate rules against** (`evaluate.normal_at_budget`, 2026-09-18). Three candidates, each
+priced with the SAME `policy.Cost` as the arm, the best of them on the calibration split, and
+`reference_rule` on the row says which: `default_cell`, the deepest depth at natural stop where its
+mean price fits; `deepest_depth_capped` / `shallower_depth`, the deepest depth at the largest cap
+whose MEAN PRICE fits, one depth down where not even the cheapest cap fits; and `default_at_budget`,
+the per-prompt hard cap Table 1 reports under that name. The third is what keeps a gated row from
+landing below its own table's `default_at_budget` row.
+
+The cap the reference takes used to be read off `policy.avg_picks` at a fitted multiplier, which can
+only name a cell on the upper convex hull of (price, cap) and breaks the tie at the hull's own slope
+to the cheaper one. Under `cap` accounting the geometric ladder is its own hull and nothing was
+wrong; under `expected`, where every cap past the mean natural length costs the same, the middle of
+the ladder falls off it and the rule returned the cheapest cap of the depth whatever the run was
+priced under. On mcleish_llama32_r32/svamp at 1.0x that reference was depth 8 at cap 0, nine points,
+where the budget affords cap 64 at 67.5; both gated arms measured a verified +47 against it, opened,
+and landed at 51.5 -- sixteen points below `default_at_budget`. Reading the mean price directly, at
+the run's own accounting, is what removes it (`tests/alloc/test_reference_pricing.py`).
+
 **Underspending is the claim, not a defect.** Where the multiplier reaches 0 the budget never
 binds: the arm buys its best-scoring cell outright and spends less than it was given. Each row
 carries `cost_saving_pct` against its own budget and `pct_of_default_cost`, and the markdown says

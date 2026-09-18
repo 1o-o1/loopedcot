@@ -212,7 +212,10 @@ class TestTheCheaperEvaluationHalf(unittest.TestCase):
     def test_the_gate_still_runs_and_the_row_is_not_an_ungated_pick(self):
         r, plain = self.row, self.t1["rows"]["avg_lookup"]
         self.assertIsNotNone(r["gate_margin_pts"][ONE])
-        self.assertEqual(r["reference_rule"][ONE], "deepest_depth_capped")
+        # the default cell does not fit the calibration mean, so the reference is one of the
+        # two normal-operation candidates, whichever reads better on the fitting half
+        self.assertEqual(r["reference_rule"][ONE], "default_at_budget")
+        self.assertEqual(r["reference_k"][ONE], KS[-1])
         self.assertTrue(r["gate_reverted"][ONE])
         self.assertGreater(r["acc_pts"][ONE], plain["acc_pts"][ONE])
 

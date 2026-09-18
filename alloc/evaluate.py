@@ -997,8 +997,10 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
                         else cells.acc[dki, dbi, ev]) for v in V]
             rows[name].update({
                 "note": rows[name]["note"] + "; the gate's reference is NORMAL OPERATION at the "
-                        "same budget -- the deepest depth at the largest cap per prompt the budget "
-                        "affords on average, the default cell itself wherever that is affordable",
+                        "same budget, priced under this run's accounting -- the best on the "
+                        "calibration split of the default cell, the deepest depth at the largest "
+                        "cap whose mean price fits, and the per-prompt hard cap of the "
+                        "`default_at_budget` row; `reference_rule` says which",
                 "reference_rule": [v.get("reference_rule") for v in V],
                 "reference_k": [v.get("reference_k") for v in V],
                 "reference_cells": [v.get("reference_cells") for v in V],
@@ -1140,73 +1142,142 @@ def cells_used(cells, a, b):
     return counts
 
 
-def normal_at_budget(cells, fit_prices, X, default_kt):
+def _one_cell_picker(ki, bi):
+    """Return a picker that runs the single cell (ki, bi) for every prompt it is read on."""
+    def pick(prices):
+        n = np.asarray(prices, float).shape[2]
+        return np.full(n, int(ki), int), np.full(n, int(bi), int)
+    return pick
+
+
+def _hard_cap_picker(ki, order_dear_first, cheapest_bi, X):
+    """Return a picker for the PER-PROMPT HARD CAP at depth `ki`: the largest cap whose own price
+    fits X, exactly as `policy.policy_vectors` reads normal operation for the `default_at_budget`
+    row. A prompt that can afford no cap there runs the cheapest one, because a reference has to name
+    a cell for every prompt; Table 1 own row leaves that prompt out instead, so the two differ only
+    on prompts Table 1 does not count.
+    """
+    def pick(prices):
+        Pr = np.asarray(prices, float)
+        n = Pr.shape[2]
+        a = np.full(n, int(ki), int)
+        b = np.full(n, int(cheapest_bi), int)
+        taken = np.zeros(n, bool)
+        for j in order_dear_first:
+            fits = np.asarray(pol.affordable(Pr[int(ki), int(j)], X), bool) & ~taken
+            b[fits] = int(j)
+            taken |= fits
+        return a, b
+    return pick
+
+
+def normal_at_budget(cells, fit_prices, X, default_kt, fit_pos=None):
     """Return the reference the average-budget gate measures against at budget X: NORMAL OPERATION
     AT THAT BUDGET. Never None -- a gated arm must never be able to return an ungated pick.
 
-    Normal operation at a budget is the deepest depth run as far as the budget allows: per prompt
-    the largest cap at the deepest depth such that the MEAN price over the fitting prompts is at
-    most X, which is `policy.avg_picks` on a score ranking the caps by the tokens they buy, the cap
-    standing for natural stop first. If even the cheapest cap at the deepest depth is unaffordable
-    on average, the rule steps down one depth and repeats.
+    The reference is the BEST ON THE CALIBRATION SPLIT of three candidates, each priced with the
+    run own accounting: `fit_prices` is the (depth, cap, prompt) tensor of the same `policy.Cost`
+    the arm is priced with, over the prompts the arm multiplier is fitted on.
 
-    Where the DEFAULT CELL -- the deepest depth at natural stop -- is itself affordable on average
-    this returns exactly that cell for every prompt, which is the reference the gate has always
-    used, so a row that gated before gates against the same thing. Where it is not, the reference is
-    the same operating point with the cap, then the depth, stepped down, instead of no reference at
-    all: below the default cell's own mean price the gate used to be skipped entirely and the
-    average-budget pick stood ungated at the budgets where its deviation is largest.
+    `default_cell`          the deepest depth at natural stop for every prompt, offered only where
+                            its own mean price over those prompts fits X.
+    `deepest_depth_capped`  average-budget normal operation: the deepest depth at the LARGEST CAP
+                            whose mean price fits X, stepping down one depth (`shallower_depth`)
+                            only where not even the cheapest cap at the deepest depth fits.
+    `default_at_budget`     the per-prompt hard cap Table 1 reports under that name: the deepest
+                            depth at the largest cap each prompt OWN price affords. Offered only
+                            where its mean price fits X as well.
 
-    `fit_prices` is the (depth, cap, prompt) price tensor of the prompts the arm's multiplier is
-    fitted on -- the selection half under the split gate -- so the reference is fitted where the arm
-    is and then read off any prompt set with `reference_record`.
+    Whichever has the highest mean accuracy on `fit_pos` is the reference, ties going to the order
+    above, and `rule` records which one it was. Reading the fitting prompts labels and not the
+    evaluation prompts keeps the choice out of the number it is compared against. With no `fit_pos`
+    the order above decides alone.
 
-    The affordability test reads the FITTING prompts' mean price, and the evaluation prompts can be
+    Why the best of three and not one rule: the cap ladder is priced in tokens and scored by the cap
+    it buys, so under `expected` accounting -- where every cap past the natural length costs the
+    same -- most of the ladder sits off the upper convex hull of (price, cap) and no multiplier can
+    reach it. The old rule read the reference off `policy.avg_picks` at a fitted multiplier and could
+    therefore only ever name a hull cell, and at the hull own slope the tie goes to the cheaper one:
+    on mcleish_llama32_r32/svamp at 1.0x under `expected` that is depth 8 at cap 0, nine points,
+    while the budget affords cap 64 at sixty-seven. The gate then measured a 47-point deviation
+    against a reference the run had no reason to operate at, opened, and the row landed sixteen
+    points BELOW the `default_at_budget` row of the same table. Reading the mean price directly, at
+    the run own accounting, is what removes that.
+
+    `affordable_on_average` is False only at a budget no cell of the grid fits on average at all; the
+    reference is then the cheapest cell of the shallowest depth (`cheapest_over_budget`), so the gate
+    still has something measured to rule against and the row `over_budget` flag says the budget could
+    not be met.
+
+    The affordability test reads the FITTING prompts mean price, and the evaluation prompts can be
     cheaper (arc/ouro_2_6b_base at 1.0x: the default cell is over the budget on the calibration mean
     and under it on the evaluation mean). That only decides WHICH reference the rule names; the gate
     runs against it either way, and both mean prices are recorded on the row so the gap is visible.
 
-    Returns {"score", "lambda", "k", "rule", "affordable_on_average"}: the surface and multiplier
-    `policy.avg_picks` reads the reference off, the depth index it settled on, and which of the four
-    rules applied (`default_cell`, `deepest_depth_capped`, `shallower_depth`, and
-    `cheapest_over_budget` where no cell of the grid fits X on average at all).
+    Returns {"pick", "k", "rule", "affordable_on_average", "lambda"}: a per-prompt picker
+    `reference_record` reads the reference off any prompt set with, the depth index it settled on,
+    and which rule applied. `lambda` stays at zero for the record sake -- no multiplier decides a
+    reference any more.
     """
-    nk, nb = len(cells.ks), len(cells.caps)
-    dki, dbi = list(cells.ks).index(default_kt[0]), list(cells.caps).index(default_kt[1])
+    nk = len(cells.ks)
+    dki = list(cells.ks).index(default_kt[0])
+    dbi = list(cells.caps).index(default_kt[1])
     # The caps are ranked by the tokens they buy, not by their index, so a grid that marks "no cap
     # at all" with a negative cap still has natural stop at the top of the ranking.
-    limits = C.cap_limits(cells)
-    rank = np.empty(nb, float)
-    rank[np.argsort(limits, kind="stable")] = np.arange(nb, dtype=float)
+    by_limit = [int(j) for j in np.argsort(C.cap_limits(cells), kind="stable")]
+    dear_first = by_limit[::-1]
+    cheapest_bi = by_limit[0]
     prices = np.asarray(fit_prices, float)
+    idx = np.arange(prices.shape[2])
+    X = float(X)
+
+    def fits_on_average(pick):
+        a, b = pick(prices)
+        return pol.affordable(float(prices[a, b, idx].mean()), X)
+
+    cands = []
+    p_default = _one_cell_picker(dki, dbi)
+    if fits_on_average(p_default):
+        cands.append(("default_cell", dki, p_default))
     for d in range(nk - 1, -1, -1):
-        if not pol.affordable(float(np.nanmin(prices[d], axis=0).mean()), X):
+        top = next((j for j in dear_first
+                    if pol.affordable(float(prices[d, j].mean()), X)), None)
+        if top is None:
             continue                 # not even the cheapest cap at this depth fits X on average
-        S = np.full((nk, nb), np.nan)
-        S[d, :] = rank
-        lam, _spend, _met = pol.lambda_for_budget(S, prices, X)
-        default_ok = d == dki and pol.affordable(float(prices[dki, dbi, :].mean()), X)
-        rule = ("default_cell" if default_ok
-                else "deepest_depth_capped" if d == dki else "shallower_depth")
-        return {"score": S, "lambda": float(lam), "k": int(d), "rule": rule,
-                "affordable_on_average": True}
-    # No cell of the grid fits X on average, at any depth. The reference is then the cheapest cell
-    # of the shallowest depth -- where the Lagrangian's own floor sits -- so the gate still has a
-    # measured reference and the gated arm cannot quietly become an ungated one. The row's
-    # `over_budget` flag is what says the budget could not be met.
-    S = np.full((nk, nb), np.nan)
-    S[0, :] = rank
-    lam, _spend, _met = pol.lambda_for_budget(S, prices, X)
-    return {"score": S, "lambda": float(lam), "k": 0, "rule": "cheapest_over_budget",
-            "affordable_on_average": False}
+        cands.append(("deepest_depth_capped" if d == dki else "shallower_depth", d,
+                      _one_cell_picker(d, top)))
+        break
+    p_hard = _hard_cap_picker(dki, dear_first, cheapest_bi, X)
+    if fits_on_average(p_hard):
+        cands.append(("default_at_budget", dki, p_hard))
+
+    if not cands:
+        # No cell of the grid fits X on average, at any depth. The reference is then the cheapest
+        # cell of the shallowest depth -- where the Lagrangian own floor sits -- so the gate still
+        # has a measured reference and the gated arm cannot quietly become an ungated one.
+        return {"pick": _one_cell_picker(0, cheapest_bi), "lambda": 0.0, "k": 0,
+                "rule": "cheapest_over_budget", "affordable_on_average": False}
+
+    def cal_acc(pick):
+        if fit_pos is None:
+            return -np.inf
+        a, b = pick(prices)
+        v = _nanmean(cells.acc[a, b, np.asarray(fit_pos, dtype=int)])
+        return -np.inf if v != v else float(v)
+
+    # highest calibration accuracy wins; a tie goes to the candidate listed first above
+    best = max(range(len(cands)), key=lambda i: (cal_acc(cands[i][2]), -i))
+    rule, k, pick = cands[best]
+    return {"pick": pick, "lambda": 0.0, "k": int(k), "rule": rule,
+            "affordable_on_average": True}
 
 
 def reference_record(cells, ref, pos, prices):
     """Return (depth indices, cap indices, record fields) of one reference over the prompts `pos`."""
-    a, b = pol.avg_picks(ref["score"], prices, ref["lambda"])
+    a, b = ref["pick"](prices)
     price = np.asarray(prices, float)[a, b, np.arange(len(pos))]
     return a, b, {"reference_rule": ref["rule"], "reference_k": int(cells.ks[ref["k"]]),
-                  "reference_lambda": float(ref["lambda"]),
+                  "reference_lambda": float(ref.get("lambda", 0.0)),
                   "reference_affordable_on_average": bool(ref.get("affordable_on_average", True)),
                   "reference_cells": cells_used(cells, a, b),
                   "reference_mean_price": float(price.mean())}
@@ -1247,10 +1318,14 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
     the deviation is taken only when BOTH clear the bar. The policy that RUNS is always fold 1's, so
     a second fold can only withhold a deviation.
 
-    The reference is `normal_at_budget`: the deepest depth at the largest cap per prompt the budget
-    affords on average, which is the default cell itself wherever that cell is affordable on average
-    and a stepped-down cap or depth where it is not. Before this the reference was the default cell
-    alone, so below its own mean price the gate did not run and the pick stood ungated.
+    The reference is `normal_at_budget`, priced with the SAME `policy.Cost` as the arm: the best on
+    the calibration split of the default cell where its mean price fits, the deepest depth at the
+    largest cap whose mean price fits, and the per-prompt hard cap Table 1 reports as
+    `default_at_budget`. Before this the reference was the default cell alone, so below its own mean
+    price the gate did not run and the pick stood ungated; and before this the cap was read off a
+    fitted multiplier, which under `expected` accounting could only name a cell on the convex hull
+    of (price, cap) and tie-broke to the cheapest -- a reference the run had no reason to operate at,
+    over which a losing deviation measured a large margin and opened.
 
     Under `split` (the default) the calibration questions are cut in id order into a SELECTION half
     and a VERIFICATION half. The ranking and the multiplier are fitted on the selection half alone.
@@ -1340,7 +1415,7 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
             rec.update(default_prices(sel_prices, X))
             # The reference is fitted on the SELECTION half, where the arm's multiplier is fitted,
             # and exists at every budget, so no gated row can stand as an ungated pick.
-            info = normal_at_budget(cells, sel_prices, X, default_kt)
+            info = normal_at_budget(cells, sel_prices, X, default_kt, fit_pos=sel)
             ra, rb, _rf = reference_record(cells, info, ver, ver_prices)
             ea, eb, ef = reference_record(cells, info, ev, ev_prices)
             rec.update(ef)
@@ -1349,7 +1424,7 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
             # each fold's own reference, read on that fold's own verification questions
             fold_ref = [ref]
             for (hs, hv, hsp, hvp) in halves[1:]:
-                i_h = normal_at_budget(cells, hsp, X, default_kt)
+                i_h = normal_at_budget(cells, hsp, X, default_kt, fit_pos=hs)
                 ha, hb, _hf = reference_record(cells, i_h, hv, hvp)
                 fold_ref.append(np.asarray(cells.acc[ha, hb, hv], float))
 
@@ -1476,7 +1551,7 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
         if not on:
             continue
         rec.update(default_prices(cal_prices, X))
-        info = normal_at_budget(cells, cal_prices, X, default_kt)
+        info = normal_at_budget(cells, cal_prices, X, default_kt, fit_pos=cal)
         ra, rb, _rf = reference_record(cells, info, cal, cal_prices)
         ea, eb, ef = reference_record(cells, info, ev, ev_prices)
         rec.update(ef)
@@ -1546,9 +1621,12 @@ def _reference_name(rule, k):
     if rule == "cheapest_over_budget":
         return ("the cheapest cell of the shallowest depth (no cell of the grid fits this budget "
                 "on average)")
+    if rule == "default_at_budget":
+        return ("normal operation at this budget (the deepest depth, depth %s, at the largest cap "
+                "each question's own price affords -- the `default_at_budget` row)" % (k,))
     where = "one depth down" if rule == "shallower_depth" else "the deepest depth"
-    return ("normal operation at this budget (%s, depth %s, at the largest cap it affords)"
-            % (where, k))
+    return ("normal operation at this budget (%s, depth %s, at the largest cap whose mean price "
+            "fits it)" % (where, k))
 
 
 def _gate_lines(t1, name, r):

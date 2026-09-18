@@ -181,13 +181,19 @@ class TestTheWinnersCurse(unittest.TestCase):
         self.assertGreater(row["gate_margin_pts"][ONE], 0.5 * row["gate_sd_pts"][ONE])
         self.assertGreater(row["gate_margin_pts"][ONE], 3.0)          # the bias it reads
 
-    def test_the_split_gate_reverts_to_the_default_cell(self):
+    def test_the_split_gate_reverts_to_normal_operation_at_the_budget(self):
+        """The reversion lands exactly on the reference, which is the deepest depth either at
+        natural stop or at the largest cap each question affords -- whichever of the two reads
+        better on the calibration half. Every one of those cells is tied with the default cell in
+        truth here, so the reverted row is the default row to within the plant's own noise."""
         t1 = table("null", "split")
         row = t1["rows"][P.AVG_GATED]
         self.assertTrue(row["gate_reverted"][ONE])
         self.assertLessEqual(row["gate_margin_pts"][ONE], 0.5 * row["gate_sd_pts"][ONE])
-        self.assertEqual(list(row["cells_used"][ONE]), ["k%d_T%d" % DEFAULT_CELL])
-        self.assertAlmostEqual(row["acc_pts"][ONE], t1["rows"]["default"]["acc_pts"][ONE])
+        self.assertEqual(row["reference_k"][ONE], DEFAULT_CELL[0])
+        self.assertEqual(row["cells_used"][ONE], row["reference_cells"][ONE])
+        self.assertAlmostEqual(row["acc_pts"][ONE], t1["rows"]["default"]["acc_pts"][ONE],
+                               delta=8.0)
 
     def test_the_verification_margin_is_far_below_the_whole_set_one(self):
         whole = table("null", "whole")["rows"][P.AVG_GATED]["gate_margin_pts"][ONE]
@@ -273,14 +279,14 @@ class TestTheHalvesAreReported(unittest.TestCase):
         self.assertIn("sd", line[0])
         self.assertIn("cost saving", line[0])
         self.assertIn("verification questions, the ids after the", line[0])
-        self.assertIn("deviated from the default cell", line[0])
+        self.assertIn("deviated from normal operation at this budget", line[0])
 
     def test_a_reverted_row_says_so_with_the_same_two_numbers(self):
         md = E.table1_markdown(table("null", "split"))
         line = [l for l in md.split("\n") if l.startswith("- `%s` at 1.00x" % P.AVG_GATED)
                 and "margin" in l]
         self.assertEqual(len(line), 1, md)
-        self.assertIn("reverted to the default cell", line[0])
+        self.assertIn("reverted to normal operation at this budget", line[0])
         self.assertIn("Verification margin", line[0])
 
     def test_the_table_records_the_mode_it_was_built_under(self):
