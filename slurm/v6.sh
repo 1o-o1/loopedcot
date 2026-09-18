@@ -68,7 +68,7 @@ case "$MODE" in
     [ "$n" -gt 0 ] || { echo "$PREFIX: nothing to submit"; exit 0; }
     jid=$(sbatch --parsable $EXTRA --job-name="${PREFIX}" --array="0-$((n - 1))" --cpus-per-task="$ALLOC_CPUS" --mem="$ALLOC_MEM" \
       --time="$ALLOC_TIME" --output="logs/${PREFIX}_%A_%a.out" \
-      --wrap="cd '$ROOT' && source env.sh && line=\$(sed -n \$((SLURM_ARRAY_TASK_ID + 1))p '$LIST') && read -r M T <<< \"\$line\" && echo \"pair \$T \$M\" && $PROD_PYTHON -m alloc.cli --cells \"\$PROD_ART\" --task \"\$T\" --checkpoint \"\$M\" --protocol $PROTO $ALLOC_FLAGS --out \"\$PROD_ART/${PREFIX}_\${T}_\${M}\"; rc=\$?; echo RC=\$rc; exit \$rc")
+      --wrap="cd '$ROOT' && . '$ROOT/env.sh' && line=\$(sed -n \$((SLURM_ARRAY_TASK_ID + 1))p '$ROOT/$LIST') && set -- \$line && M=\$1 && T=\$2 && echo \"pair \$T \$M\" && $PROD_PYTHON -m alloc.cli --cells \"\$PROD_ART\" --task \"\$T\" --checkpoint \"\$M\" --protocol $PROTO $ALLOC_FLAGS --out \"\$PROD_ART/${PREFIX}_\${T}_\${M}\"; rc=\$?; echo RC=\$rc; exit \$rc")
     echo "$PREFIX: $n pairs in job array $jid (logs/${PREFIX}_${jid}_<i>.out)" ;;
   live)
     n=0
@@ -87,7 +87,7 @@ case "$MODE" in
         pre=""; [ "$first" = 1 ] && pre="--preflight"; first=0
         sbatch --parsable $EXTRA $(exclude_arg) --job-name="$name" --gres=gpu:1 --cpus-per-task=8 --mem="$LIVE_MEM" --time="$LIVE_TIME" \
           --output="logs/${name}.out" \
-          --wrap="echo node=\$(hostname); cd '$ROOT' && source env.sh && $PROD_PYTHON -m prod.live_check --model=$M --task=$T --cells=\"\$PROD_ART\" --alloc-dir='$ad' --budget-fraction=$B --arm $ARM $pre --out='$out'; rc=\$?; echo RC=\$rc; exit \$rc" > /dev/null
+          --wrap="echo node=\$(hostname); cd '$ROOT' && . '$ROOT/env.sh' && $PROD_PYTHON -m prod.live_check --model=$M --task=$T --cells=\"\$PROD_ART\" --alloc-dir='$ad' --budget-fraction=$B --arm $ARM $pre --out='$out'; rc=\$?; echo RC=\$rc; exit \$rc" > /dev/null
         n=$((n + 1))
       done; done
     done; done
