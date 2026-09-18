@@ -50,10 +50,10 @@ import targets as G                                            # noqa: E402  the
 
 # The grid the weights are read off: the base model's own production cells, one file per depth.
 CELL_PATTERN = "cells_ouro_1_4b_base_%s_natural_k%d.jsonl"
-CELLS_DIR_CANDIDATES = ("E:/Research/loopedcot/artifacts",
-                        "~/loopedcot/artifacts", "~/latent-loop/loopedcot/artifacts")
+CELLS_DIR_CANDIDATES = (os.path.join(os.path.dirname(HERE), "artifacts"),
+                        "E:/Research/loopedcot/artifacts", "~/loopedcot/artifacts")
 # Training source -> the evaluation task whose base grid carries its measurements. Same mapping the
-# config's `harvest.<src>.eval_task` carries; asserted against it rather than trusted.
+# config's `chains.<src>.eval_task` carries; asserted against it rather than trusted.
 GRID_TASK = {"gsm8k": "gsm8k", "math": "math500", "csqa": "csqa", "aqua": "aqua"}
 
 # Ouro-1.4B holds its whole 24-layer stack inside the recurrence, so a token at depth k costs

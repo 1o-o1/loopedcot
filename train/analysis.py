@@ -37,7 +37,7 @@ def grid_from(cfg):
 
 
 def tasks_from(cfg):
-    """Return the evaluation tasks of the configured harvest sources, in config order."""
+    """Return the evaluation tasks of the configured chains sources, in config order."""
     seen = []
     for src in cfg.sources:
         task = cfg.eval_task(src)
@@ -99,7 +99,7 @@ def commitment(dd, ids, caps, budget_key=None):
 
 
 def main(argv):
-    """Compare one run's cell grids with a reference arm's and write F1-F5 with paired bootstrap intervals in percentage points; returns a process exit code."""
+    """Compare one run's cell grids with a reference variant's and write F1-F5 with paired bootstrap intervals in percentage points; returns a process exit code."""
     NAME, REF, BOOT = "s36", "s33", 2000
     cfg_path, root = G.DEFAULT_CONFIG, None
     cells_dir = ref_dir = out_dir = None
@@ -127,7 +127,8 @@ def main(argv):
     TOP_T = top_budgets(cfg)          # the largest generated budget: F3's non-inferiority cell
     P = G.paths(root)
     ART = os.path.expanduser(cells_dir or P["artifacts"])
-    REFART = os.path.expanduser(ref_dir or "~/latent-loop/s33/artifacts")
+    # the reference grids of record are this repository's own production cells
+    REFART = os.path.expanduser(ref_dir or os.path.join(os.path.dirname(HERE), "artifacts"))
     OUT = os.path.expanduser(out_dir or ART)
     os.makedirs(OUT, exist_ok=True)
     rng = np.random.default_rng(int(cfg["seed"]))
@@ -148,7 +149,7 @@ def main(argv):
         return d or None
 
     def load_ref(task, k):
-        """Return the reference arm's cells for one (task, k) keyed by (row, cap), or None when absent."""
+        """Return the reference variant's cells for one (task, k) keyed by (row, cap), or None when absent."""
         for name in ("cells_%s_%s_k%d.jsonl" % (task, REF, k),
                      "cells_%s_%s_fixed_k%d.jsonl" % (task, REF, k),
                      # the production grid's spelling: model first, then the natural-stop protocol
@@ -227,7 +228,7 @@ def main(argv):
         ids = eval_ids(da, db)
         e = {"n": len(ids)}
         for T in (32, 128):
-            a, b = paired_own(da, db, ids, T, T)     # one row contributes to both arms or neither
+            a, b = paired_own(da, db, ids, T, T)     # one row contributes to both variants or neither
             if not a:
                 e[str(T)] = "not run"
                 continue

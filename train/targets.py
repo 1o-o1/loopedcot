@@ -11,14 +11,12 @@ DEFAULT_CONFIG = os.path.join(HERE, "config.yaml")
 # ship with the package and are pinned by content in config.yaml, exactly like the pool.
 THEORY_WEIGHTS = os.path.join(HERE, "data", "theory_weights.json")
 
-# Import the shared evaluation harness to keep exemplar bytes and task protocols identical.
-S32DIR = os.path.expanduser("~/latent-loop/s32")
-S28DIR = os.path.expanduser("~/latent-loop/s28")
-S17DIR = os.path.expanduser("~/latent-loop/s17")
-for _p in (os.path.join(S32DIR, "scripts"), os.path.join(S28DIR, "scripts"),
-           os.path.join(S17DIR, "scripts"), os.path.join(S32DIR, "pylibs")):
-    if _p not in sys.path:
-        sys.path.append(_p)
+# The shared evaluation harness ships with the package (s32_common, s28_common, s13_shots,
+# s3_patch), so exemplar bytes and task protocols are identical and every stage imports it by bare
+# name from this directory.
+RUN_ROOT_ENV = "S36_RUN_ROOT"
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
@@ -29,14 +27,14 @@ KIND_OF_FORMAT = {"numeric_hash": "numeric", "math_boxed": "math", "letter_paren
 
 # ================================================================= config
 class Config(dict):
-    """Map configuration fields to task formats, token block lengths, budget arms, and loop-depth distributions."""
+    """Map configuration fields to task formats, token block lengths, budget variants, and loop-depth distributions."""
 
     def horizon(self, src):
-        """Return the natural-stop horizon in tokens for one harvest source, or the shared default."""
-        h = self["harvest"].get(src)
+        """Return the natural-stop horizon in tokens for one chains source, or the shared default."""
+        h = self["chains"].get(src)
         if h and "horizon" in h:
             return int(h["horizon"])
-        return int(self["harvest_horizon"])
+        return int(self["chains_horizon"])
 
     def block_len_for(self, n_tokens):
         """Return the smallest block-length bucket that holds a visit of n_tokens, or None when none does."""
@@ -59,27 +57,27 @@ class Config(dict):
         return list(by_src.get(src, self["budget_grid"]))
 
     def eval_task(self, src):
-        """Return the evaluation task whose prompt and parser a harvest source borrows."""
-        return self["harvest"][src]["eval_task"]
+        """Return the evaluation task whose prompt and parser a chains source borrows."""
+        return self["chains"][src]["eval_task"]
 
     def fmt(self, src):
-        """Return the answer format name of a harvest source."""
-        return self["harvest"][src]["format"]
+        """Return the answer format name of a chains source."""
+        return self["chains"][src]["format"]
 
     def kind(self, src):
-        """Return the answer kind (numeric, math or letter) of a harvest source."""
+        """Return the answer kind (numeric, math or letter) of a chains source."""
         return KIND_OF_FORMAT[self.fmt(src)]
 
-    def arm(self, name):
-        """Return one arm's target rule, budget-line flag and fallback flag."""
-        if name not in self["arms"]:
-            raise KeyError("unknown arm %r; config has %s" % (name, sorted(self["arms"])))
-        return self["arms"][name]
+    def variant(self, name):
+        """Return one variant's target rule, budget-line flag and fallback flag."""
+        if name not in self["variants"]:
+            raise KeyError("unknown variant %r; config has %s" % (name, sorted(self["variants"])))
+        return self["variants"][name]
 
     @property
     def sources(self):
-        """Return the harvest source names, in config order."""
-        return list(self["harvest"])
+        """Return the chains source names, in config order."""
+        return list(self["chains"])
 
     @property
     def budget_grid(self):
@@ -121,21 +119,27 @@ def load_config(path=None, sources=None):
         assert m, "block length %d has no micro_by_block_len entry" % L
         assert nb % m == 0, ("effective_batch_blocks %d is not a whole number of micro-batches of "
                              "%d blocks (block length %d)" % (nb, m, L))
-    for src, h in c["harvest"].items():
+    for src, h in c["chains"].items():
         top = max(t for t in c.budget_grid_for(src) if t is not None)
-        assert top <= c.horizon(src), ("source %s draws budgets up to %d but harvests only to %d; "
+        assert top <= c.horizon(src), ("source %s draws budgets up to %d but its chains only run to %d; "
                                        "the top budget would never bind" % (src, top, c.horizon(src)))
     if sources:
         keep = [s.strip() for s in sources.split(",") if s.strip()]
-        missing = [s for s in keep if s not in c["harvest"]]
+        missing = [s for s in keep if s not in c["chains"]]
         assert not missing, "unknown source(s) %s" % missing
-        c["harvest"] = {k: v for k, v in c["harvest"].items() if k in keep}
+        c["chains"] = {k: v for k, v in c["chains"].items() if k in keep}
     return c
 
 
 def paths(root):
     """Return named output-directory paths under the supplied run root, expanding the user home directory."""
     root = os.path.expanduser(root)
+    # the harness modules keep their own ART/ADAPTERS/LOGS/... constants; publish the run root so
+    # they resolve under it, whether they are imported before this call or after it
+    os.environ[RUN_ROOT_ENV] = root
+    _h = sys.modules.get("s32_common")
+    if _h is not None and hasattr(_h, "set_run_root"):
+        _h.set_run_root(root)
     d = {k: os.path.join(root, k) for k in ("artifacts", "data", "gates", "logs", "adapters",
                                             "train_logs", "prompts")}
     d["root"] = root
@@ -149,15 +153,15 @@ def ensure_dirs(P):
             os.makedirs(v, exist_ok=True)
 
 
-def data_dir(P, arm):
-    """Return (and create) the block/schedule directory of one arm; arms never share stage-2 files."""
-    d = os.path.join(P["data"], str(arm))
+def data_dir(P, variant):
+    """Return (and create) the block/schedule directory of one variant; variants never share stage-2 files."""
+    d = os.path.join(P["data"], str(variant))
     os.makedirs(d, exist_ok=True)
     return d
 
 
 def blocks_fingerprint(arrays):
-    """Return a hex digest over every block length, id array and mask, so a trainer can tell one arm's data from another's."""
+    """Return a hex digest over every block length, id array and mask, so a trainer can tell one variant's data from another's."""
     h = hashlib.sha256()
     for L, a in sorted(arrays.items()):
         h.update(b"L%d:" % int(L))
@@ -246,7 +250,7 @@ def require_root(root, stage):
     """Return the run root or refuse to start; --root has no default, so two runs can never land in one directory because nobody typed it."""
     if not root:
         raise SystemExit("%s: --root=<run root> is required and has no default, for example "
-                         "--root=$HOME/latent-loop/<run>" % stage)
+                         "--root=$PROD_ART/s36" % stage)
     return root
 
 
@@ -321,19 +325,19 @@ def load_theory_weights(cfg, path=None):
     return tw, sha
 
 
-def uses_theory(cfg, arm):
-    """Return whether one arm draws T and the block depth from the theory tables or from the flat mix."""
-    return str(cfg.arm(arm).get("draw", "theory")) == "theory"
+def uses_theory(cfg, variant):
+    """Return whether one variant draws T and the block depth from the theory tables or from the flat mix."""
+    return str(cfg.variant(variant).get("draw", "theory")) == "theory"
 
 
-def budget_draw(cfg, tw, arm, src):
+def budget_draw(cfg, tw, variant, src):
     """Return one source's budget grid and the probability of each entry, in grid order.
 
-    A theory arm reads the table; `uniform_longest` draws every entry of the grid with equal
-    probability, which is what every arm did before the weights existed.
+    A theory variant reads the table; `uniform_longest` draws every entry of the grid with equal
+    probability, which is what every variant did before the weights existed.
     """
     grid = cfg.budget_grid_for(src)
-    if not uses_theory(cfg, arm):
+    if not uses_theory(cfg, variant):
         return grid, np.full(len(grid), 1.0 / len(grid))
     w = tw["sources"][src]["budget_weights"]
     p = np.array([float(w[budget_key(t)]) for t in grid], float)
@@ -341,14 +345,14 @@ def budget_draw(cfg, tw, arm, src):
     return grid, p / p.sum()
 
 
-def depth_draw(cfg, tw, arm, src):
-    """Return the block depths and the probability of each, for one source and arm.
+def depth_draw(cfg, tw, variant, src):
+    """Return the block depths and the probability of each, for one source and variant.
 
-    A theory arm reads that source's depth table; `uniform_longest` takes the fixed
+    A theory variant reads that source's depth table; `uniform_longest` takes the fixed
     `depth_probabilities` mix, the same for every source.
     """
     depths = cfg.depths
-    if not uses_theory(cfg, arm):
+    if not uses_theory(cfg, variant):
         p = np.array([float(cfg["depth_probabilities"][d]) for d in depths], float)
     else:
         w = tw["sources"][src]["depth_weights"]
@@ -357,13 +361,13 @@ def depth_draw(cfg, tw, arm, src):
     return depths, p / p.sum()
 
 
-def intended_weights(cfg, tw, arm, srcs):
-    """Return the budget and depth weight tables one arm intends to draw with, per source."""
+def intended_weights(cfg, tw, variant, srcs):
+    """Return the budget and depth weight tables one variant intends to draw with, per source."""
     T, D = {}, {}
     for src in srcs:
-        grid, p = budget_draw(cfg, tw, arm, src)
+        grid, p = budget_draw(cfg, tw, variant, src)
         T[src] = {budget_key(t): float(pi) for t, pi in zip(grid, p)}
-        depths, q = depth_draw(cfg, tw, arm, src)
+        depths, q = depth_draw(cfg, tw, variant, src)
         D[src] = {str(int(d)): float(qi) for d, qi in zip(depths, q)}
     return {"budget": T, "depth": D}
 
@@ -410,7 +414,7 @@ def v10_draw_weights(man, tol=0.05, sd_mult=3.0):
     weight. Dropped draws are the only mechanism that can move the two apart at large n, and they
     are counted per T in the same manifest.
     """
-    rec = {"tol": float(tol), "sd_mult": float(sd_mult), "arm": man.get("arm"),
+    rec = {"tol": float(tol), "sd_mult": float(sd_mult), "variant": man.get("variant"),
            "draw": man.get("draw_rule"),
            "theory_weights_sha256": man.get("theory_weights_sha256"), "by_source": {},
            "worst": 0.0, "ok": True}
@@ -741,10 +745,10 @@ def select_chain(cands, rule):
     raise ValueError("unknown target rule %r" % (rule,))
 
 
-def build_target(cfg, tok, arm, src, question, gold, T, chain_A, chain_B, fullplus=False,
+def build_target(cfg, tok, variant, src, question, gold, T, chain_A, chain_B, fullplus=False,
                  fallback_chain_A=None):
-    """Return token IDs, binary loss mask, and token-count metadata for a budget/arm; supervise chain, answer, EOS, or answer/EOS only for fallback. None IDs indicate a dropped visit."""
-    A = cfg.arm(arm)
+    """Return token IDs, binary loss mask, and token-count metadata for a budget/variant; supervise chain, answer, EOS, or answer/EOS only for fallback. None IDs indicate a dropped visit."""
+    A = cfg.variant(variant)
     et = cfg.eval_task(src)
     chain_A = trim_answer_sentence(chain_A, et)
     chain_B = trim_answer_sentence(chain_B, et)
@@ -756,7 +760,7 @@ def build_target(cfg, tok, arm, src, question, gold, T, chain_A, chain_B, fullpl
     _, a_ids = chain_ids(tok, prompt + sfx, answer_text(cfg, src, gold))
     EOS = tok.eos_token_id
     bl = budget_line(cfg, T, with_line)
-    info = {"T": T, "arm": arm, "n_prompt": len(p_ids), "n_suffix": len(s_ids),
+    info = {"T": T, "variant": variant, "n_prompt": len(p_ids), "n_suffix": len(s_ids),
             "n_answer": len(a_ids), "fullplus": bool(fullplus), "kind": None, "chain_used": None,
             "n_chain": 0, "budget_line": bl,
             "budget_line_tokens": (len(tok(bl, add_special_tokens=False)["input_ids"]) if bl
@@ -997,22 +1001,22 @@ def v3_context(arrays, spans, max_report=20, pad_id=None):
 
 # ================================================================= records
 def load_records(cfg, P, n_records=None):
-    """Return pool records with correct A/B candidates and raw standard fallback chains, plus harvest counts, optionally limited by record count."""
+    """Return pool records with correct A/B candidates and raw standard fallback chains, plus the chain-stage counts, optionally limited by record count."""
     check_pool(cfg)
     pool = defaultdict(dict)
     with open(os.path.expanduser(cfg["pool_jsonl"]), encoding="utf-8") as f:
         for line in f:
             r = json.loads(line)
-            if r.get("src") in cfg["harvest"]:
+            if r.get("src") in cfg["chains"]:
                 pool[r["src"]][int(r["pool_i"])] = r
     records, stats = [], {}
     for src in cfg.sources:
         got = {}
         for tag, key in (("A", "chain_A"), ("B", "chain_B")):
-            p = os.path.join(P["artifacts"], "harvest_%s_%s_k%d.jsonl"
-                             % (src, tag, int(cfg["k_harvest"])))
+            p = os.path.join(P["artifacts"], "chains_%s_%s_k%d.jsonl"
+                             % (src, tag, int(cfg["k_chains"])))
             if not os.path.exists(p):
-                raise SystemExit("MISSING harvest file %s" % p)
+                raise SystemExit("MISSING chains file %s" % p)
             n_tot = n_kept = 0
             with open(p, encoding="utf-8") as f:
                 for line in f:
@@ -1043,8 +1047,8 @@ def load_records(cfg, P, n_records=None):
 
 # ================================================================= stage 2 main
 def main(argv):
-    """Draw visits until the supervised-token budget is met, pack one visit per block, and write the arm's blocks, schedule, spans and manifest; returns a process exit code."""
-    cfg_path, root, arm = DEFAULT_CONFIG, None, None
+    """Draw visits until the supervised-token budget is met, pack one visit per block, and write the variant's blocks, schedule, spans and manifest; returns a process exit code."""
+    cfg_path, root, variant = DEFAULT_CONFIG, None, None
     budget, seed, n_records, sources = None, None, None, None
     for a in argv:
         k, _, v = a.lstrip("-").partition("=")
@@ -1052,8 +1056,8 @@ def main(argv):
             cfg_path = v
         elif k == "root":
             root = v
-        elif k == "arm":
-            arm = v
+        elif k == "variant":
+            variant = v
         elif k == "sources":
             sources = v
         elif k == "budget":
@@ -1064,8 +1068,8 @@ def main(argv):
             n_records = int(v)
     require_root(root, "targets.py")
     cfg = load_config(cfg_path, sources)
-    arm = arm or cfg["default_arm"]
-    A = cfg.arm(arm)
+    variant = variant or cfg["default_variant"]
+    A = cfg.variant(variant)
     budget = budget if budget is not None else int(cfg["supervised_token_budget"])
     seed = seed if seed is not None else int(cfg["seed"])
     P = paths(root)
@@ -1078,10 +1082,10 @@ def main(argv):
         tok.pad_token = tok.eos_token
     pad_id = tok.pad_token_id
 
-    records, harvest_stats = load_records(cfg, P, n_records=n_records)
-    print("[targets] arm=%s %d records; harvest kept %s"
-          % (arm, len(records), {k: round(v["kept_frac"], 3)
-                                 for k, v in harvest_stats.items()}), flush=True)
+    records, chains_stats = load_records(cfg, P, n_records=n_records)
+    print("[targets] variant=%s %d records; chains kept %s"
+          % (variant, len(records), {k: round(v["kept_frac"], 3)
+                                     for k, v in chains_stats.items()}), flush=True)
     by_src = defaultdict(list)
     for i, r in enumerate(records):
         by_src[r["src"]].append(i)
@@ -1091,16 +1095,16 @@ def main(argv):
     # The objective's two draws come from the theory tables, per source: T from the budget weights
     # and the block depth from the depth weights. `uniform_longest` is the ablation that keeps the
     # old uniform T and the fixed depth mix; the tables are still loaded and recorded, so the two
-    # arms differ only in what they draw with.
+    # variants differ only in what they draw with.
     tw, tw_sha = load_theory_weights(cfg)
     T_GRID_BY_SRC, T_P_BY_SRC, D_P_BY_SRC = {}, {}, {}
     depths = cfg.depths
     for s in srcs:
-        T_GRID_BY_SRC[s], T_P_BY_SRC[s] = budget_draw(cfg, tw, arm, s)
-        _d, D_P_BY_SRC[s] = depth_draw(cfg, tw, arm, s)
-    want = intended_weights(cfg, tw, arm, srcs)
+        T_GRID_BY_SRC[s], T_P_BY_SRC[s] = budget_draw(cfg, tw, variant, s)
+        _d, D_P_BY_SRC[s] = depth_draw(cfg, tw, variant, s)
+    want = intended_weights(cfg, tw, variant, srcs)
     print("[targets] draw=%s; T weights %s"
-          % ("theory" if uses_theory(cfg, arm) else "uniform",
+          % ("theory" if uses_theory(cfg, variant) else "uniform",
              {s: {k: round(v, 4) for k, v in want["budget"][s].items()} for s in srcs}),
           flush=True)
     print("[targets] depth weights %s"
@@ -1141,7 +1145,7 @@ def main(argv):
         depth = int(depths[int(rng.choice(len(depths), p=D_P_BY_SRC[src]))])
         fullplus = bool(T is None and rng.random() < float(cfg["fullplus_p"]))
         try:
-            ids, msk, info = build_target(cfg, tok, arm, src, r["question"], r["gold"], T,
+            ids, msk, info = build_target(cfg, tok, variant, src, r["question"], r["gold"], T,
                                           r["chain_A"], r["chain_B"], fullplus=fullplus,
                                           fallback_chain_A=r.get("fallback_chain_A"))
         except AssertionError:
@@ -1205,8 +1209,8 @@ def main(argv):
     drop_by_L = {str(L): int(a["blocks"].shape[0]) - int(used_by_L[L])
                  for L, a in sorted(arrays.items())}
 
-    # one directory per arm: the trainer must never pick up another arm's blocks
-    DATA = data_dir(P, arm)
+    # one directory per variant: the trainer must never pick up another variant's blocks
+    DATA = data_dir(P, variant)
     for L, Aa in arrays.items():
         np.save(os.path.join(DATA, "blocks_%d.npy" % L), Aa["blocks"])
         np.save(os.path.join(DATA, "mask_%d.npy" % L), Aa["mask"])
@@ -1227,7 +1231,7 @@ def main(argv):
 
     tok_total = int(sum(int(a["blocks"].size) for a in arrays.values()))
     man = {
-        "arm": arm, "arm_config": A, "seed": seed, "supervised_token_budget": budget,
+        "variant": variant, "variant_config": A, "seed": seed, "supervised_token_budget": budget,
         "data_dir": DATA, "blocks_sha256": blocks_fingerprint(arrays), "pad_id": int(pad_id),
         "exemplar_sha256": exemplar_fingerprints(tok, cfg),
         "supervised_tokens_scheduled": sup_scheduled,
@@ -1237,11 +1241,11 @@ def main(argv):
         "effective_batch_blocks": int(cfg["effective_batch_blocks"]),
         "lora": lora_settings(cfg),
         "supervised_tokens_drawn": sup_total, "n_visits": len(visits),
-        "n_records": len(records), "harvest": harvest_stats,
+        "n_records": len(records), "chains": chains_stats,
         "one_visit_per_block": True,
         "packing": "one visit per block, smallest fitting bucket, right-padded, pad mask 0",
         "block_lens": cfg.block_lens,
-        "harvest_horizon_by_source": {s: cfg.horizon(s) for s in cfg.sources},
+        "chains_horizon_by_source": {s: cfg.horizon(s) for s in cfg.sources},
         "budget_grid_by_source": {s: [budget_key(t) for t in cfg.budget_grid_for(s)]
                                   for s in cfg.sources},
         "blocks_by_len": {str(L): int(a["blocks"].shape[0]) for L, a in sorted(arrays.items())},
@@ -1264,7 +1268,7 @@ def main(argv):
         "visits_by_src_depth": {s: dict(n_by_src_depth[s]) for s in n_by_src_depth},
         # the objective's two draws: what the theory asked for, and what the draw realised. V10
         # compares them; they can only differ through drops, which are counted above.
-        "draw_rule": "theory" if uses_theory(cfg, arm) else "uniform",
+        "draw_rule": "theory" if uses_theory(cfg, variant) else "uniform",
         "theory_weights_json": THEORY_WEIGHTS, "theory_weights_sha256": tw_sha,
         "theory_weights_formulas": tw.get("formulas"),
         "draw_weights_intended": want,
@@ -1288,8 +1292,8 @@ def main(argv):
                                     for d in depths},
         "v3_context": v3, "draw_tries": tries}
     man["v10_draw_weights"] = v10_draw_weights(man)
-    jdump(man, os.path.join(P["artifacts"], "target_manifest_%s.json" % arm))
-    print(json.dumps({k: man[k] for k in ("arm", "supervised_tokens_drawn", "n_visits",
+    jdump(man, os.path.join(P["artifacts"], "target_manifest_%s.json" % variant))
+    print(json.dumps({k: man[k] for k in ("variant", "supervised_tokens_drawn", "n_visits",
                                           "blocks_by_len", "optimiser_steps",
                                           "supervised_tokens_per_opt_step",
                                           "supervised_density", "padding_share",

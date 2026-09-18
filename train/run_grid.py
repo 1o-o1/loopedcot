@@ -17,8 +17,8 @@ def parse_budgets(s):
 
 def main(argv):
     """Generate once per budget, score every cap of that generation, and append one resumable cell row per (question, budget, cap); returns a process exit code."""
-    ARM_NAME, TASK = argv[0], argv[1]
-    cfg_path, root, arm = G.DEFAULT_CONFIG, None, None
+    NAME, TASK = argv[0], argv[1]
+    cfg_path, root, variant = G.DEFAULT_CONFIG, None, None
     K, NP, SUFFIX, ADAPTER, WAIT, GRID_OVR = 4, None, "", None, True, None
     for a in argv[2:]:
         k, _, v = a.lstrip("-").partition("=")
@@ -26,8 +26,8 @@ def main(argv):
             cfg_path = v
         elif k == "root":
             root = v
-        elif k == "arm":
-            arm = v
+        elif k == "variant":
+            variant = v
         elif k == "k":
             K = int(v)
         elif k == "n":
@@ -42,13 +42,13 @@ def main(argv):
             WAIT = False
     G.require_root(root, "run_grid.py")
     cfg = G.load_config(cfg_path)
-    arm = arm or cfg["default_arm"]
-    WITH_LINE = bool(cfg.arm(arm)["budget_line"])
+    variant = variant or cfg["default_variant"]
+    WITH_LINE = bool(cfg.variant(variant)["budget_line"])
     P = G.paths(root)
     G.ensure_dirs(P)
-    if ADAPTER is None and ARM_NAME != "A0":
-        ADAPTER = os.path.join(P["adapters"], ARM_NAME)
-    TAG = "%s_%s_k%d%s" % (TASK, ARM_NAME, K, SUFFIX)
+    if ADAPTER is None and NAME != "A0":
+        ADAPTER = os.path.join(P["adapters"], NAME)
+    TAG = "%s_%s_k%d%s" % (TASK, NAME, K, SUFFIX)
     GRID = GRID_OVR if GRID_OVR is not None else cfg["eval_budgets"]
     CAPS = [int(c) for c in cfg["eval_standard_caps"]]
     HORIZON = int(cfg["eval_horizon"])     # the no-limit pass runs to here, not to the harness default
@@ -66,8 +66,8 @@ def main(argv):
                             gpu_procs, load_ckpt, Appender, load_base)
     from s3_patch import patch_universal_cache
     import torch
-    print("[s36 run %s arm=%s frac=%.2f line=%s] %s | %s"
-          % (TAG, arm, MEM_FRACTION, WITH_LINE, nvsmi(), gpu_procs()), flush=True)
+    print("[s36 run %s variant=%s frac=%.2f line=%s] %s | %s"
+          % (TAG, variant, MEM_FRACTION, WITH_LINE, nvsmi(), gpu_procs()), flush=True)
 
     ev, cal = split_rows(TASK)
     rows = ev + cal
@@ -79,15 +79,15 @@ def main(argv):
     NL = int(cfg["n_layers"])
     qp, ap_, suffix_text, stops, marker, kind = G.task_bits(TASK)
 
-    if ARM_NAME == "A0":
+    if NAME == "A0":
         tok, model = load_base()
-        minfo = {"arm": "A0", "merged": False, "adapter": None}
+        minfo = {"name": "A0", "merged": False, "adapter": None}
     else:
         from peft import PeftModel
         tok, _m = load_base()
         _pm = PeftModel.from_pretrained(_m, ADAPTER, is_trainable=False)
         model = _pm.merge_and_unload().to(G.DEV).eval()
-        minfo = {"arm": ARM_NAME, "merged": True, "adapter": ADAPTER}
+        minfo = {"name": NAME, "merged": True, "adapter": ADAPTER}
     if WAIT:
         G.wait_for_gpu(os.path.join(P["logs"], "gpu_wait.log"))
     patched, already = patch_universal_cache(model)
@@ -99,14 +99,14 @@ def main(argv):
     SUF = tok(suffix_text, add_special_tokens=False)["input_ids"]
 
     # the exemplar block must be the one the targets were built against, byte for byte
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % arm), {}) or {}
+    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
     G.check_exemplars(tok, cfg, man.get("exemplar_sha256"), tasks=[TASK])
     if TASK in ("math", "math500"):
         G.check_exemplar_source(G.math_shot_source())
 
     META = os.path.join(P["artifacts"], "meta_%s.json" % TAG)
     meta = G.jload(META, {}) or {}
-    meta.update({"name": ARM_NAME, "arm": arm, "task": TASK, "k": K, "n_problems": N,
+    meta.update({"name": NAME, "variant": variant, "task": TASK, "k": K, "n_problems": N,
                  "n_eval": min(len(ev), N), "n_cal": max(0, N - len(ev)),
                  "grid_budgets": [str(t) for t in GRID], "standard_caps": CAPS,
                  "horizon": HORIZON, "harness_default_horizon": MAXB,
@@ -254,7 +254,7 @@ def main(argv):
                     if (int(rows[i]["idx"]), G.budget_key(T), B) in done:
                         continue
                     row = {"idx": i, "row_idx": rows[i]["idx"], "split": split[i],
-                           "arm": ARM_NAME, "target_arm": arm, "task": TASK, "k": K,
+                           "name": NAME, "variant": variant, "task": TASK, "k": K,
                            "budget": ("none" if T is None else int(T)),
                            "budget_line": bl_text, "no_budget_line": (not WITH_LINE), "B": B,
                            "correct": bool(G.ans_eq_fixed(pred, gold, TASK)), "pred": pred,

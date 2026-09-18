@@ -63,9 +63,9 @@ def test_fallback_keeps_standard_chain_even_when_it_was_incorrect(cfg, tok):
     assert ids is None
 
 
-def test_no_limit_obeys_arm_rule_and_default_has_no_extra_readout(cfg, tok):
-    for arm, expected in (("budget_longest", "B"), ("budget_shortest", "A"), ("nobudget", "B")):
-        _, _, info = build(cfg, tok, arm, None, a="AAA", b="BBBBBB")
+def test_no_limit_obeys_variant_rule_and_default_has_no_extra_readout(cfg, tok):
+    for variant, expected in (("budget_longest", "B"), ("budget_shortest", "A"), ("nobudget", "B")):
+        _, _, info = build(cfg, tok, variant, None, a="AAA", b="BBBBBB")
         assert info["chain_used"] == expected
         assert info["kind"] == "CHAIN"
     # the extra read-out is opt-in per visit; the configured share is what targets.py draws with
@@ -237,37 +237,37 @@ def test_grid_twice_generates_matching_lines_without_duplicate_rows(cfg, tok, mo
         assert any("Budget: 2048 tokens." not in prompt for prompt, limit in calls)
         assert any("Budget: no limit." in prompt and limit == 128 for prompt, limit in calls)
         assert max(limit for _p, limit in calls) >= 128
-        import harvest
+        import chains
         pool_path = Path(root) / "pool.jsonl"
         pool = [{"src": SRC, "pool_i": i, "question": Q, "gold": GOLD} for i in (7, 19)]
         pool_path.write_text("".join(json.dumps(row) + "\n" for row in pool))
         cfg["pool_jsonl"] = str(pool_path)
-        harvest_args = [SRC, "--n=2", "--no-wait", f"--root={root}"]
-        assert harvest.main(harvest_args) == 0
-        harvested = Path(root) / "artifacts/harvest_gsm8k_A_k4.jsonl"
-        first_harvest, count = harvested.read_bytes(), len(calls)
+        chains_args = [SRC, "--n=2", "--no-wait", f"--root={root}"]
+        assert chains.main(chains_args) == 0
+        chains_file = Path(root) / "artifacts/chains_gsm8k_A_k4.jsonl"
+        first_chains, count = chains_file.read_bytes(), len(calls)
         pool_path.write_text("".join(json.dumps(row) + "\n" for row in reversed(pool)))
-        assert harvest.main(harvest_args) == 0
-        assert harvested.read_bytes() == first_harvest
+        assert chains.main(chains_args) == 0
+        assert chains_file.read_bytes() == first_chains
         assert len(calls) == count
-        hrows = [json.loads(line) for line in first_harvest.splitlines()]
+        hrows = [json.loads(line) for line in first_chains.splitlines()]
         assert all(r["horizon"] == cfg.horizon(SRC) for r in hrows)
         assert all(r["kept"] and not r["hit_horizon"] for r in hrows)
-        meta = json.loads((Path(root) / "artifacts/harvest_meta_gsm8k_A.json").read_text())
+        meta = json.loads((Path(root) / "artifacts/chains_meta_gsm8k_A.json").read_text())
         assert meta["horizon"] == cfg.horizon(SRC) == 1024
         assert meta["n_hit_horizon"] == 0 and meta["n_correct_but_unfinished"] == 0
 
 
-def test_harvest_drops_a_chain_that_ran_into_its_horizon(cfg, tok, monkeypatch):
+def test_chains_drops_a_chain_that_ran_into_its_horizon(cfg, tok, monkeypatch):
     """A chain that never stopped is not a correct chain: it is dropped from the kept pool and counted,
     so every no-limit target is a chain that finished on its own."""
     import json
     import sys
     import tempfile
     import types
-    import harvest
+    import chains
 
-    cfg["harvest"] = {SRC: dict(cfg["harvest"][SRC], horizon=256)}
+    cfg["chains"] = {SRC: dict(cfg["chains"][SRC], horizon=256)}
     harness = types.ModuleType("s32_common")
     harness.MEM_FRACTION = 0.5
     harness.set_steps = lambda *args: None
@@ -318,13 +318,13 @@ def test_harvest_drops_a_chain_that_ran_into_its_horizon(cfg, tok, monkeypatch):
         pool_path.write_text("".join(json.dumps(
             {"src": SRC, "pool_i": i, "question": Q, "gold": GOLD}) + "\n" for i in (3, 4)))
         cfg["pool_jsonl"] = str(pool_path)
-        assert harvest.main([SRC, "--n=2", "--no-wait", "--root=%s" % root]) == 0
+        assert chains.main([SRC, "--n=2", "--no-wait", "--root=%s" % root]) == 0
         rows = [json.loads(line) for line in
-                (Path(root) / "artifacts/harvest_gsm8k_A_k4.jsonl").read_text().splitlines()]
+                (Path(root) / "artifacts/chains_gsm8k_A_k4.jsonl").read_text().splitlines()]
         assert rows and all(r["hit_horizon"] for r in rows)
         assert all(r["answer_correct"] and not r["kept"] for r in rows)   # correct text, unfinished
         assert all(r["horizon"] == 256 for r in rows)
-        meta = json.loads((Path(root) / "artifacts/harvest_meta_gsm8k_A.json").read_text())
+        meta = json.loads((Path(root) / "artifacts/chains_meta_gsm8k_A.json").read_text())
         assert meta["horizon"] == 256
         assert meta["n_kept"] == 0 and meta["n_hit_horizon"] == len(rows)
         assert meta["n_correct_but_unfinished"] == len(rows)

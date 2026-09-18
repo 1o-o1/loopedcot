@@ -4,14 +4,14 @@
 seed: 20260914                      # deterministic data and depth sampling
 base_repo: ByteDance/Ouro-1.4B      # base checkpoint; adapter training freezes base weights
 n_layers: 24                        # layers per loop for layer-token cost accounting
-k_harvest: 4                        # recurrence depth used to harvest chains from the base model
+k_chains: 4                        # recurrence depth the base model's chains are generated at
 
-# ---------------------------------------------------------------- pool and harvest sources
+# ---------------------------------------------------------------- pool and chains sources
 pool_jsonl: train/data/pool.jsonl   # screened read-only question pool, shipped with the package; relative to the repository root
 pool_sha256: 7d5569c32611a90afc57a3655052b0338dd12d30346f4c0938ebb544758d81d3   # stage 2 and gate V9 refuse a pool whose bytes differ
 # The pool is read-only: V9's screening argument is about these exact questions. To re-pin after a
 # deliberate re-screen, run `sha256sum <pool_jsonl>` and paste the digest above; nothing else.
-harvest:                            # source -> evaluation task whose prompt/parser it uses, pool N, format, natural-stop horizon
+chains:                            # source -> evaluation task whose prompt/parser it uses, pool N, format, natural-stop horizon
   gsm8k: {eval_task: gsm8k,   n: 3000, format: numeric_hash, horizon: 1024}
   math:  {eval_task: math500, n: 1360, format: math_boxed,   horizon: 2048}
   csqa:  {eval_task: csqa,    n: 1500, format: letter_paren, horizon: 1024}
@@ -19,12 +19,12 @@ harvest:                            # source -> evaluation task whose prompt/par
 # The horizon is per source because the base model's chains are not the same length per task: the
 # 512 horizon of the first draft capped MATH chains that run to 2048, and a checkpoint trained only
 # on chains under 512 learns a length prior its grid cannot be compared with the base grids at.
-harvest_horizon: 1024               # natural-stop horizon for a source without its own (arc, svamp)
+chains_horizon: 1024               # natural-stop horizon for a source without its own (arc, svamp)
 prompt_file_pattern: prompts_short_%s.txt   # short-exemplar block per source; looked up in <run root>/prompts/, then in the package's prompts/
-harvest_batch: 16                   # decode batch size at harvest time
-harvest_correct_only: true          # a chain is kept only if its own answer equals gold under the fixed parser
+chains_batch: 16                   # decode batch size while the chains are generated
+chains_correct_only: true          # a chain is kept only if its own answer equals gold under the fixed parser
 # A chain that reaches its horizon without a stop marker is NOT a correct chain, whatever its text
-# parses to: it is an unfinished chain. harvest.py drops those from the kept pool and counts them
+# parses to: it is an unfinished chain. chains.py drops those from the kept pool and counts them
 # (`n_hit_horizon`, `n_correct_but_unfinished`), so every target is built from a chain that stopped
 # on its own. That is what makes the no-limit target the FULL chain.
 
@@ -54,11 +54,11 @@ eval_horizon: 4096                  # generation horizon of the no-limit pass; t
 # grids in Table 1. The budgeted passes are separate files: they are a different protocol.
 chain_tail_chars: 200               # characters of the cut chain stored per cell as chain_tail
 
-# ---------------------------------------------------------------- target rule per arm (--arm)
+# ---------------------------------------------------------------- target rule per variant (--variant)
 # `draw` selects where T and the block depth come from: `theory` reads that source's tables in
 # train/data/theory_weights.json, `uniform` draws T uniformly over the source's grid and the depth
 # from depth_probabilities below. Only the uniform_longest ablation uses `uniform`.
-arms:
+variants:
   budget_longest:                   # THE RECIPE
     rule: longest_fitting           # T>0: the LONGEST correct chain among {A,B} with at most T tokens
     budget_line: true
@@ -84,9 +84,9 @@ arms:
     budget_line: true
     fallback: true
     draw: uniform                   # uniform T over the source's grid, fixed depth_probabilities
-default_arm: budget_longest
-# Target kinds in every arm: T=0 -> DIRECT (suffix + answer, only answer and EOS supervised);
-# T=none -> the arm-selected full correct chain + EOS, and in a fullplus_p share also the
+default_variant: budget_longest
+# Target kinds in every variant: T=0 -> DIRECT (suffix + answer, only answer and EOS supervised);
+# T=none -> the variant-selected full correct chain + EOS, and in a fullplus_p share also the
 # read-out suffix and answer (CHAIN_PLUS).
 # T>0 -> CHAIN (the selected chain + EOS, chain and EOS supervised); otherwise FALLBACK.
 fullplus_p: 0.2                     # share of no-limit targets that also carry the read-out suffix and answer
@@ -105,7 +105,7 @@ theory_weights_sha256: 9c3e1e1acb678cb031cec820bfcadb7fa39db0ef2bb7cbe9b493b0328
 # targets.py refuses a file whose sha256 is not the digest above, exactly as it refuses an edited pool.
 
 # ---------------------------------------------------------------- mixture and balance
-depth_probabilities: {1: 0.10, 2: 0.30, 3: 0.20, 4: 0.40}   # the uniform_longest arm's fixed depth mix; theory arms read theory_weights.json
+depth_probabilities: {1: 0.10, 2: 0.30, 3: 0.20, 4: 0.40}   # the uniform_longest variant's fixed depth mix; theory variants read theory_weights.json
 supervised_token_budget: 1200000    # count only loss-target tokens, excluding prompt and padding
 source_max_share: 0.3333333333      # no source above one third of supervised tokens
 format_max_share: 0.5               # no answer format above one half of supervised tokens

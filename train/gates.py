@@ -28,9 +28,9 @@ def get_tok(cfg):
     return t
 
 
-def load_arrays(cfg, P, arm):
-    """Return one arm's block arrays keyed by block length, plus its visit spans; padding is included in the arrays and excluded by every span."""
-    D = G.data_dir(P, arm)
+def load_arrays(cfg, P, variant):
+    """Return one variant's block arrays keyed by block length, plus its visit spans; padding is included in the arrays and excluded by every span."""
+    D = G.data_dir(P, variant)
     arrays = {}
     for name in sorted(os.listdir(D)):
         if name.startswith("blocks_") and name.endswith(".npy"):
@@ -44,15 +44,15 @@ def load_arrays(cfg, P, arm):
 
 
 # ================================================================= V4 (GPU)
-def run_v4(cfg, P, arm, CK, wait=False):
+def run_v4(cfg, P, variant, CK, wait=False):
     """Check on GPU that a batched forward at one depth equals the same blocks forwarded singly, and that another depth differs; waits for an idle GPU only when asked; returns a process exit code."""
     import torch
     from s3_patch import patch_universal_cache
     # the preflight is a two-minute job: it waits only under the shared-box policy, never on a
     # scheduled job and never when --no-wait says the caller has the GPU already
     waited = G.wait_for_gpu(os.path.join(P["logs"], "gpu_wait.log")) if wait else {"waited_s": 0}
-    arrays, _spans = load_arrays(cfg, P, arm)
-    sched = json.load(open(os.path.join(G.data_dir(P, arm), "schedule.json"), encoding="utf-8"))
+    arrays, _spans = load_arrays(cfg, P, variant)
+    sched = json.load(open(os.path.join(G.data_dir(P, variant), "schedule.json"), encoding="utf-8"))
     from s32_common import load_base
     tok, model = load_base()
     patch_universal_cache(model)
@@ -89,11 +89,11 @@ def run_v4(cfg, P, arm, CK, wait=False):
 
 
 # ================================================================= V1, V2, V3-CONTEXT, V9, V10 (CPU)
-def run_cpu(cfg, P, arm, CK):
+def run_cpu(cfg, P, variant, CK):
     """Run the CPU gates (V1 prompt parity, V2 masks, V3-CONTEXT with its negative control, V9 pool membership, V10 draw weights) and stop on the first failure; returns a process exit code."""
     tok = get_tok(cfg)
     from s32_common import build_prompts
-    A = cfg.arm(arm)
+    A = cfg.variant(variant)
     with_line = bool(A["budget_line"])
 
     # V9 argues about a named set of screened questions, so the pool is pinned by content and
@@ -106,7 +106,7 @@ def run_cpu(cfg, P, arm, CK):
             pool.setdefault(r["src"], []).append(r)
 
     # ---------------------------------------------------------------- V1
-    v1 = {"arm": arm, "budget_line_present": with_line, "n_checked": 0, "diffs": 0, "detail": [],
+    v1 = {"variant": variant, "budget_line_present": with_line, "n_checked": 0, "diffs": 0, "detail": [],
           "by_task": {}}
     for src in cfg.sources:
         et = cfg.eval_task(src)
@@ -149,18 +149,18 @@ def run_cpu(cfg, P, arm, CK):
                                   str(T): len(tok(G.budget_line(cfg, T, with_line),
                                                   add_special_tokens=False)["input_ids"])
                                   for T in cfg.budget_grid_for(src)},
-                              "harvest_horizon": cfg.horizon(src)}
+                              "chains_horizon": cfg.horizon(src)}
         v1["diffs"] += nd
     v1["detail"] = v1["detail"][:20]
     G.jdump(v1, os.path.join(P["gates"], "v1_parity.json"))
     print("[V1] %d prompts checked, %d diffs" % (v1["n_checked"], v1["diffs"]), flush=True)
 
     # ---------------------------------------------------------------- V2
-    visits = [json.loads(l) for l in open(os.path.join(G.data_dir(P, arm), "visits.jsonl"),
+    visits = [json.loads(l) for l in open(os.path.join(G.data_dir(P, variant), "visits.jsonl"),
                                           encoding="utf-8")]
     records, _hs = G.load_records(cfg, P)
     bykey = {(r["src"], r["pool_i"]): r for r in records}
-    arrays, spans = load_arrays(cfg, P, arm)
+    arrays, spans = load_arrays(cfg, P, variant)
     L_ = ["# V2: loss masks", "",
           "20 visits rebuilt from data/visits.jsonl, every token printed with the supervised ones",
           "marked. The prompt, the budget line, the forced suffix and the PADDING must never be",
@@ -172,7 +172,7 @@ def run_cpu(cfg, P, arm, CK):
         v = visits[int(si)]
         r = bykey[(v["src"], v["record"])]
         T = v["T"]
-        ids, msk, info = G.build_target(cfg, tok, arm, r["src"], r["question"], r["gold"], T,
+        ids, msk, info = G.build_target(cfg, tok, variant, r["src"], r["question"], r["gold"], T,
                                         r["chain_A"], r["chain_B"],
                                         fullplus=(v["kind"] == "CHAIN_PLUS"),
                                         fallback_chain_A=r.get("fallback_chain_A"))
@@ -248,17 +248,14 @@ def run_cpu(cfg, P, arm, CK):
           % (v3["ok"], v3["n_supervised_tokens"], v3_out["split_detected"]), flush=True)
 
     # ---------------------------------------------------------------- V9
-    # The s33 screening record (drop_near and the overlap counts) ships with the package; the
-    # spike read it from the Spark's ~/latent-loop/s33, kept as the fallback.
-    s33_v9 = (G.jload(os.path.join(HERE, "data", "v9_contamination.json"), {})
-              or G.jload(os.path.expanduser("~/latent-loop/s33/gates/v9_contamination.json"), {})
-              or {})
+    # The s33 screening record (drop_near and the overlap counts) ships with the package.
+    s33_v9 = G.jload(os.path.join(HERE, "data", "v9_contamination.json"), {}) or {}
     poolq = {G.norm_q(r["question"]) for src in pool for r in pool[src]}
     missing = n_h = 0
     for src in cfg.sources:
         for tag in ("A", "B"):
-            p = os.path.join(P["artifacts"], "harvest_%s_%s_k%d.jsonl"
-                             % (src, tag, int(cfg["k_harvest"])))
+            p = os.path.join(P["artifacts"], "chains_%s_%s_k%d.jsonl"
+                             % (src, tag, int(cfg["k_chains"])))
             if not os.path.exists(p):
                 continue
             with open(p, encoding="utf-8") as f:
@@ -271,21 +268,21 @@ def run_cpu(cfg, P, arm, CK):
     shots = (G.math_shot_source()
              if any(cfg.eval_task(s) in ("math", "math500") for s in cfg.sources) else None)
     G.check_exemplar_source(shots)
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % arm), {}) or {}
+    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
     G.check_exemplars(tok, cfg, man.get("exemplar_sha256"))
-    v9 = {"n_harvest_questions": n_h, "not_in_pool": missing,
+    v9 = {"n_chains_questions": n_h, "not_in_pool": missing,
           "pool_jsonl": cfg["pool_jsonl"], "pool_sha256": pool_sha256,
           "exemplar_sha256": G.exemplar_fingerprints(tok, cfg), "math_exemplar_source": shots,
           "s33_v9_exact_overlaps_left_in_pool": s33_v9.get("V9_overlap"),
           "s33_v9_near_duplicates_dropped": s33_v9.get("n_near_duplicates"),
           "s33_v9_drop_near": s33_v9.get("drop_near"),
           "s33_v9_pool_after": s33_v9.get("n_pool_after"),
-          "argument": ("every harvest question comes from the screened pool, which was checked "
+          "argument": ("every chain's question comes from the screened pool, which was checked "
                        "against GSM8K test, MATH500, SVAMP test, AQuA test, CSQA validation, the "
                        "two BBH files and the five calibration sets, with every exact overlap and "
                        "every near-duplicate dropped. This recipe introduces no new question.")}
     G.jdump(v9, os.path.join(P["gates"], "v9_contamination.json"))
-    print("[V9] %d harvest questions, %d not in the pool" % (n_h, missing), flush=True)
+    print("[V9] %d chain questions, %d not in the pool" % (n_h, missing), flush=True)
 
     # ---------------------------------------------------------------- V10
     # The two draws ARE the objective. The manifest carries both the table stage 0 wrote and the
@@ -301,7 +298,7 @@ def run_cpu(cfg, P, arm, CK):
     print("[V10] draw=%s, worst |realised - intended| = %.4f over %d tables (tol %.2f)"
           % (v10.get("draw"), v10["worst"], len(v10["by_source"]), V10_TOL), flush=True)
 
-    upd(CK, arm=arm, V1=int(v1["diffs"]), V1_n_checked=int(v1["n_checked"]), V2=bool(v2_ok),
+    upd(CK, variant=variant, V1=int(v1["diffs"]), V1_n_checked=int(v1["n_checked"]), V2=bool(v2_ok),
         V2_padding_bad_blocks=int(pad_bad), V3_CONTEXT=bool(v3["ok"]),
         V3_CONTEXT_split_detected=bool(v3_out["split_detected"]),
         V3_CONTEXT_supervised_tokens=int(v3["n_supervised_tokens"]), V9=int(missing),
@@ -318,28 +315,28 @@ def run_cpu(cfg, P, arm, CK):
 
 
 def main(argv):
-    """Dispatch to the CPU gates or the GPU preflight for one arm; returns a process exit code."""
+    """Dispatch to the CPU gates or the GPU preflight for one variant; returns a process exit code."""
     mode = "--v4" if "--v4" in argv else "--cpu"
-    cfg_path, root, arm, sources = G.DEFAULT_CONFIG, None, None, None
+    cfg_path, root, variant, sources = G.DEFAULT_CONFIG, None, None, None
     for a in argv:
         k, _, v = a.lstrip("-").partition("=")
         if k == "config":
             cfg_path = v
         elif k == "root":
             root = v
-        elif k == "arm":
-            arm = v
+        elif k == "variant":
+            variant = v
         elif k == "sources":
             sources = v
     G.require_root(root, "gates.py")
     cfg = G.load_config(cfg_path, sources)
-    arm = arm or cfg["default_arm"]
+    variant = variant or cfg["default_variant"]
     P = G.paths(root)
     G.ensure_dirs(P)
     CK = os.path.join(P["gates"], "checks.json")
     if mode != "--v4":
-        return run_cpu(cfg, P, arm, CK)
-    return run_v4(cfg, P, arm, CK, wait=G.should_wait_for_gpu(argv))
+        return run_cpu(cfg, P, variant, CK)
+    return run_v4(cfg, P, variant, CK, wait=G.should_wait_for_gpu(argv))
 
 
 if __name__ == "__main__":

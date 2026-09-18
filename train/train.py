@@ -21,10 +21,10 @@ def lora_config(cfg):
                       bias="none", task_type="CAUSAL_LM", target_modules=lo["targets"])
 
 
-def check_data_matches_arm(arrays, manifest, arm):
-    """Refuse blocks another arm produced: the manifest must name this arm and fingerprint these arrays."""
-    assert manifest.get("arm") == arm, ("blocks were built for arm %r, not %r"
-                                        % (manifest.get("arm"), arm))
+def check_data_matches_variant(arrays, manifest, variant):
+    """Refuse blocks another variant produced: the manifest must name this variant and fingerprint these arrays."""
+    assert manifest.get("variant") == variant, ("blocks were built for variant %r, not %r"
+                                                % (manifest.get("variant"), variant))
     want, got = manifest.get("blocks_sha256"), G.blocks_fingerprint(arrays)
     assert want == got, "blocks do not match the manifest fingerprint (%s != %s)" % (got, want)
 
@@ -86,9 +86,9 @@ def block_ce_sum(base, x, mask, depth):
 
 
 def main(argv):
-    """Train one arm's adapter over its own blocks and write train_config_<arm>.json with realised supervised tokens, content tokens and layer passes; returns a process exit code."""
+    """Train one variant's adapter over its own blocks and write train_config_<variant>.json with realised supervised tokens, content tokens and layer passes; returns a process exit code."""
     NAME = argv[0] if argv and not argv[0].startswith("-") else "s36"
-    cfg_path, root, arm = G.DEFAULT_CONFIG, None, None
+    cfg_path, root, variant = G.DEFAULT_CONFIG, None, None
     ckpt_every, wait, max_steps = None, True, None
     for a in argv:
         k, _, v = a.lstrip("-").partition("=")
@@ -96,8 +96,8 @@ def main(argv):
             cfg_path = v
         elif k == "root":
             root = v
-        elif k == "arm":
-            arm = v
+        elif k == "variant":
+            variant = v
         elif k == "ckpt-every":
             ckpt_every = int(v)
         elif k == "max-steps":
@@ -106,7 +106,7 @@ def main(argv):
             wait = False
     G.require_root(root, "train.py")
     cfg = G.load_config(cfg_path)
-    arm = arm or cfg["default_arm"]
+    variant = variant or cfg["default_variant"]
     ckpt_every = ckpt_every if ckpt_every is not None else int(cfg["ckpt_every"])
     P = G.paths(root)
     G.ensure_dirs(P)
@@ -115,7 +115,7 @@ def main(argv):
               else {"waited_s": 0})
 
     # ---------------------------------------------------------------- data
-    DATA = G.data_dir(P, arm)
+    DATA = G.data_dir(P, variant)
     arrays = {}
     for name in sorted(os.listdir(DATA)):
         if name.startswith("blocks_") and name.endswith(".npy"):
@@ -124,9 +124,9 @@ def main(argv):
                          "mask": np.load(os.path.join(DATA, "mask_%d.npy" % L)),
                          "length": np.load(os.path.join(DATA, "length_%d.npy" % L)),
                          "depth": np.load(os.path.join(DATA, "bdepth_%d.npy" % L))}
-    assert arrays, "no blocks_<L>.npy in %s -- run targets.py --arm=%s first" % (DATA, arm)
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % arm), {}) or {}
-    check_data_matches_arm(arrays, man, arm)
+    assert arrays, "no blocks_<L>.npy in %s -- run targets.py --variant=%s first" % (DATA, variant)
+    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
+    check_data_matches_variant(arrays, man, variant)
     with open(os.path.join(DATA, "spans.jsonl"), encoding="utf-8") as f:
         spans = [json.loads(line) for line in f if line.strip()]
     assert G.v3_context(arrays, spans, pad_id=man.get("pad_id"))["ok"], "invalid block boundaries"
@@ -144,8 +144,8 @@ def main(argv):
         L = int(mb["seq_len"])
         assert len({int(arrays[L]["depth"][b]) for b in mb["blocks"]}) == 1, mb
         assert int(arrays[L]["depth"][mb["blocks"][0]]) == int(mb["depth"]), mb
-    print("name=%s arm=%s blocks=%s micro_batches=%d micro=%s n_opt=%d warmup=%d"
-          % (NAME, arm, {L: int(a["blocks"].shape[0]) for L, a in arrays.items()}, n_micro,
+    print("name=%s variant=%s blocks=%s micro_batches=%d micro=%s n_opt=%d warmup=%d"
+          % (NAME, variant, {L: int(a["blocks"].shape[0]) for L, a in arrays.items()}, n_micro,
              {L: cfg.micro(L) for L in sorted(arrays)}, n_opt, warmup), flush=True)
 
     torch.manual_seed(int(cfg["seed"]))
@@ -175,8 +175,9 @@ def main(argv):
     if os.path.exists(os.path.join(CKPT, "state.json")):
         st = G.jload(os.path.join(CKPT, "state.json")) or {}
         if st.get("name") == NAME:
-            assert st.get("arm", arm) == arm, ("checkpoint %s was trained on arm %r, not %r"
-                                               % (CKPT, st.get("arm"), arm))
+            assert st.get("variant", variant) == variant, (
+                "checkpoint %s was trained on variant %r, not %r"
+                % (CKPT, st.get("variant"), variant))
             from peft import set_peft_model_state_dict
             from safetensors.torch import load_file
             weights = load_file(os.path.join(CKPT, "adapter", "adapter_model.safetensors"))
@@ -200,10 +201,10 @@ def main(argv):
         prog = (step - warmup) / max(1, n_opt - warmup)
         return LR * 0.5 * (1.0 + math.cos(math.pi * min(1.0, prog)))
 
-    META = os.path.join(P["artifacts"], "train_config_%s.json" % arm)
+    META = os.path.join(P["artifacts"], "train_config_%s.json" % variant)
     meta = G.jload(META, {}) or {}
     meta.update({
-        "name": NAME, "arm": arm, "arm_config": cfg.arm(arm), "seed": int(cfg["seed"]),
+        "name": NAME, "variant": variant, "variant_config": cfg.variant(variant), "seed": int(cfg["seed"]),
         "blocks_by_len": {str(L): int(a["blocks"].shape[0]) for L, a in arrays.items()},
         "one_visit_per_block": True,
         "packing": "one visit per block, right-padded, pad mask 0, causal forward, no attention mask",
@@ -224,7 +225,7 @@ def main(argv):
         "accum_by_block_len": {str(L): cfg.accum(L) for L in sorted(arrays)},
         "effective_batch_blocks": int(cfg["effective_batch_blocks"]),
         "padding_share_by_block_len": man.get("padding_share_by_block_len"),
-        "harvest_horizon_by_source": man.get("harvest_horizon_by_source"),
+        "chains_horizon_by_source": man.get("chains_horizon_by_source"),
         "n_micro_batches": n_micro, "n_opt_steps": n_opt,
         "warmup_steps": warmup, "lr": LR, "weight_decay": float(cfg["weight_decay"]),
         "betas": list(cfg["betas"]), "grad_clip": float(cfg["grad_clip"]),
@@ -240,7 +241,7 @@ def main(argv):
         "budget_grid_by_source": man.get("budget_grid_by_source"),
         "block_lens": cfg.block_lens,
         "control_line": (cfg["budget_line_with_limit"] + " | " + cfg["budget_line_no_limit"]
-                         + "  (never supervised)") if cfg.arm(arm)["budget_line"] else "none",
+                         + "  (never supervised)") if cfg.variant(variant)["budget_line"] else "none",
         "gpu_wait": waited, "errors": {}})
     G.jdump(meta, META)
 
@@ -330,7 +331,7 @@ def main(argv):
                 with atomic_checkpoint(CKPT) as staging:
                     pmodel.save_pretrained(os.path.join(staging, "adapter"))
                     torch.save(opt.state_dict(), os.path.join(staging, "opt.pt"))
-                    G.jdump({"name": NAME, "arm": arm, "opt_step": step, "n_opt": n_opt,
+                    G.jdump({"name": NAME, "variant": variant, "opt_step": step, "n_opt": n_opt,
                              "warmup": warmup, "losses": losses,
                              "supervised_tokens": state["sup"],
                              "padded_tokens": state["real"],
@@ -362,8 +363,8 @@ def main(argv):
         "peak_gb": round(torch.cuda.max_memory_allocated() / 1024 ** 3, 3),
         "adapter": os.path.join(P["adapters"], NAME)})
     G.jdump(meta, META)
-    print("DONE %s arm=%s %d opt steps sup %d loss/tok %.4f -> %.4f %.0fs %.2fs/step peak %.2f GB"
-          % (NAME, arm, step, state["sup"], meta["mean_loss_first_10"] or 0,
+    print("DONE %s variant=%s %d opt steps sup %d loss/tok %.4f -> %.4f %.0fs %.2fs/step peak %.2f GB"
+          % (NAME, variant, step, state["sup"], meta["mean_loss_first_10"] or 0,
              meta["mean_loss_last_10"] or 0, meta["seconds"], meta["seconds_per_opt_step"],
              meta["peak_gb"]), flush=True)
     return 0

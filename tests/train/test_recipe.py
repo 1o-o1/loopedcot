@@ -68,8 +68,8 @@ CH_B = "B" * 12             # the short-exemplar chain: 12 tokens
 Q, GOLD, SRC = "what is 2+2", "4", "gsm8k"
 
 
-def build(cfg, tok, arm, T, a=CH_A, b=CH_B, fullplus=False):
-    return G.build_target(cfg, tok, arm, SRC, Q, GOLD, T, a, b, fullplus=fullplus)
+def build(cfg, tok, variant, T, a=CH_A, b=CH_B, fullplus=False):
+    return G.build_target(cfg, tok, variant, SRC, Q, GOLD, T, a, b, fullplus=fullplus)
 
 
 # ================================================================= 1. the target rule
@@ -112,8 +112,8 @@ def test_no_limit_uses_the_short_chain_only_when_the_standard_one_is_not_correct
     assert ids is None and info["dropped"] == "no_correct_chain"
 
 
-# ================================================================= 6. the arm flags
-def test_shortest_fitting_arm_reproduces_the_s34_p1_rule(cfg, tok):
+# ================================================================= 6. the variant flags
+def test_shortest_fitting_variant_reproduces_the_s34_p1_rule(cfg, tok):
     """Check that the shortest-fitting ablation selects the short correct chain when both candidates fit."""
     _i, _m, info = build(cfg, tok, "budget_shortest", 64)
     assert info["chain_used"] == "B" and info["n_chain"] == len(CH_B)
@@ -121,14 +121,14 @@ def test_shortest_fitting_arm_reproduces_the_s34_p1_rule(cfg, tok):
     assert longest["chain_used"] == "A"
 
 
-def test_nocut_arm_drops_instead_of_falling_back(cfg, tok):
+def test_nocut_variant_drops_instead_of_falling_back(cfg, tok):
     ids, msk, info = build(cfg, tok, "nocut", 8)
     assert ids is None and info["dropped"] == "no_fitting_chain_and_no_fallback"
     ids, _m, info = build(cfg, tok, "nocut", 64)
     assert ids is not None and info["kind"] == "CHAIN"
 
 
-def test_nobudget_arm_carries_no_line_but_the_same_target(cfg, tok):
+def test_nobudget_variant_carries_no_line_but_the_same_target(cfg, tok):
     _i, _m, nb = build(cfg, tok, "nobudget", 64)
     _i, _m, bl = build(cfg, tok, "budget_longest", 64)
     assert nb["budget_line"] == "" and nb["budget_line_tokens"] == 0
@@ -137,10 +137,10 @@ def test_nobudget_arm_carries_no_line_but_the_same_target(cfg, tok):
     assert nb["n_prompt"] == bl["n_prompt"] - bl["budget_line_tokens"]
 
 
-def test_every_arm_in_the_config_builds(cfg, tok):
-    for arm in cfg["arms"]:
-        ids, _m, info = build(cfg, tok, arm, 64)
-        assert ids is not None, (arm, info)
+def test_every_variant_in_the_config_builds(cfg, tok):
+    for variant in cfg["variants"]:
+        ids, _m, info = build(cfg, tok, variant, 64)
+        assert ids is not None, (variant, info)
 
 
 # ================================================================= 5. the budget line
@@ -187,11 +187,11 @@ def test_chain_ids_match_the_ids_the_harness_would_generate(cfg, tok):
 
 
 # ================================================================= 3. one visit per block
-def make_visits(cfg, tok, arm="budget_longest", n=12, block_len=256):
+def make_visits(cfg, tok, variant="budget_longest", n=12, block_len=256):
     visits = []
     for j in range(n):
         T = [0, 8, 32, 64, None][j % 5]
-        ids, msk, info = G.build_target(cfg, tok, arm, SRC, Q + " #%d" % j, GOLD, T, CH_A, CH_B)
+        ids, msk, info = G.build_target(cfg, tok, variant, SRC, Q + " #%d" % j, GOLD, T, CH_A, CH_B)
         assert ids is not None
         visits.append({"ids": ids, "mask": msk, "depth": 1 + (j % 4),
                        "n_prompt": info["n_prompt"], "block_len": block_len,
@@ -272,7 +272,7 @@ def test_every_bucket_has_a_micro_and_a_whole_number_of_them_per_step(cfg):
 
 
 def test_generation_waves_cover_every_horizon_in_the_config(cfg):
-    """Harvest and the grid step through the same doubling waves, or a 4096 horizon is one blind pass."""
+    """Chains and the grid step through the same doubling waves, or a 4096 horizon is one blind pass."""
     assert G.generation_waves(512) == [128, 256, 512]
     assert G.generation_waves(1024) == [128, 256, 512, 1024]
     assert G.generation_waves(2048) == [128, 256, 512, 1024, 2048]

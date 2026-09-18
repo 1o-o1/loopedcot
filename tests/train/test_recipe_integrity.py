@@ -1,4 +1,4 @@
-"""Check that stage outputs are keyed by arm, that constants come from the config, and that
+"""Check that stage outputs are keyed by variant, that constants come from the config, and that
 checkpoints and analysis pairing survive interruption and missing grids."""
 import importlib.util
 import json
@@ -23,8 +23,8 @@ def load_module(name, filename):
     return module
 
 
-# ================================================================= stage-2 outputs are per arm
-def test_stage2_paths_and_fingerprint_separate_the_arms(tmp_path, cfg, tok):
+# ================================================================= stage-2 outputs are per variant
+def test_stage2_paths_and_fingerprint_separate_the_variants(tmp_path, cfg, tok):
     P = G.paths(str(tmp_path))
     G.ensure_dirs(P)
     one = G.data_dir(P, "budget_longest")
@@ -43,8 +43,8 @@ def test_manifest_budget_keys_match_the_grid_cell_keys(cfg, tok):
     assert counts == {"none": 2, "32": 1}
 
 
-def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, tok, monkeypatch):
-    """Run stage 2 for two arms over the same harvest and show the blocks cannot be crossed."""
+def test_stage2_writes_one_variant_and_the_trainer_rejects_the_other(tmp_path, cfg, tok, monkeypatch):
+    """Run stage 2 for two variants over the same chains and show the blocks cannot be crossed."""
     import sys
     import types
 
@@ -67,13 +67,13 @@ def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, 
         for i in range(40)), encoding="utf-8")
     cfg["pool_jsonl"] = str(pool)
     cfg["pool_sha256"] = G.file_sha256(str(pool))
-    cfg["harvest"] = {SRC: dict(cfg["harvest"][SRC])}
+    cfg["chains"] = {SRC: dict(cfg["chains"][SRC])}
     use_block_lens(cfg, 512, micro=4, blocks=8)
     cfg["supervised_token_budget"] = 3000
     P = G.paths(str(tmp_path))
     G.ensure_dirs(P)
     for tag, chain in (("A", "A" * 40), ("B", "B" * 12)):
-        Path(P["artifacts"], "harvest_%s_%s_k4.jsonl" % (SRC, tag)).write_text("".join(
+        Path(P["artifacts"], "chains_%s_%s_k4.jsonl" % (SRC, tag)).write_text("".join(
             json.dumps({"pool_i": i, "kept": True, "chain": chain + " #### 4",
                         "question": "%s #%d" % (Q, i)}) + "\n" for i in range(40)),
             encoding="utf-8")
@@ -81,12 +81,12 @@ def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, 
 
     train = load_module("recipe_training_guard", "train.py")
     built = {}
-    for arm in ("budget_longest", "budget_shortest"):
-        assert G.main(["--arm=%s" % arm, "--root=%s" % tmp_path]) == 0
-        manifest = json.loads(Path(P["artifacts"], "target_manifest_%s.json" % arm)
+    for variant in ("budget_longest", "budget_shortest"):
+        assert G.main(["--variant=%s" % variant, "--root=%s" % tmp_path]) == 0
+        manifest = json.loads(Path(P["artifacts"], "target_manifest_%s.json" % variant)
                               .read_text(encoding="utf-8"))
-        assert manifest["arm"] == arm
-        assert Path(manifest["data_dir"]) == Path(G.data_dir(P, arm))
+        assert manifest["variant"] == variant
+        assert Path(manifest["data_dir"]) == Path(G.data_dir(P, variant))
         arrays = {}
         for npy in Path(manifest["data_dir"]).glob("blocks_*.npy"):
             L = int(npy.stem.split("_")[1])
@@ -95,12 +95,12 @@ def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, 
                          "length": np.load(npy.with_name("length_%d.npy" % L))}
             assert int(arrays[L]["length"].sum()) < int(arrays[L]["blocks"].size)
         assert arrays and manifest["n_visits"] > 0
-        train.check_data_matches_arm(arrays, manifest, arm)
-        built[arm] = (arrays, manifest)
+        train.check_data_matches_variant(arrays, manifest, variant)
+        built[variant] = (arrays, manifest)
         assert set(manifest["visits_by_T"]) <= {"none", "0", "16", "32", "64", "128", "256",
                                                 "512", "1024"}
         assert manifest["budget_grid_by_source"][SRC][-1] == "none"
-        assert manifest["harvest_horizon_by_source"][SRC] == cfg.horizon(SRC)
+        assert manifest["chains_horizon_by_source"][SRC] == cfg.horizon(SRC)
         assert manifest["blocks_by_len"] == {"512": sum(manifest["visits_by_block_len"].values())}
         assert 0.0 < manifest["padding_share_by_block_len"]["512"] < 1.0
         assert manifest["pad_id"] == tok.pad_token_id
@@ -110,18 +110,18 @@ def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, 
         assert manifest["blocks_dropped_as_remainder"] >= 0
     assert built["budget_longest"][1]["blocks_sha256"] != built["budget_shortest"][1]["blocks_sha256"]
     with pytest.raises(AssertionError):
-        train.check_data_matches_arm(built["budget_longest"][0], built["budget_shortest"][1],
+        train.check_data_matches_variant(built["budget_longest"][0], built["budget_shortest"][1],
                                      "budget_shortest")
     gates = load_module("recipe_gates", "gates.py")
-    for arm, (arrays, _m) in built.items():
-        loaded, spans = gates.load_arrays(cfg, P, arm)
+    for variant, (arrays, _m) in built.items():
+        loaded, spans = gates.load_arrays(cfg, P, variant)
         assert sorted(loaded) == sorted(arrays)
         assert G.v3_context(loaded, spans, pad_id=tok.pad_token_id)["ok"]
 
-    # the CPU gates must find and pass an arm's own directory, and V3 must still catch a split
+    # the CPU gates must find and pass a variant's own directory, and V3 must still catch a split
     from test_recipe import AP, PREFIX, QP
     harness = types.ModuleType("s32_common")
-    harness.build_prompts = lambda tk, task, rows, arm_, k, T=None, tag_override=None: (
+    harness.build_prompts = lambda tk, task, rows, harness_mode, k, T=None, tag_override=None: (
         [PREFIX + QP + r["input"] + AP for r in rows], None, None, None, {"tag_line": ""})
     monkeypatch.setitem(sys.modules, "s32_common", harness)
     screen = {"drop_near": True, "V9_overlap": 0, "n_near_duplicates": 3, "n_pool_after": 40}
@@ -141,7 +141,7 @@ def test_stage2_writes_one_arm_and_the_trainer_rejects_the_other(tmp_path, cfg, 
     with pytest.raises(SystemExit):
         gates.run_cpu(cfg, P, "budget_longest", str(checks))
     with pytest.raises(SystemExit):
-        G.main(["--arm=budget_longest", "--root=%s" % tmp_path])
+        G.main(["--variant=budget_longest", "--root=%s" % tmp_path])
 
 
 # ================================================================= the fallback context
@@ -256,23 +256,23 @@ def test_f1_own_answer_rate_is_paired_per_row():
                  (1, 32): {"split": "eval", "trace_answer": "4"}}
     both = analysis.paired_own(candidate, reference, [0, 1], 32, 32)
     assert both == ([1.0, 0.0], [0.0, 1.0])
-    # a row present on one side only must drop out of both arms, never shift the pairing
+    # a row present on one side only must drop out of both variants, never shift the pairing
     one = analysis.paired_own(candidate, {(1, 32): reference[(1, 32)]}, [0, 1], 32, 32)
     assert one == ([0.0], [1.0])
 
 
 # ================================================================= the training loop
-def test_training_refuses_another_arms_blocks(tmp_path, cfg, tok, monkeypatch):
+def test_training_refuses_another_variants_blocks(tmp_path, cfg, tok, monkeypatch):
     train = load_module("recipe_training_guard", "train.py")
     arrays, spans = G.pack_one_visit_per_block(make_visits(cfg, tok, n=4), tok.pad_token_id)
-    manifest = {"arm": "nocut", "blocks_sha256": G.blocks_fingerprint(arrays)}
+    manifest = {"variant": "nocut", "blocks_sha256": G.blocks_fingerprint(arrays)}
     with pytest.raises(AssertionError):
-        train.check_data_matches_arm(arrays, manifest, "budget_longest")
-    manifest = {"arm": "budget_longest", "blocks_sha256": "0" * 64}
+        train.check_data_matches_variant(arrays, manifest, "budget_longest")
+    manifest = {"variant": "budget_longest", "blocks_sha256": "0" * 64}
     with pytest.raises(AssertionError):
-        train.check_data_matches_arm(arrays, manifest, "budget_longest")
-    manifest = {"arm": "budget_longest", "blocks_sha256": G.blocks_fingerprint(arrays)}
-    train.check_data_matches_arm(arrays, manifest, "budget_longest")
+        train.check_data_matches_variant(arrays, manifest, "budget_longest")
+    manifest = {"variant": "budget_longest", "blocks_sha256": G.blocks_fingerprint(arrays)}
+    train.check_data_matches_variant(arrays, manifest, "budget_longest")
 
 
 def test_micro_batch_width_must_match_the_schedule_bucket_by_bucket(cfg, tok):
@@ -405,7 +405,7 @@ def test_v4_preflight_takes_its_wait_from_the_flags(tmp_path, monkeypatch):
     gates = load_module("recipe_gates_wait", "gates.py")
     seen = {}
 
-    def fake_v4(cfg, P, arm, CK, wait):
+    def fake_v4(cfg, P, variant, CK, wait):
         seen["wait"] = wait
         return 0
 
@@ -428,7 +428,7 @@ def test_share_caps_are_inactive_only_when_no_mixture_could_satisfy_them(cfg):
 
 
 def synthetic_run(tmp_path, cfg, tok, monkeypatch, chains, budget):
-    """Write a pool and a harvest file per source, pin the pool, and return the run paths."""
+    """Write a pool and a chains file per source, pin the pool, and return the run paths."""
     transformers = types.ModuleType("transformers")
     transformers.AutoTokenizer = types.SimpleNamespace(from_pretrained=lambda *a, **k: tok)
     monkeypatch.setitem(sys.modules, "transformers", transformers)
@@ -440,14 +440,14 @@ def synthetic_run(tmp_path, cfg, tok, monkeypatch, chains, budget):
         for src in chains for i in range(40)), encoding="utf-8")
     cfg["pool_jsonl"] = str(pool)
     cfg["pool_sha256"] = G.file_sha256(str(pool))
-    cfg["harvest"] = {s: dict(cfg["harvest"][s]) for s in chains}
+    cfg["chains"] = {s: dict(cfg["chains"][s]) for s in chains}
     use_block_lens(cfg, 512, micro=4, blocks=8)
     cfg["supervised_token_budget"] = budget
     P = G.paths(str(tmp_path))
     G.ensure_dirs(P)
     for src, chain in chains.items():
         for tag in ("A", "B"):
-            Path(P["artifacts"], "harvest_%s_%s_k4.jsonl" % (src, tag)).write_text("".join(
+            Path(P["artifacts"], "chains_%s_%s_k4.jsonl" % (src, tag)).write_text("".join(
                 json.dumps({"pool_i": i, "kept": True, "chain": chain,
                             "question": "%s %s #%d" % (Q, src, i)}) + "\n" for i in range(40)),
                 encoding="utf-8")
@@ -461,7 +461,7 @@ def test_share_caps_bind_below_fifty_thousand_supervised_tokens(tmp_path, cfg, t
                       {"gsm8k": "A" * 60, "csqa": "A" * 4}, budget=4000)
     cfg["source_max_share"] = 0.6       # feasible for two sources
     cfg["format_max_share"] = 0.9       # feasible for two formats
-    assert G.main(["--arm=budget_longest", "--root=%s" % tmp_path]) == 0
+    assert G.main(["--variant=budget_longest", "--root=%s" % tmp_path]) == 0
     man = json.loads(Path(P["artifacts"], "target_manifest_budget_longest.json")
                      .read_text(encoding="utf-8"))
     caps = man["share_caps"]
@@ -477,7 +477,7 @@ def test_a_single_source_run_is_not_starved_by_an_unsatisfiable_cap(tmp_path, cf
                                                                    monkeypatch):
     """The cap is recorded inactive and the run still draws its whole budget."""
     P = synthetic_run(tmp_path, cfg, tok, monkeypatch, {"gsm8k": "A" * 40}, budget=3000)
-    assert G.main(["--arm=budget_longest", "--root=%s" % tmp_path]) == 0
+    assert G.main(["--variant=budget_longest", "--root=%s" % tmp_path]) == 0
     man = json.loads(Path(P["artifacts"], "target_manifest_budget_longest.json")
                      .read_text(encoding="utf-8"))
     assert man["share_caps"]["source"]["active"] is False
@@ -511,7 +511,7 @@ def test_the_config_pins_the_shipped_pool(cfg):
 
 
 # ================================================================= F4: --root is required
-ROOT_STAGES = [("harvest", "harvest.py", ["gsm8k"]),
+ROOT_STAGES = [("chains", "chains.py", ["gsm8k"]),
                ("targets", "targets.py", []),
                ("gates", "gates.py", []),
                ("train", "train.py", ["s36_budget_longest"]),
@@ -527,7 +527,7 @@ def test_every_stage_refuses_to_guess_the_run_root(name, filename, argv):
         module.main(list(argv))
     assert "--root" in str(raised.value)
     source = Path(G.__file__).with_name(filename).read_text(encoding="utf-8")
-    assert "latent-loop/s36" not in source, filename
+    assert '"~/' not in source and "'~/" not in source, filename     # no home-directory default
 
 
 def test_the_readme_commands_pass_the_root():
@@ -561,9 +561,9 @@ def test_the_readme_states_the_measured_micro4_memory():
 
 
 def test_the_readme_costs_are_the_ones_the_new_buckets_imply(cfg):
-    """The estimates are recomputed for the bucket set, and the superseded per-arm figure is named."""
+    """The estimates are recomputed for the bucket set, and the superseded per-variant figure is named."""
     text = readme_text()
-    assert "7.4 h per arm** figure was 590 steps" in text      # superseded, and said to be
+    assert "7.4 h per variant** figure was 590 steps" in text      # superseded, and said to be
     for claim in ("9.1 h", "about 800 steps", "14.8 h", "5.9 h", "about 26 h",
                   "s/step idle", "1.12 h each"):
         assert claim in text, claim
@@ -573,14 +573,14 @@ def test_the_readme_costs_are_the_ones_the_new_buckets_imply(cfg):
     assert "6,144" in text and "5,120" in text                  # the resident-positions argument
 
 
-def test_the_readme_states_the_arm_order_of_record():
-    """Item 6: the four arms stay, but the plan of record runs two of them."""
+def test_the_readme_states_the_variant_order_of_record():
+    """Item 6: the four variants stay, but the plan of record runs two of them."""
     text = readme_text()
     head = text[text.index("## Ablations"):text.index("## Files")]
     assert "plan of record" in head
     assert head.index("budget_longest") < head.index("nobudget")
-    for arm in ("budget_longest", "budget_shortest", "nobudget", "nocut"):
-        assert arm in head, arm
+    for variant in ("budget_longest", "budget_shortest", "nobudget", "nocut"):
+        assert variant in head, variant
     assert "only if time remains" in head
 
 
@@ -602,7 +602,7 @@ def test_config_pins_the_production_caps_horizon_and_budgets(cfg):
     assert int(pc["horizon"]) == int(cfg["eval_horizon"])
 
 
-def test_the_harvest_horizon_is_per_source_and_covers_that_source_grid(cfg):
+def test_the_chains_horizon_is_per_source_and_covers_that_source_grid(cfg):
     assert {s: cfg.horizon(s) for s in cfg.sources} == {"gsm8k": 1024, "math": 2048,
                                                         "csqa": 1024, "aqua": 1024}
     assert cfg.budget_grid_for("math")[-2] == 2048
@@ -640,10 +640,10 @@ def test_load_config_refuses_a_bucket_table_or_a_grid_that_cannot_be_run(tmp_pat
 
 # ================================================================= the per-source budget grid
 def test_each_source_draws_only_its_own_budget_grid(tmp_path, cfg, tok, monkeypatch):
-    """MATH draws 2048 because it harvests to 2048; GSM8K must never see a budget it cannot fill."""
+    """MATH draws 2048 because its chains run to 2048; GSM8K must never see a budget it cannot fill."""
     P = synthetic_run(tmp_path, cfg, tok, monkeypatch,
                       {"gsm8k": "A" * 40, "math": "M" * 60}, budget=8000)
-    assert G.main(["--arm=budget_longest", "--root=%s" % tmp_path]) == 0
+    assert G.main(["--variant=budget_longest", "--root=%s" % tmp_path]) == 0
     man = json.loads(Path(P["artifacts"], "target_manifest_budget_longest.json")
                      .read_text(encoding="utf-8"))
     assert man["budget_grid_by_source"]["math"][-2] == "2048"
@@ -665,7 +665,7 @@ def test_a_visit_longer_than_the_longest_bucket_is_dropped_and_counted(tmp_path,
     cfg["micro_by_block_len"] = {128: 4}
     cfg["effective_batch_blocks"] = 8
     cfg["fallback_ceiling"] = 1.0              # a 200-token chain fits almost no budget here
-    assert G.main(["--arm=budget_longest", "--root=%s" % tmp_path]) == 0
+    assert G.main(["--variant=budget_longest", "--root=%s" % tmp_path]) == 0
     man = json.loads(Path(P["artifacts"], "target_manifest_budget_longest.json")
                      .read_text(encoding="utf-8"))
     assert man["dropped_draws"].get("longer_than_longest_block", 0) > 0

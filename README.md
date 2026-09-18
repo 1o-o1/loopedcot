@@ -272,7 +272,7 @@ scored on the rest.
 
 `train/` is the budget-conditioned anytime training package: it self-distils Ouro-1.4B on its own
 correct chains and teaches one looped adapter to answer at any token budget and any loop count k in
-{1, 2, 3, 4}. LoRA r16 alpha 32 on the seven projections, base frozen. Chains are harvested from the
+{1, 2, 3, 4}. LoRA r16 alpha 32 on the seven projections, base frozen. Chains are generated from the
 base model at k=4 on the TRAIN splits of GSM8K, MATH, CSQA and AQuA (natural stop, per-source
 horizons 1024, MATH 2048; a chain that hits its horizon is discarded), and each training example is
 the task's evaluation exemplar block byte-identical, the question, one line `Budget: T tokens.` or
@@ -283,17 +283,17 @@ count. The theory sets the training distribution: per source, T and the block de
 `train/data/theory_weights.json`, each table half uniform and half the base model's own production
 grid (the accuracy left unrealised at that cap, and the allocator's depth usage with the deepest
 depth floored at 0.20), the file sha-pinned in `train/config.yaml` and the realised draws checked by
-gate V10. Arms: `budget_longest` (the recipe) and `uniform_longest` (the same targets under a uniform
+gate V10. Variants: `budget_longest` (the recipe) and `uniform_longest` (the same targets under a uniform
 T and a flat depth mix). The reference is this repository's own `ouro_1_4b_base` production grid.
 
 ```bash
 R=$PROD_ART/s36
-$PROD_PYTHON -m train.harvest gsm8k --prompt=standard --root=$R    # x4 sources x {standard,short}
-$PROD_PYTHON -m train.targets --arm=budget_longest --root=$R
-$PROD_PYTHON -m train.gates --cpu --arm=budget_longest --root=$R   # V1 V2 V3-CONTEXT V9 V10
-$PROD_PYTHON -m train.gates --v4 --arm=budget_longest --no-wait --root=$R
-$PROD_PYTHON -m train.train s36_budget_longest --arm=budget_longest --no-wait --root=$R
-$PROD_PYTHON -m train.run_grid s36_budget_longest gsm8k --arm=budget_longest --k=4 --no-wait --root=$R
+$PROD_PYTHON -m train.chains gsm8k --prompt=standard --root=$R    # x4 sources x {standard,short}
+$PROD_PYTHON -m train.targets --variant=budget_longest --root=$R
+$PROD_PYTHON -m train.gates --cpu --variant=budget_longest --root=$R   # V1 V2 V3-CONTEXT V9 V10
+$PROD_PYTHON -m train.gates --v4 --variant=budget_longest --no-wait --root=$R
+$PROD_PYTHON -m train.train s36_budget_longest --variant=budget_longest --no-wait --root=$R
+$PROD_PYTHON -m train.run_grid s36_budget_longest gsm8k --variant=budget_longest --k=4 --no-wait --root=$R
 $PROD_PYTHON -m train.analysis --name=s36_budget_longest --ref=ouro_1_4b_base --ref-dir=$PROD_ART --root=$R
 ```
 
@@ -301,8 +301,8 @@ $PROD_PYTHON -m train.analysis --name=s36_budget_longest --ref=ouro_1_4b_base --
 production grids, which are named `artifacts/cells_ouro_1_4b_base_<task>_natural_k<k>.jsonl`,
 have to be reachable under that spelling before the last line runs.
 
-Under Slurm the same six stages are `slurm/harvest_s36.sbatch` (array 0-7, one source and one prompt
-each), `slurm/arm_s36.sbatch` (array 0-1, targets then gates then training for one arm) and
-`slurm/grids_s36.sbatch` (array 0-7, one arm and one task each, with the analysis command in its
+Under Slurm the same six stages are `slurm/chains_s36.sbatch` (array 0-7, one source and one prompt
+each), `slurm/variant_s36.sbatch` (array 0-1, targets then gates then training for one variant) and
+`slurm/grids_s36.sbatch` (array 0-7, one variant and one task each, with the analysis command in its
 header). `--root` is required and has no default. Everything else -- the target rule, the gates, the
 two grid files, the measured compute -- is in `train/README.md`.

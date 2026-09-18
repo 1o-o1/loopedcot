@@ -209,7 +209,7 @@ def test_the_deepest_depth_is_never_starved(cfg, shipped):
 
 
 # ================================================================= the realised draw
-def draw_run(tmp_path, cfg, tok, monkeypatch, arm, budget, chains=None):
+def draw_run(tmp_path, cfg, tok, monkeypatch, variant, budget, chains=None):
     """Run stage 2 on a synthetic pool and return its manifest."""
     chains = chains or {"gsm8k": "A" * 40, "math": "M" * 60}
     transformers = types.ModuleType("transformers")
@@ -223,20 +223,20 @@ def draw_run(tmp_path, cfg, tok, monkeypatch, arm, budget, chains=None):
         for src in chains for i in range(40)), encoding="utf-8")
     cfg["pool_jsonl"] = str(pool)
     cfg["pool_sha256"] = G.file_sha256(str(pool))
-    cfg["harvest"] = {s: dict(cfg["harvest"][s]) for s in chains}
+    cfg["chains"] = {s: dict(cfg["chains"][s]) for s in chains}
     use_block_lens(cfg, 512, micro=4, blocks=8)
     cfg["supervised_token_budget"] = budget
     P = G.paths(str(tmp_path))
     G.ensure_dirs(P)
     for src, chain in chains.items():
         for tag in ("A", "B"):
-            Path(P["artifacts"], "harvest_%s_%s_k4.jsonl" % (src, tag)).write_text("".join(
+            Path(P["artifacts"], "chains_%s_%s_k4.jsonl" % (src, tag)).write_text("".join(
                 json.dumps({"pool_i": i, "kept": True, "chain": chain,
                             "question": "%s %s #%d" % (Q, src, i)}) + "\n" for i in range(40)),
                 encoding="utf-8")
     monkeypatch.setattr(G, "load_config", lambda *a, **k: cfg)
-    assert G.main(["--arm=%s" % arm, "--root=%s" % tmp_path]) == 0
-    return json.loads(Path(P["artifacts"], "target_manifest_%s.json" % arm)
+    assert G.main(["--variant=%s" % variant, "--root=%s" % tmp_path]) == 0
+    return json.loads(Path(P["artifacts"], "target_manifest_%s.json" % variant)
                       .read_text(encoding="utf-8"))
 
 
@@ -262,7 +262,7 @@ def test_the_draw_histograms_match_the_weights_on_a_large_draw(tmp_path, cfg, to
 
 def test_uniform_longest_reproduces_the_old_uniform_draw(tmp_path, cfg, tok, monkeypatch):
     """The ablation differs from the recipe in the draw and in nothing else."""
-    recipe, ablation = cfg.arm("budget_longest"), cfg.arm("uniform_longest")
+    recipe, ablation = cfg.variant("budget_longest"), cfg.variant("uniform_longest")
     assert {k: v for k, v in ablation.items() if k != "draw"} == \
            {k: v for k, v in recipe.items() if k != "draw"}
     assert G.uses_theory(cfg, "budget_longest") and not G.uses_theory(cfg, "uniform_longest")
@@ -286,7 +286,7 @@ def test_uniform_longest_reproduces_the_old_uniform_draw(tmp_path, cfg, tok, mon
 def test_v10_catches_a_draw_that_missed_a_weight():
     """A gate that cannot fail proves nothing: a histogram that starved one budget must fail it."""
     intended = {"0": 0.25, "16": 0.25, "32": 0.25, "none": 0.25}
-    man = {"arm": "budget_longest", "draw_rule": "theory",
+    man = {"variant": "budget_longest", "draw_rule": "theory",
            "draw_weights_intended": {"budget": {"gsm8k": intended}, "depth": {}},
            "visits_by_src_T": {"gsm8k": {"0": 3000, "16": 3000, "32": 3000, "none": 3000}},
            "visits_by_src_depth": {}}

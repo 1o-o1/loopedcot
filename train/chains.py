@@ -25,15 +25,15 @@ def main(argv):
             BATCH = int(v)
         elif k == "no-wait":
             WAIT = False
-    G.require_root(root, "harvest.py")
+    G.require_root(root, "chains.py")
     cfg = G.load_config(cfg_path)
-    assert TASK in cfg["harvest"], "%s is not a harvest source (%s)" % (TASK, cfg.sources)
+    assert TASK in cfg["chains"], "%s is not a chains source (%s)" % (TASK, cfg.sources)
     assert prompt_kind in ("standard", "short"), prompt_kind
     TAGC = "A" if prompt_kind == "standard" else "B"
-    K = int(cfg["k_harvest"])
+    K = int(cfg["k_chains"])
     HORIZON = cfg.horizon(TASK)      # per source: the base model's chains are not one length
-    NP = NP if NP is not None else int(cfg["harvest"][TASK]["n"])
-    BATCH = BATCH if BATCH is not None else int(cfg["harvest_batch"])
+    NP = NP if NP is not None else int(cfg["chains"][TASK]["n"])
+    BATCH = BATCH if BATCH is not None else int(cfg["chains_batch"])
     EVAL_TASK = cfg.eval_task(TASK)
     P = G.paths(root)
     G.ensure_dirs(P)
@@ -45,7 +45,7 @@ def main(argv):
                             load_ckpt, Appender, load_base)
     from s3_patch import patch_universal_cache
     import torch
-    print("[harvest %s prompt=%s frac=%.2f] %s | %s"
+    print("[chains %s prompt=%s frac=%.2f] %s | %s"
           % (TAG, prompt_kind, MEM_FRACTION, nvsmi(), gpu_procs()), flush=True)
 
     rows = []
@@ -80,7 +80,7 @@ def main(argv):
     enc = [tok(p, add_special_tokens=False)["input_ids"] for p in prompts]
     plen = [len(e) for e in enc]
 
-    OUT = os.path.join(P["artifacts"], "harvest_%s.jsonl" % TAG)
+    OUT = os.path.join(P["artifacts"], "chains_%s.jsonl" % TAG)
     done = load_ckpt(OUT, lambda r: int(r["pool_i"]))
     todo0 = [i for i in range(N) if int(rows[i]["pool_i"]) not in done]
     print("[%s] resume: %d done, %d to do; prefix %d tokens, prompt mean %.0f"
@@ -109,7 +109,7 @@ def main(argv):
                "question": rows[i]["question"], "gold": rows[i]["gold"],
                "options": rows[i].get("options"), "chain": chain, "n_chain": c,
                "own_answer": own, "answer_correct": ok,
-               "kept": bool(ok and not hit) if cfg["harvest_correct_only"] else bool(not hit),
+               "kept": bool(ok and not hit) if cfg["chains_correct_only"] else bool(not hit),
                "stop_marker": mk, "hit_horizon": hit, "horizon": HORIZON,
                "prompt": prompt_kind, "chain_tag": TAGC}
         ap.write(row)
@@ -159,7 +159,7 @@ def main(argv):
             break
     for i in todo0:
         if not cur[i]["done"]:
-            raise RuntimeError("harvest generation did not finish; leave the row pending for resume")
+            raise RuntimeError("chains generation did not finish; leave the row pending for resume")
         emit(i)
     ap.close()
 
@@ -186,8 +186,8 @@ def main(argv):
             "prompt_tokens_mean": sum(plen) / max(1, len(plen)),
             "seconds": round(time.time() - T0, 1),
             "peak_gb": round(torch.cuda.max_memory_allocated() / 1024 ** 3, 3)}
-    G.jdump(meta, os.path.join(P["artifacts"], "harvest_meta_%s_%s.json" % (TASK, TAGC)))
-    print("DONE harvest %s: kept %d/%d (%.3f) at horizon %d, %d hit it (%d of them parsed "
+    G.jdump(meta, os.path.join(P["artifacts"], "chains_meta_%s_%s.json" % (TASK, TAGC)))
+    print("DONE chains %s: kept %d/%d (%.3f) at horizon %d, %d hit it (%d of them parsed "
           "correctly and were dropped), len mean %s median %s, %.0fs"
           % (TAG, meta["n_kept"], meta["n_questions"], meta["kept_frac"], HORIZON,
              meta["n_hit_horizon"], meta["n_correct_but_unfinished"], meta["len_mean"],

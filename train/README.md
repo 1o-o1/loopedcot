@@ -1,9 +1,9 @@
 # Budget-conditioned anytime training
 
-One reviewable package: harvest, targets, gates, training, evaluation grid, analysis, config,
+One reviewable package: chains, targets, gates, training, evaluation grid, analysis, config,
 prompts and tests for teaching Ouro-1.4B to answer under a stated token budget. It imports only the
-shared evaluation harness; nothing is imported from another experiment directory, and anything
-reused was copied with its source named at the point of use.
+shared evaluation harness, which ships inside this directory; nothing is imported from another
+experiment directory, and anything reused was copied with its source named at the point of use.
 
 ## What the recipe teaches
 
@@ -16,9 +16,9 @@ produce under that budget. The budget `T` is drawn from **that source's own grid
 **Why the grid reaches the task's own horizon.** The base model's chains are not one length. On the
 hard tasks they run to thousands of tokens: Ouro-1.4B base gains 7 points on MATH500 between a 512
 cap and a 4096 cap, and the production grids this recipe is compared against run the natural stop out
-to 4096 with caps {0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096}. A recipe that harvested to 512
+to 4096 with caps {0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096}. A recipe that generated chains only to 512
 and capped its grid at 512 would teach a length prior, and its grid at horizon 512 could not be
-placed beside those base grids in Table 1. So the harvest horizon is per source (GSM8K, CSQA and
+placed beside those base grids in Table 1. So the horizon for chain generation is per source (GSM8K, CSQA and
 AQuA 1024, MATH 2048), the top budget of each source equals its horizon, and the no-limit target is
 the **full** chain.
 
@@ -35,8 +35,8 @@ all, not even a `DIRECT` one: that is a stated decision, not an oversight, and i
 inside the region where the model can already reach the answer.
 
 A chain that ran into its horizon is not a correct chain whatever its text parses to -- it is an
-unfinished chain, and supervising it would teach the model to stop where the harvest stopped. Those
-are dropped from the kept pool and counted per source in `harvest_meta_<src>_<tag>.json` as
+unfinished chain, and supervising it would teach the model to stop where chain generation stopped. Those
+are dropped from the kept pool and counted per source in `chains_meta_<src>_<tag>.json` as
 `n_hit_horizon` and `n_correct_but_unfinished`. At the 512 horizon of the first draft that share was
 0.00 on GSM8K and 0.03 on MATH; at 1024 and 2048 it is smaller still, and what was cut off before is
 now a usable long chain.
@@ -198,11 +198,11 @@ actually realised, per source, sits within 0.05 of the table it was supposed to 
 
 ## Ablations: one flag
 
-`--arm` selects the target rule. Everything else is identical, so an arm difference is a target
-difference. Each arm keeps its own blocks, spans and schedule under `data/<arm>/`, and the trainer
-refuses blocks whose manifest names another arm or whose content hash does not match.
+`--variant` selects the target rule. Everything else is identical, so a variant difference is a target
+difference. Each variant keeps its own blocks, spans and schedule under `data/<variant>/`, and the trainer
+refuses blocks whose manifest names another variant or whose content hash does not match.
 
-| arm | rule | budget line | fallback | draw |
+| variant | rule | budget line | fallback | draw |
 |---|---|---|---|---|
 | `budget_longest` | longest correct chain that fits `T` | yes | yes | theory |
 | `budget_shortest` | shortest correct chain that fits `T` | yes | yes | theory |
@@ -212,14 +212,14 @@ refuses blocks whose manifest names another arm or whose content hash does not m
 
 `uniform_longest` is the ablation that prices the theory weights themselves: the same target rule and
 the same line, drawing `T` uniformly over the source's grid and the depth from the flat
-`depth_probabilities` mix, which is what every arm did before the weights existed. **It is not
+`depth_probabilities` mix, which is what every variant did before the weights existed. **It is not
 scheduled** -- it is there so a reviewer asking "what do the weights buy?" can be answered by one
-flag rather than by a rebuild, and it runs only if the two arms of record leave time.
+flag rather than by a rebuild, and it runs only if the two variants of record leave time.
 
 **The plan of record runs them in order, not in parallel.** `budget_longest` and the base-model
 reference grid go first, because those two are what Table 1 needs; `nobudget` second, because it
 prices the budget line itself and is the one ablation a reviewer will ask for; `budget_shortest`,
-`nocut` and `uniform_longest` only if time remains. Each arm is about 15 h of idle Spark time (train
+`nocut` and `uniform_longest` only if time remains. Each variant is about 15 h of idle Spark time (train
 plus grid), so the order is the schedule.
 
 ## Files
@@ -229,14 +229,15 @@ plus grid), so the order is the schedule.
 | `train/config.yaml` | every knob, one line of comment each. The single source of the recipe's numbers; a value no stage implements is refused at load. |
 | `train/theory_weights.py` | stage 0, CPU, run once. The two definitions copied from the paper's mechanism, and the budget and depth tables they imply, read off the base model's production grid. |
 | `train/data/theory_weights.json` | those tables, plus the formulas, the per-source commitment surfaces and the sha256 of every grid file they were read from. Pinned in `config.yaml`. |
-| `train/harvest.py` | stage 1, GPU. Chains A and B from the base checkpoint at k=4, correct-only, resumable per pool question. |
-| `train/targets.py` | stage 2, CPU, **and the shared library**: config, prompt builder, budget line, target rule, one-visit-per-block packer, span table, `target_manifest_<arm>.json`. |
+| `train/chains.py` | stage 1, GPU. Chains A and B from the base checkpoint at k=4, correct-only, resumable per pool question. |
+| `train/targets.py` | stage 2, CPU, **and the shared library**: config, prompt builder, budget line, target rule, one-visit-per-block packer, span table, `target_manifest_<variant>.json`. |
 | `train/gates.py` | stage 3. V1 parity, V2 masks, V3-CONTEXT (+ its negative control), V9 contamination on CPU; V4 preflight on GPU. Any failure stops. |
-| `train/train.py` | stage 4, GPU. The loop above, an atomic checkpoint every 100 steps, `train_config_<arm>.json` with realised tokens and layer passes. |
+| `train/train.py` | stage 4, GPU. The loop above, an atomic checkpoint every 100 steps, `train_config_<variant>.json` with realised tokens and layer passes. |
 | `train/run_grid.py` | stage 5, GPU. The no-limit pass at horizon 4096 cut at the ten standard caps, written in the base grids' cells format; one budgeted pass per stated budget with its own line and hard stop, in `cells_budget_*.jsonl`. |
-| `train/analysis.py` | stage 6, CPU. F1-F5 against a reference arm, paired bootstraps; the grid comes from `config.yaml`. |
-| `prompts/` | the short-exemplar blocks used only at harvest time, with their provenance in `prompts/README.txt`. |
-| `tests/` | CPU tests on synthetic data: the rule, the masks token by token, the packing, the line, the arms, arm keying, resume, and V3-CONTEXT failing on a split stream. |
+| `train/analysis.py` | stage 6, CPU. F1-F5 against a reference variant, paired bootstraps; the grid comes from `config.yaml`. |
+| `train/s32_common.py`, `train/s28_common.py`, `train/s13_shots.py`, `train/s3_patch.py` | the shared evaluation harness, copied in so the package runs from a checkout: model loading, the static cache, batch sizing, the natural stop, decoding, the exemplar blocks and the parsers. Every directory they write hangs off the run root (`S36_RUN_ROOT`, published by `targets.paths()`); the exemplar blocks stay package-relative, in `prompts/`. |
+| `prompts/` | the short-exemplar blocks used only when the chains are generated, and the standard exemplar block per task, with their provenance in `prompts/README.txt`. |
+| `tests/` | CPU tests on synthetic data: the rule, the masks token by token, the packing, the line, the variants, variant keying, resume, and V3-CONTEXT failing on a split stream. |
 
 ## The gates
 
@@ -259,7 +260,7 @@ plus grid), so the order is the schedule.
   which the same manifest counts per `T`. Below a few thousand visits the multinomial sampling error
   of the histogram is larger than 0.05, so the bound there is three of its own standard errors
   instead, reported per table as `sampling_bound_binds`.
-- **V9 contamination** - every harvest question is a pool question, and the pool was screened
+- **V9 contamination** - every chain's question is a pool question, and the pool was screened
   against every evaluation set. The gate also pins the exemplar block per task by sha256 (the grid
   refuses to run against a different one) and refuses MATH exemplars drawn from the evaluation split,
   which the shot helper will silently do when no training split is reachable.
@@ -292,19 +293,24 @@ at 2048**; F4's commitment runs over the shared caps and still reports `G128`.
 
 ## Running it
 
-    PY=~/latent-loop/.venv/bin/python ; R=$HOME/latent-loop/s36 ; cd $R
-    $PY train/theory_weights.py --cells-dir=~/loopedcot/artifacts   # stage 0, once; re-pin the digest
-    $PY train/harvest.py gsm8k --root=$R --prompt=standard   # and --prompt=short, for each source
-    $PY train/targets.py --root=$R --arm=budget_longest
-    $PY train/gates.py --cpu --root=$R --arm=budget_longest
-    $PY train/gates.py --v4  --root=$R --arm=budget_longest
-    $PY train/train.py s36_budget_longest --root=$R --arm=budget_longest
-    $PY train/run_grid.py s36_budget_longest gsm8k --root=$R --arm=budget_longest --k=4
-    $PY train/run_grid.py A0 gsm8k --root=$R --arm=budget_longest --k=4   # the base reference, same protocol
+    source env.sh ; PY=$PROD_PYTHON ; R=$PROD_ART/s36   # run from the repository root
+    $PY train/theory_weights.py --cells-dir=$PROD_ART   # stage 0, once; re-pin the digest
+    $PY train/chains.py gsm8k --root=$R --prompt=standard   # and --prompt=short, for each source
+    $PY train/targets.py --root=$R --variant=budget_longest
+    $PY train/gates.py --cpu --root=$R --variant=budget_longest
+    $PY train/gates.py --v4  --root=$R --variant=budget_longest
+    $PY train/train.py s36_budget_longest --root=$R --variant=budget_longest
+    $PY train/run_grid.py s36_budget_longest gsm8k --root=$R --variant=budget_longest --k=4
+    $PY train/run_grid.py A0 gsm8k --root=$R --variant=budget_longest --k=4   # the base reference, same protocol
     $PY train/analysis.py --root=$R --name=s36_budget_longest --ref=s33
 
 **`--root` is required and has no default.** Every stage refuses to start without it, so two runs
 can never write into one directory because nobody typed the flag.
+
+**CSQA and AQuA rows come from the run root.** `run_grid.py` takes its question rows from the shared
+harness's `split_rows`, which reads `<run root>/artifacts/data32_<task>.jsonl` for CSQA and AQuA;
+GSM8K and MATH500 are loaded straight from their Hugging Face datasets. Those two files have to be
+in the run root before stage 5 runs on those tasks.
 
 **Stage 0 needs no run root and no GPU.** It reads the base grids and writes into the package, not
 into a run; `--cells-dir` names the directory holding them, and `S36_CELLS_DIR` answers for it.
@@ -313,12 +319,12 @@ into a run; `--cells-dir` names the directory holding them, and `S36_CELLS_DIR` 
 file at `pool_jsonl` hashes to it: V9's screening argument is about those exact questions. After a
 deliberate re-screen, re-pin with `sha256sum <pool_jsonl>` and paste the digest into `config.yaml`.
 
-**Waiting for the GPU.** `gates.py --v4`, `harvest.py`, `train.py` and `run_grid.py` can wait for an
+**Waiting for the GPU.** `gates.py --v4`, `chains.py`, `train.py` and `run_grid.py` can wait for an
 idle GPU. The V4 preflight waits only when `--wait` asks for it or `CLUSTER=0` marks the shared
 unmanaged box, never under Slurm, and never with `--no-wait`.
 
 `--prompt=short` reads `<run root>/prompts/prompts_short_<src>.txt` when that file exists and falls
-back to the copy shipped in `prompts/`. Useful flags: `--sources=gsm8k,math` restricts the harvest
+back to the copy shipped in `prompts/`. Useful flags: `--sources=gsm8k,math` restricts the chains
 table, `--max-steps=N` bounds training, `--budgets=0,32,none` overrides the grid, `--n=N` bounds the
 problem count. The CPU tests run anywhere: `python -m pytest tests -q`.
 
@@ -334,8 +340,8 @@ the **3.3** contention factor the same smoke measured on training (149.2 vs 45.2
 | train, 32 blocks of 1024 only / 1280 only (idle) | 38.9 s / 59.8 s per step |
 | supervised density, one visit per block | **0.055** of padded tokens; padding share 0.329 at fixed 1024/1280 |
 | supervised tokens per optimiser step (GSM8K+MATH smoke) | 2,033-2,142, i.e. **63.5 per visit** |
-| harvest, 100 questions, k=4, contended | GSM8K 415 s standard / 158 s short; MATH 995 s / 336 s |
-| harvest chain lengths at the old 512 horizon | GSM8K mean 72.6, max 159, **0.00 hit the horizon**; MATH mean 194, p90 340, **0.03 hit it** |
+| chains, 100 questions, k=4, contended | GSM8K 415 s standard / 158 s short; MATH 995 s / 336 s |
+| chain lengths at the old 512 horizon | GSM8K mean 72.6, max 159, **0.00 hit the horizon**; MATH mean 194, p90 340, **0.03 hit it** |
 | grid, natural-stop decode rate, Ouro-1.4B base | 69.4 tok/s at k=4, 128.1 at k=2, 201.9 at k=1 |
 | production record: `ouro_1_4b_base` natural grids, horizon 4096 | **43.2 GPU-h for 40 jobs** at full N (280 tokens per problem, the four S36 tasks at k=4 are 3.7 h of it) |
 
@@ -363,7 +369,7 @@ bucket, so the step time is the per-block cost times 32:
 The model reproduces the measured 1024 point by construction and under-predicts the measured 1280
 point by 15 percent (51 s against 59.8), so read the long buckets as a floor, not a ceiling.
 
-**Harvest, at the new per-source horizons.** Two prompts per source over the N of record (GSM8K
+**Chains, at the new per-source horizons.** Two prompts per source over the N of record (GSM8K
 3,000, MATH 1,360, CSQA 1,500, AQuA 1,500). GSM8K, CSQA and AQuA cost nothing extra for the raise:
 no GSM8K chain reached even 512. MATH pays for the 3 percent that did, now running to at most 2048,
 at the 20.4 tok/s aggregate the smoke measured.
@@ -374,11 +380,11 @@ at the 20.4 tok/s aggregate the smoke measured.
 | MATH | measured 9.95 + 3.36 s/question, plus 0.4 h for the horizon tail | 5.4 h | 1.6 h |
 | CSQA | **estimated**, GSM8K scaled by prompt+chain tokens (x0.91) | 2.2 h | 0.7 h |
 | AQuA | **estimated**, GSM8K scaled (x1.00) | 2.4 h | 0.7 h |
-| total, once for all arms | | **14.8 h** | **4.5 h** |
+| total, once for all variants | | **14.8 h** | **4.5 h** |
 
-Raising the horizon is 0.4 h of that 14.8 h. The cost of the change is three percent of the harvest.
+Raising the horizon is 0.4 h of that 14.8 h. The cost of the change is three percent of chain generation.
 
-**Training, per arm, at 1.2M supervised tokens.** Two estimated counts drive it, both replaceable by
+**Training, per variant, at 1.2M supervised tokens.** Two estimated counts drive it, both replaceable by
 the stage-2 manifest before the run starts (`supervised_tokens_per_opt_step`, `visits_by_block_len`):
 
 - supervised tokens per visit, **estimated 46.5** for the four-source mixture, from the measured
@@ -388,16 +394,16 @@ the stage-2 manifest before the run starts (`supervised_tokens_per_opt_step`, `v
 - the bucket mix, **estimated** from prompt length plus measured chain length: 1024 **0.94**, 1536
   0.06, 2048 and above under 0.01. Mean 41 s/step idle.
 
-| per arm | idle | contended |
+| per variant | idle | contended |
 |---|---|---|
 | train, about 800 steps | **9.1 h** | 30 h |
 | the same plan under the old 512 recipe | 10.4 h (830 steps at 45.2 s) | 34 h |
 
 Training is **cheaper**, not dearer, than the 512 recipe on the same four sources: the longer chains
 put more supervised tokens in each visit, and bucketing stops the MATH blocks being padded to 1280.
-The earlier **7.4 h per arm** figure was 590 steps on a GSM8K+MATH-only mixture and is superseded.
+The earlier **7.4 h per variant** figure was 590 steps on a GSM8K+MATH-only mixture and is superseded.
 
-**The grid, per arm, at horizon 4096.** Priced the way the production record is priced: tokens per
+**The grid, per variant, at horizon 4096.** Priced the way the production record is priced: tokens per
 problem over the measured natural-stop rate, at 300 questions per (task, depth).
 
 | pass | tokens per problem |
@@ -406,11 +412,11 @@ problem over the measured natural-stop rate, at 300 questions per (task, depth).
 | budgeted {0, 32, 128, 512, 2048} | 0 + 32 + 128 + 200 + 220 generated + 5 read-outs = 640 |
 | total | **932**, against 680 for the 512 grid |
 
-| per arm | hours |
+| per variant | hours |
 |---|---|
 | four tasks at k=4 | 4.5 h (1.12 h each; the 512 grid was 0.82 h each) |
 | MATH500 at k=2, CSQA and AQuA at k=1 (F4, F5) | 1.4 h |
-| **grid total per arm** | **5.9 h**, and the same again for the base reference |
+| **grid total per variant** | **5.9 h**, and the same again for the base reference |
 
 That cross-checks against the production record: 3.7 h buys the four tasks at k=4 at full N (3,294
 questions) and 280 tokens each, and 1,200 questions at 932 tokens each is 4.5 h at the same rate.
@@ -424,11 +430,11 @@ tok/s rate above was measured at width 16, so a narrower width makes the grid ho
 **The largest uncertainty is the mean natural stop at 4096.** The 220-token figure is the production
 estimator's, measured at a 512 horizon, and MATH500's 7-point gain between 512 and 4096 says the true
 mean is longer on the hard tasks. At a 600-token mean the no-limit and 2048 passes both grow and the
-grid is **2.4 h per (task, k)**, i.e. 12 h per arm rather than 6. The first grid job on the cluster
+grid is **2.4 h per (task, k)**, i.e. 12 h per variant rather than 6. The first grid job on the cluster
 reports `passes.none.natural_stop_mean` and `natural_stop_max`; re-price from it before queueing the
 rest.
 
-**The plan of record, end to end, on an idle Spark.** Harvest 4.5 h once, then `budget_longest`
+**The plan of record, end to end, on an idle Spark.** Chains 4.5 h once, then `budget_longest`
 train 9.1 h + grid 5.9 h, and the base reference grid 5.9 h: **about 26 h to the first
 Table-1-comparable result**. `nobudget` adds 15 h; `budget_shortest` and `nocut` 15 h each. Contended
 throughout it is roughly 57 h to the same point.
@@ -441,8 +447,8 @@ throughout it is roughly 57 h to the same point.
 peaked at **58.4 GB**, but that number is censored: the process ran under a 59.3 GB allocator cap and
 **15 of 20** steps took the OOM split path, halving the chunk for that window and restoring the full
 width afterwards. The peak is therefore what the cap allowed, not what the configuration wants, and
-the true uncapped peak is higher. **Budget 70 GB per arm** and do not place a second job beside it;
-the 9.1 h per arm figure assumes an **uncontended** GPU, against the 3.3x the same smoke measured
+the true uncapped peak is higher. **Budget 70 GB per variant** and do not place a second job beside it;
+the 9.1 h per variant figure assumes an **uncontended** GPU, against the 3.3x the same smoke measured
 while sharing the card.
 
 **The bucket memory note, and the one number to watch.** The resident forward is `micro x block_len`

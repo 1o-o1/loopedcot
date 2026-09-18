@@ -9,3 +9,10 @@ matplotlib>=3.8,<4
 math_verify>=0.5
 pyyaml>=6
 huggingface_hub>=0.23
+
+# S36 training package (train/). `math_verify` above is the PyPI distribution `math-verify`
+# (import name math_verify): MATH answer checking in train/s32_common.py:math_eq, which replaces the
+# copy the spike vendored under s32/pylibs. It is imported lazily inside math_eq and falls back to
+# string normalisation when it is absent, so the CPU tests and the non-MATH stages run without it.
+# `datasets` above is the loader train/s32_common.py and train/s13_shots.py use for GSM8K, MATH-500
+# and the MATH exemplar shots; those imports are lazy too.
