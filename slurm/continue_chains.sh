@@ -1,14 +1,18 @@
 #!/bin/bash
 # Chain-continuation runs (prod.generate --continue-chains): one Slurm job per (model, task, depth), one GPU
 # each, ALL submitted at once so the scheduler fills every free GPU on every node. Run from anywhere:
+#   bash slurm/continue_chains.sh probe   # one 5-minute job per GPU node: can torch initialise CUDA there? then
+#                                         # run it again to read the verdicts; export SBATCH_EXTRA="--exclude=<bad nodes>"
 #   bash slurm/continue_chains.sh c1      # think-tag continuation: 2 Thinking checkpoints x 10 tasks x depths 1-4 = 80 jobs
 #   bash slurm/continue_chains.sh c2      # horizon 4096 -> 8192 on the ten (model, task, depth) below; a Thinking job
 #                                         # waits for its c1 job (afterok) and continues from the natural2 cells
+#   bash slurm/continue_chains.sh retry   # resubmit every c1 and c2 job that is not RC=0 and not running/pending
 #   bash slurm/continue_chains.sh c2more  # the four extra k=2 Thinking jobs, only once c2 is done and GPUs are idle
 #   bash slurm/continue_chains.sh status  # finished / failed counts, and the last 30 log lines of every failed job
 #   bash slurm/continue_chains.sh report  # per c2 job: rows continued, share stopped before 8192, accuracy at caps 4096 and 8192
-# Every job log ends with RC=<exit code of prod.generate>. Outputs: cells_<model>_<task>_natural2_k<K>.jsonl (c1)
-# and cells_<model>_<task>_natural2h_k<K>.jsonl (c2) beside the natural grid, plus their meta files.
+# Every job log starts with the node, CUDA_VISIBLE_DEVICES and nvidia-smi -L, and ends with RC=<exit code of
+# prod.generate>; the batch job exits with that code, so an afterok dependency really waits for success.
+# Outputs: cells_<model>_<task>_natural2_k<K>.jsonl (c1) and cells_<model>_<task>_natural2h_k<K>.jsonl (c2).
 # Knobs (export before running): TIME_C1 (24:00:00) TIME_C2 (48:00:00) MEM (64gb) CPUS (8) SBATCH_EXTRA HITLIST
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +24,8 @@ TIME_C1="${TIME_C1:-24:00:00}"; TIME_C2="${TIME_C2:-48:00:00}"; MEM="${MEM:-64gb
 EXTRA="${SBATCH_EXTRA:-}"
 CAPS_C1="0,16,32,64,128,256,512,1024,2048,4096"
 CAPS_C2="0,16,32,64,128,256,512,1024,2048,4096,8192"
+C1_MODELS="ouro_1_4b_think ouro_2_6b_think"
+TASKS="gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag"
 # The horizon-extension set (model:task:depth): the deepest depths of the two tasks whose chains run into the
 # 4096 horizon most (MATH500, AQuA) on the Thinking checkpoints, and McLeish's deepest depth on MATH500 and
 # StrategyQA. The full >= 5% horizon-hit list is 83 jobs and was cut to these ten on 2026-09-17.
@@ -34,51 +40,88 @@ width_for() {  # the batch width for 8192-token sequences: half the width the 40
   esac
 }
 
-submit() {  # submit <name> <time> <dependency or ""> <command...>
+ok_log()   { [ -f "logs/$1.out" ] && grep -q "^RC=0" "logs/$1.out"; }
+in_queue() { squeue -u "$USER" -h -n "$1" -o %j | grep -qx "$1"; }
+
+submit() {  # submit <name> <time> <dependency or ""> <command...>; prints the job id
   local name="$1" time="$2" dep="$3"; shift 3
+  [ -f "logs/${name}.out" ] && mv -f "logs/${name}.out" "logs/${name}.prev.out"
   sbatch --parsable $EXTRA ${dep:+--dependency=afterok:$dep} --job-name="$name" --gres=gpu:1 \
     --cpus-per-task="$CPUS" --mem="$MEM" --time="$time" --output="logs/${name}.out" \
-    --wrap="cd '$ROOT' && $* ; echo RC=\$?"
+    --wrap="echo node=\$(hostname) CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-unset}; nvidia-smi -L; cd '$ROOT' && $* ; rc=\$?; echo RC=\$rc; exit \$rc"
 }
 
-submit_c2() {  # submit_c2 <list>
-  local n=0 M T K dep src
-  for item in $1; do
-    IFS=: read -r M T K <<< "$item"
-    dep=""; src=""
-    if [[ "$M" == ouro_* ]]; then
-      [ -f logs/c1_jobs.txt ] || { echo "run c1 first: logs/c1_jobs.txt missing"; exit 1; }
-      dep=$(awk -v m="$M" -v t="$T" -v k="$K" '$1==m && $2==t && $3==k {print $4}' logs/c1_jobs.txt)
-      [ -n "$dep" ] || { echo "no c1 job recorded for $M $T k$K; skipped"; continue; }
-      src="--continue-from-cells=$PROD_ART/cells_${M}_${T}_natural2_k${K}.jsonl"
-    fi
-    submit "c2_${T}_${M}_k${K}" "$TIME_C2" "$dep" "$PROD_PYTHON -m prod.generate --model=$M --task=$T --k=$K --protocol=natural --out=$PROD_ART --continue-chains=horizon --protocol-tag=natural2h --horizon=8192 --old-horizon=4096 --caps=$CAPS_C2 --no-extra-caps --batch-width=$(width_for "$M" "$K") $src" > /dev/null
-    n=$((n + 1))
-  done
-  echo "c2: $n jobs submitted"
+c1_cmd() { echo "$PROD_PYTHON -m prod.generate --model=$1 --task=$2 --k=$3 --protocol=natural --out=$PROD_ART --continue-chains=think_tag --protocol-tag=natural2 --horizon=4096 --old-horizon=4096 --caps=$CAPS_C1 --no-extra-caps --no-think-tag-is-stop"; }
+c2_cmd() {  # c2_cmd <model> <task> <k>
+  local src=""
+  [[ "$1" == ouro_* ]] && src="--continue-from-cells=$PROD_ART/cells_${1}_${2}_natural2_k${3}.jsonl"
+  echo "$PROD_PYTHON -m prod.generate --model=$1 --task=$2 --k=$3 --protocol=natural --out=$PROD_ART --continue-chains=horizon --protocol-tag=natural2h --horizon=8192 --old-horizon=4096 --caps=$CAPS_C2 --no-extra-caps --batch-width=$(width_for "$1" "$3") $src"
 }
+
+record_c1() {  # record_c1 <model> <task> <k> <jobid>: replace the pair's line in logs/c1_jobs.txt
+  touch logs/c1_jobs.txt
+  awk -v m="$1" -v t="$2" -v k="$3" '!($1==m && $2==t && $3==k)' logs/c1_jobs.txt > logs/c1_jobs.tmp
+  echo "$1 $2 $3 $4" >> logs/c1_jobs.tmp; mv -f logs/c1_jobs.tmp logs/c1_jobs.txt
+}
+
+submit_c1_pair() {  # skips a pair already RC=0 or in the queue
+  local name="c1_${2}_${1}_k${3}"
+  ok_log "$name" && { echo "  done   $name"; return 1; }
+  in_queue "$name" && { echo "  queued $name"; return 1; }
+  local jid; jid=$(submit "$name" "$TIME_C1" "" "$(c1_cmd "$1" "$2" "$3")")
+  record_c1 "$1" "$2" "$3" "$jid"; echo "  sent   $name ($jid)"
+}
+
+submit_c2_pair() {  # a Thinking pair waits for its c1 job unless that job is already RC=0
+  local name="c2_${2}_${1}_k${3}" dep=""
+  ok_log "$name" && { echo "  done   $name"; return 1; }
+  in_queue "$name" && { echo "  queued $name"; return 1; }
+  if [[ "$1" == ouro_* ]] && ! ok_log "c1_${2}_${1}_k${3}"; then
+    dep=$(awk -v m="$1" -v t="$2" -v k="$3" '$1==m && $2==t && $3==k {print $4}' logs/c1_jobs.txt 2>/dev/null)
+    [ -n "$dep" ] || { echo "  skip   $name: its c1 job is neither done nor recorded (run c1 or retry first)"; return 1; }
+  fi
+  local jid; jid=$(submit "$name" "$TIME_C2" "$dep" "$(c2_cmd "$1" "$2" "$3")")
+  echo "  sent   $name ($jid)${dep:+ after c1 job $dep}"
+}
+
+submit_c2_list() { local n=0 M T K; for item in $1; do IFS=: read -r M T K <<< "$item"; submit_c2_pair "$M" "$T" "$K" && n=$((n + 1)); done; echo "c2: $n jobs submitted"; }
 
 case "$MODE" in
+  probe)
+    nodes=$(sinfo -h -N -o "%N %G" | awk '$2 ~ /gpu/ {print $1}' | sort -u)
+    if ls logs/probe_*.out >/dev/null 2>&1; then
+      echo "verdicts (delete logs/probe_*.out to probe again):"
+      for f in logs/probe_*.out; do n=${f#logs/probe_}; n=${n%.out}; if grep -q "^RC=0" "$f"; then echo "  ok   $n: $(grep -m1 'device_count' "$f")"; elif grep -q "^RC=" "$f"; then echo "  BAD  $n: $(grep -m1 -i 'error' "$f" | cut -c1-120)"; else echo "  ...  $n (not finished)"; fi; done
+      bad=$(for f in logs/probe_*.out; do grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { n=${f#logs/probe_}; echo -n "${n%.out},"; }; done); bad=${bad%,}
+      [ -n "$bad" ] && echo "export SBATCH_EXTRA=\"--exclude=$bad\"   # then: bash slurm/continue_chains.sh retry"
+      exit 0
+    fi
+    for n in $nodes; do
+      sbatch --parsable $EXTRA --nodelist="$n" --job-name="probe_$n" --gres=gpu:1 --cpus-per-task=2 --mem=8gb --time=00:05:00 --output="logs/probe_$n.out" \
+        --wrap="hostname; echo CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-unset}; nvidia-smi -L; nvidia-smi --query-gpu=name,compute_mode,memory.used,driver_version --format=csv; $PROD_PYTHON -c 'import torch; torch.cuda.init(); print(\"device_count\", torch.cuda.device_count(), torch.cuda.get_device_name(0), torch.version.cuda)'; rc=\$?; echo RC=\$rc; exit \$rc" > /dev/null
+    done
+    echo "probes sent to: $(echo $nodes | tr '\n' ' '); run this again in a few minutes for the verdicts" ;;
   c1)
-    : > logs/c1_jobs.txt
-    for M in ouro_1_4b_think ouro_2_6b_think; do for T in gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag; do for K in 1 2 3 4; do
-      jid=$(submit "c1_${T}_${M}_k${K}" "$TIME_C1" "" "$PROD_PYTHON -m prod.generate --model=$M --task=$T --k=$K --protocol=natural --out=$PROD_ART --continue-chains=think_tag --protocol-tag=natural2 --horizon=4096 --old-horizon=4096 --caps=$CAPS_C1 --no-extra-caps --no-think-tag-is-stop")
-      echo "$M $T $K $jid" >> logs/c1_jobs.txt
-    done; done; done
-    echo "c1: $(wc -l < logs/c1_jobs.txt) jobs submitted (ids in logs/c1_jobs.txt)" ;;
-  c2)      submit_c2 "$HITLIST" ;;
-  c2more)  submit_c2 "$HITLIST_MORE" ;;
+    for M in $C1_MODELS; do for T in $TASKS; do for K in 1 2 3 4; do submit_c1_pair "$M" "$T" "$K"; done; done; done
+    echo "c1 job ids in logs/c1_jobs.txt" ;;
+  c2)      submit_c2_list "$HITLIST" ;;
+  c2more)  submit_c2_list "$HITLIST_MORE" ;;
+  retry)
+    # c2 jobs still waiting on a c1 job that failed can never start (afterok): cancel them, resubmit below
+    for j in $(squeue -u "$USER" -h -o "%i %j %r" | awk '$2 ~ /^c2_/ && $3 ~ /Dependency/ {print $1}'); do scancel "$j"; done
+    for M in $C1_MODELS; do for T in $TASKS; do for K in 1 2 3 4; do submit_c1_pair "$M" "$T" "$K"; done; done; done | grep -v "  done\|  queued"
+    submit_c2_list "$HITLIST" | grep -v "  done\|  queued" ;;
   status)
     for stage in c1 c2; do
-      all=$(ls logs/${stage}_*.out 2>/dev/null | wc -l); ok=$(grep -l "^RC=0" logs/${stage}_*.out 2>/dev/null | wc -l)
-      done_any=$(grep -l "^RC=" logs/${stage}_*.out 2>/dev/null | wc -l)
+      all=$(ls logs/${stage}_*.out 2>/dev/null | grep -vc prev); ok=$(grep -l "^RC=0" logs/${stage}_*.out 2>/dev/null | grep -vc prev)
+      done_any=$(grep -l "^RC=" logs/${stage}_*.out 2>/dev/null | grep -vc prev)
       echo "$stage: $all started, $done_any finished, $ok ok, $((done_any - ok)) failed, $((all - done_any)) running"
     done
+    echo "queued/running: $(squeue -u "$USER" -h | wc -l) (never-startable, dependency on a failed job: $(squeue -u "$USER" -h -o %r | grep -c DependencyNever))"
     for f in logs/c1_*.out logs/c2_*.out; do
-      [ -f "$f" ] || continue
-      grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { echo "== FAILED $f"; tail -30 "$f"; }
-    done
-    echo "queued/running: $(squeue -u "$USER" -h | wc -l)" ;;
+      [ -f "$f" ] || continue; case "$f" in *.prev.out) continue ;; esac
+      grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { echo "== FAILED $f ($(grep -m1 '^node=' "$f"))"; tail -30 "$f"; }
+    done ;;
   report)
     $PROD_PYTHON - "$PROD_ART" <<'EOF'
 import glob, json, os, re, sys
@@ -122,5 +165,5 @@ for mp in sorted(glob.glob(os.path.join(art, "meta_*_natural2h_k*.json"))):
 EOF
     ;;
   *)
-    echo "usage: bash slurm/continue_chains.sh c1|c2|c2more|status|report"; exit 1 ;;
+    echo "usage: bash slurm/continue_chains.sh probe|c1|c2|retry|c2more|status|report"; exit 1 ;;
 esac
