@@ -106,17 +106,23 @@ No evaluation label reaches either ranking; both ranking functions reject non-ca
 ## The gate
 
 At a given budget the allocator's pick can be worse than normal operation. The gate keeps normal
-unless the predicted margin clears its own uncertainty:
+unless the MEASURED margin clears its own uncertainty:
 
-    run the pick  iff  A_hat(pick) - A_hat(normal) > c_gate * s
-    s = the standard deviation of that same margin across resamples of the calibration questions
+    run the pick  iff  mean_ver[ acc(pick) - acc(normal) ] > c_gate * s
+    s = the paired bootstrap SD of that same difference over the verification questions
 
-Those resamples are the same draws the calibration bootstrap uses to re-rank the cells, so gate
-noise and order noise come from one plan. `c_gate = 0` demands only a strictly positive margin.
+The margin is the two cells' own labels on the verification questions, differenced question by
+question, and never the surface's prediction of it. `A_hat` ranks the cells; only the labels can
+say whether the cell it ranked first is better. Where the equation's assumption fails -- a task
+whose early read-out is committed and wrong, so the depth's committed mean is dragged up by the one
+cell that is accurate at the horizon -- the predicted margin has the wrong sign, and a gate reading
+it opens on a deviation that loses points. `c_gate = 0` demands only a strictly positive margin.
 **`c_gate = 0.5` is the frozen default**: swept over `{0, 0.5, 1, 1.5, 2}` on seven tasks under
 "maximise mean gain over normal subject to a worst-case per-budget loss no worse than -1 point".
 `c = 0` breaks the constraint; `0.5` satisfies it at the highest mean gain and wins every
-leave-one-task-out fold. `evaluate.gate_selection` reruns the sweep, splitting the calibration
+leave-one-task-out fold. It is re-confirmed against `1.0` in the twenty-grid sweep below, where at
+the frozen split the two carry the same deviations and the same cost saving and `0.5` gains +0.83
+points at 1.0x against `1.0`'s +0.80. `evaluate.gate_selection` reruns the sweep, splitting the calibration
 questions in two so no evaluation label picks the constant. `--one-se` replaces the constant with a
 whole standard error, the conventional conservative reading.
 
@@ -137,15 +143,46 @@ is bootstrapped in its turn to report how often a refit still clears the same ba
 sizes travel with every gated row. A calibration split shorter than the sum is used entire, keeping
 the requested proportion, and the row says `gate_split_truncated`.
 
-**`--n-select 50 --n-verify 30` is the frozen default**, swept over `{50/50, 100/20, 50/30}` on the
-ten S33 spike grids (five tasks, two checkpoints) at 1.0x of the default cost. `100/20` cannot run
-there at all -- every one of those grids has exactly 100 calibration ids -- and `50/50` closes the
-one true deviation in the set, MATH500 A0 at depth 3, worth +3.3 points for a 21.5 percent saving.
-`50/30` keeps it, opens no deviation that loses beyond its own interval, and spends 8.6 percent
-under budget against the old gate's 8.1 at the same mean accuracy.
+**`--n-select 70 --n-verify 30` is the frozen default**, re-swept under the measured rule over
+`{50/50, 50/30, 70/30}` x `c_gate {0.5, 1.0}` on **twenty grids**: the ten Ouro-1.4B base
+production grids at horizon 4096 (ten tasks, 100 calibration and 300 evaluation questions each) and
+the ten S33 spike grids (five tasks, two checkpoints). Both gated arms, expected accounting, 1.0x
+of the default cost. The objective, in order: no deviation that loses to its own fallback beyond
+the paired evaluation interval, then the largest mean gain at 1.0x, then the largest mean cost
+saving.
 
-`--gate-mode whole` restores the old rule, one set fitting and measuring, so the two can be read
-side by side. It is the only way to reproduce the pre-repair numbers.
+| setting | deviations | false | gain @1.0x | saving @1.0x | worst row |
+|---|---|---|---|---|---|
+| 50/50, c 0.5 | 19 | 0 | +0.56 | 12.77% | -10.0 |
+| 50/50, c 1.0 | 16 | 0 | +0.67 | 10.35% | -10.0 |
+| 50/30, c 0.5 | 22 | **1** | +0.64 | 12.64% | -10.0 |
+| 50/30, c 1.0 | 19 | **1** | +0.73 | 11.41% | -10.0 |
+| **70/30, c 0.5** | 17 | 0 | **+0.83** | 11.10% | -2.0 |
+| 70/30, c 1.0 | 17 | 0 | +0.80 | 11.10% | -2.0 |
+
+The one false deviation, at 50/30 under both bars, is HellaSwag: ids 50-79 read +6.7 points for the
+depth-3 deviation against an SD of 6.5, and it then loses 5.7 points over 300 evaluation questions.
+Moving the cut to 70 changes both halves -- a policy fitted on 70 questions, verified on ids 70-99
+-- and that pair measures +0.0, so the gate reverts. `50/50` saves more but gains less, and saving
+is the third criterion. The verdict does not move with the bootstrap seed.
+
+What 70/30 gives up: the gate now reverts every S33 grid at 1.0x, including MATH500 A0's depth-3
+deviation, which the whole-set gate keeps on a +8.0 point margin and ids 50-79 backed at +16.7.
+Ids 70-99 measure the same policy at -10.0. A margin that swings 27 points between two halves of
+one calibration set is not a margin thirty questions can settle, and the conservative reading is
+the one that carries no losing deviation.
+
+`--gate-mode whole` restores the old rule, so the two can be read side by side: one set fits and
+measures, and what it reads is the PREDICTED margin `A_hat(pick) - A_hat(normal)` against the SD of
+that margin across calibration resamples -- the same draws the calibration bootstrap uses to
+re-rank the cells, so gate noise and order noise come from one plan. It is the only way to
+reproduce the pre-repair numbers.
+
+**What the verification half has to be big enough for.** The margin is a measurement, so its error
+bar is the sampling error of `n_verify` questions and nothing else: thirty binary questions give
+about 5 to 7 points of SD, and `c_gate = 0.5` asks for half of one. That is the live constraint on
+this gate, and it is why the sweep above is read on twenty grids rather than on any single task's
+verdict. A larger verification half costs selection questions, which is the trade `50/50` loses on.
 
 ## The average budget
 
@@ -199,6 +236,41 @@ carries `cost_saving_pct` against its own budget and `pct_of_default_cost`, and 
 it in one line -- GSM8K `avg_equation` is the same 73.7 points at 74.2 percent of the default
 cost.
 
+## v5: the calibration size, the deviation families, the oracle gap
+
+Two changes and one column, all aimed at the distance between the allocator and the best cell the
+evaluation questions actually have. **The calibration size is now a function of N**:
+`n_cal = max(100, min(300, floor(0.2 N)))`, and the split of record draws calibration as the first
+`n_cal` of one seeded permutation, so a larger size keeps every id the smaller one had and takes
+the extra ids off the front of the evaluation split, which shrinks by exactly as many
+(`cells.promote_calibration`, `--n-cal` to override); the gate's cut is then 70/30 OF that size
+rather than a fixed 70 and 30, which at the frozen 100 is the frozen 70 and 30 and nothing about
+these grids moves. **The structured deviation families** replace the free set as what the gate is
+allowed to deviate to, tested in order, smallest first, the first whose verification margin clears
+the bar winning: `F0` the deepest depth at cap 0, `F1` the deepest depth at any cap, `F2` one depth
+shallower at any cap, `F3` the free set, which is v4 exactly and is the last resort, so a family
+can only add a deviation the structured test earned and never take one away. Fewer cells in the
+running means less of a winner's curse for the bar to cover, and both gated arms record which
+family opened. **The oracle gap** is the third: the best single cell on the EVALUATION questions
+minus each arm at 1.0x, one column of Table 1 and one field per row of `results.json`. It reads
+the evaluation labels, so it is a diagnostic -- the price of calibration noise, what the arm gives
+up by having to find the cell from the calibration half instead of being told it -- and never a
+policy result; no arm consumes it, and a negative gap means an arm beat every single cell by
+varying the cell per question.
+
+**What is frozen.** The size rule and the 70/30 proportion. At N = 400 the rule sits on its floor
+and returns the 100 v4 used, so the twenty grids here do not move by it; the emulation is where it
+pays, promoting evaluation ids in seeded order to n_cal 150 and 200 (the evaluation split shrinking
+to 250 and 200). Over the ten production grids the mean gain at 1.0x runs +0.07, +0.41, +0.25 under
+v4's gate and +0.12, +0.73, +0.77 under v5's, with no false deviation at any size, and HellaSwag's
+genuine cap-0 optimum -- worth +5.6 and +7.5 points, and the one grid where the gap closes to zero
+-- is recovered only at 150 and 200. The families **are frozen on** (ruling 2026-09-18: the production grids at horizon 4096 are the setting of record, and there they win at every calibration size; `--no-families` restores the free set). They carry no false
+deviation either, but over the twenty grids at n_cal 100 the mean gain at 1.0x falls +0.67 to +0.62
+and the oracle gap rises 2.03 to 2.08, and the condition was that the gain rise. The split is not
+even: on the ten production grids they win at every size and cut the gap (2.11 to 2.06, 2.32 to
+1.94, 2.55 to 1.95); on the ten S33 spike grids they lose, +1.26 to +1.11, and those rows are the
+larger numbers. The families are on by default; `--no-families` turns them off.
+
 ## Gain, contrast, Table 1
 
 **Gain over normal** is averaged over the budgets where normal operation is affordable for at least
@@ -227,12 +299,13 @@ row with a bootstrap interval over questions.
 ## Running it
 
     cd work/spikes/s35_allocator
-    python -m unittest discover -s tests -t tests            # 143 tests, CPU, seconds
+    python -m unittest discover -s tests -t tests            # 206 tests, CPU, a minute
 
     python -m alloc.cli --cells DIR --task gsm8k --checkpoint NAME \
                         --model-config PATH | --layers-per-loop N [--fixed-layers M] \
                         [--reference NAME] [--c-gate 0.5] [--n-labels 30] \
-                        [--gate-mode split|whole] [--one-se] [--n-select 50] [--n-verify 30] \
+                        [--gate-mode split|whole] [--one-se] [--n-select 70] [--n-verify 30] \
+                        [--n-cal 150] [--no-families] \
                         [--accounting cap|realised|expected|all] [--avg-budget] \
                         [--ks 1,2,4,8] [--caps 0,64,512,4096] --out OUTDIR
 
@@ -249,7 +322,8 @@ reconstruction error and its noise floor, both rankings, the calibration and pre
 every cell's median price and expected length); `results.json` (five arms with both gain means, both
 bootstrap intervals, the worst budget and the per-budget record; the two contrasts; the
 non-inferiority verdict at the top three `B*` budgets with a 2-point margin; the default cost;
-Table 1, and one Table 1 per accounting under `--accounting all`); `table1.md` and one
+Table 1 with the oracle gap of every arm, and one Table 1 per accounting under `--accounting all`;
+the resolved calibration size and the promotion record under `n_cal_rule`); `table1.md` and one
 `table1_<accounting>.md` per accounting run. The gains and the contrasts are priced under one
 accounting, the first of the list, so `all` tabulates three and prices the rest under `cap`.
 
@@ -257,11 +331,11 @@ accounting, the first of the list, so `all` tabulates three and prices the rest 
 
 | file | holds |
 |---|---|
-| `alloc/cells.py` | both file-name and row shapes, labels, the read-out parse, the reserve, the grid assertions, model geometry, the calibration expected-length table |
+| `alloc/cells.py` | both file-name and row shapes, labels, the read-out parse, the reserve, the grid assertions, model geometry, the calibration expected-length table, the calibration-size rule and the seeded promotion of evaluation ids into it |
 | `alloc/mechanism.py` | arrival, `G`, `c`, `l`, `A_hat`, the reconstruction error and noise floor |
-| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, both rankings, affordability, normal operation, the gate, the one-standard-error rule, the paired margin SD, the average-budget multiplier |
-| `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the calibration split, the gate sweep |
-| `tests/` | a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close and a planted cap-0 optimum it must keep, a reproduction test against frozen real numbers |
+| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, both rankings, affordability, normal operation, both gates (`MeasuredGate`, the default; `Gate`, the predicted one `whole` keeps), the one-standard-error rule, the paired margin SD, the average-budget multiplier, the 70/30 proportion and the four deviation families |
+| `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the calibration split, the gate sweep, the family tests, the oracle gap, each arm against its own fallback |
+| `tests/` | a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close, a planted cap-0 optimum it must keep and a planted wrong-signed surface where the predicted margin opens the gate and the measured one reverts, a reproduction test against frozen real numbers, and the v5 file: the size rule, the promotion, the proportional split, the four families on a true cap-0 plant and on a losing one, the oracle gap, the fallback interval, the frozen defaults |
 
 Rerunning the real grids reproduces 26 frozen numbers to **0.05 points** (tolerance 0.1): headline
 and pooled gain over normal on six tasks under lookup and five under equation at 30 labels, plus

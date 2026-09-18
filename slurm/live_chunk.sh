@@ -6,6 +6,7 @@
 # and Slurm would kill them with the job.
 set -u
 LIST="$1"; ID="$2"; PER="$3"
+ALLOC_PREFIX="${ALLOC_PREFIX:-alloc_v5}"   # the alloc output the picks are read from
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 source "$ROOT/env.sh"
@@ -18,6 +19,7 @@ for line in "${LINES[@]}"; do
   LOG="$ROOT/logs/live_${T}_${M}_${ARM}_b${B}.log"
   echo "[chunk $ID] start $M $T $ARM $B -> $LOG"
   PYTHONUNBUFFERED=1 $PROD_PYTHON -m prod.live_check --model="$M" --task="$T" --cells="$PROD_ART" \
+      --alloc-dir="$PROD_ART/${ALLOC_PREFIX}_${T}_${M}" \
       --budget-fraction="$B" --arm "$ARM" --out="$OUT" > "$LOG" 2>&1 &
   pids+=("$!:$M $T $ARM $B")
 done

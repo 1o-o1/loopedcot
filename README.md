@@ -132,10 +132,10 @@ $PROD_PYTHON -m prod.score --cells=$PROD_ART --model=ouro_1_4b_think --task=math
 $PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think --task=math500           # heatmap, frontier, card, arrival, gain figures
 $PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think --task=math500 --protocol=forced
 $PROD_PYTHON -m prod.analyze.cards --cells=$PROD_ART --model=ouro_1_4b_think --tasks=gsm8k,math500,aqua  # per-checkpoint card over several datasets
-$PROD_PYTHON -m prod.live_check --model=ouro_1_4b_base --task=gsm8k --cells=$PROD_ART --budget-fraction=0.5 --no-generate   # the allocator's offline pick per prompt
+$PROD_PYTHON -m prod.live_check --model=ouro_1_4b_base --task=gsm8k --cells=$PROD_ART --alloc-dir=$PROD_ART/alloc_v5_gsm8k_ouro_1_4b_base --budget-fraction=0.5 --no-generate   # the allocator's pick per prompt, read from alloc's results.json
 $PROD_PYTHON -m prod.analyze.table1 --cells=$PROD_ART --models=ouro_1_4b_base,ouro_1_4b_think,ouro_2_6b_base,ouro_2_6b_think --tasks=gsm8k,math500,svamp,aqua,csqa,arc,strategyqa,bbh,mmlu,hellaswag --accounting=both   # Table 1: default vs allocator at 25/50/100% of the default cost
 $PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> --model-config prod/config.yaml --accounting all --avg-budget --out $PROD_ART/alloc_v2_<task>_<model>   # the S35 allocator: lookup, equation, gated and average-budget arms under the cap, expected and realised accountings
-$PROD_PYTHON -m prod.live_check --model=<model> --task=<task> --cells=$PROD_ART --budget-fraction=0.5 --arm avg_gated_lookup   # live check of the average-budget gated arm (--arm lookup is the per-prompt cap rule)
+$PROD_PYTHON -m prod.live_check --model=<model> --task=<task> --cells=$PROD_ART --alloc-dir=$PROD_ART/alloc_v5_<task>_<model> --budget-fraction=0.5 --arm avg_gated_lookup   # live check of the average-budget gated arm at alloc's own picks (--arm lookup is the per-prompt cap rule)
 ```
 
 `prod.score` prints the accuracy table and writes `score_<model>_<task>_<protocol>.json`; the figures
@@ -144,14 +144,24 @@ fraction of the cap cost of the default's own uncapped cell, so the 100 percent 
 baseline; realised spend is reported beside every row; `--trained=<model>` adds the trained checkpoint's row).
 `alloc.cli` (package `alloc/`, its README explains the method) writes: `cards.json` (the checkpoint's calibration
 card: per-cell accuracy and price, the two rankings, the label-free commitment curve); `results.json` (per budget, every
-arm's paired accuracy, gain and bootstrap intervals, under the accounting the gains are priced in); `table1_cap.md` (arms
+arm's paired accuracy, gain and bootstrap intervals, under the accounting the gains are priced in; `table1` is priced under
+the first accounting of `--accounting`, named by `table1_accounting`, and `table1_by_accounting.expected` is the
+expected-accounting table; `picks` holds every arm's per-prompt pick per accounting and budget, with the calibration ids
+they were fitted on); `table1_cap.md` (arms
 charged the whole cap they commit to); `table1_expected.md` (arms charged the mean chain length the calibration prompts
 realised at that cell, the decision-time price the average-budget arms are fitted under); `table1_realised.md` (arms
-charged what their rows actually generated, an audit price). `prod.live_check --arm avg_gated_lookup` regenerates every
-evaluation prompt at that arm's pick and prints n, live accuracy, grid accuracy at the same picks, live minus grid in
-points, and the mean realised price against the budget; `--arm lookup` (default) is the per-prompt cap rule as before.
-The allocator's gate verifies every deviation from the default on held-out calibration questions (50 to select, 30 to
-verify, the default split), and Table 1 prints the verified margin beside each deviation.
+charged what their rows actually generated, an audit price). `prod.live_check --alloc-dir <alloc output> --arm
+avg_gated_lookup` reads that arm's picks for the budget fraction out of alloc's `results.json` (it refuses to run without
+them, or if the cells' split is not the one alloc calibrated on), regenerates every evaluation prompt at its recorded cell
+and prints n, live accuracy, grid accuracy at the same picks, live minus grid in points, and the mean realised price
+against the budget; `--arm lookup` (default) is the per-prompt cap rule, read the same way.
+The calibration split grows with the dataset, min(300, 20 percent of N) with a floor of 100, promoted from the
+evaluation split in seeded order (round-robin over subtasks on BBH; `--n-cal` overrides), and the gate fits on 70
+percent of it and verifies every deviation from the default on the rest, with the verified margin, its sd and the cost
+saving printed under Table 1 for each `avg_gated_lookup` deviation. The gate tests the structured deviation families
+first, smallest first (F0 the deepest depth at cap 0, F1 the deepest depth at any cap, F2 one depth shallower, then F3
+the free set), and Table 1's oracle-gap column is the best single evaluation cell minus each arm at 1.0x, a diagnostic
+of calibration noise that no arm reads.
 
 ## 6. What the queue is
 
@@ -194,6 +204,8 @@ Greedy decoding, bf16, batch width pinned per job and stored per row. Each probl
 per loop count to its natural stop (horizon 4096); every cap is a cut of that chain followed by the
 read-out suffix. A cell's label is the model's own answer if it was written and parses within the cut,
 else the forced read-out (protocol v2). Costs are layer passes k x L x (prompt + generated + read-out),
-prompt-inclusive and prompt-free, with FLOPs alongside. The calibration split is 100 items per dataset
-by seed 20260908 (BBH stratified by subtask); policies are chosen on calibration rows and scored on the
-rest.
+prompt-inclusive and prompt-free, with FLOPs alongside. 100 items per dataset are held out at generation time
+by seed 20260908 (BBH stratified by subtask); at analysis time `alloc` calibrates on min(300, 20 percent of N)
+questions, floor 100, taken as the first ids of that seeded order, and the evaluation split shrinks by the
+same count (MATH500, SVAMP and AQuA stay at 100). Policies are chosen on the calibration questions and
+scored on the rest.

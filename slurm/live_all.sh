@@ -5,7 +5,9 @@
 # Every array task cd's into the repository root (absolute path from this file's location). Skips the
 # GSM8K lookup runs (submitted earlier with slurm/live.sbatch) and any run whose output file exists,
 # so it can be re-run to fill gaps. The run list is kept in logs/live_jobs_<timestamp>.txt.
-# Knobs (export before running): MODELS TASKS ARMS BUDGETS PER_GPU MAXJOBS TIME SBATCH_EXTRA
+# Knobs (export before running): MODELS TASKS ARMS BUDGETS PER_GPU MAXJOBS TIME SBATCH_EXTRA ALLOC_PREFIX
+#   ALLOC_PREFIX (default alloc_v5): every check reads its picks from artifacts/<ALLOC_PREFIX>_<task>_<model>/,
+#   so run slurm/alloc.sbatch with that PREFIX first; a pair without that directory is skipped here.
 #   PER_GPU=2 fits two Ouro-1.4B or McLeish checks on a 96 GB card; keep 1 for the 2.6B checkpoints.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +22,7 @@ PER_GPU="${PER_GPU:-1}"
 MAXJOBS="${MAXJOBS:-56}"
 TIME="${TIME:-12:00:00}"
 EXTRA="${SBATCH_EXTRA:-}"          # e.g. SBATCH_EXTRA="--partition=gpu --account=lab"
+ALLOC_PREFIX="${ALLOC_PREFIX:-alloc_v5}"
 
 LIST="$ROOT/logs/live_jobs_$(date +%Y%m%d_%H%M%S).txt"
 : > "$LIST"
@@ -30,6 +33,7 @@ for M in $MODELS; do
         [ "$ARM" = lookup ] && [ "$T" = gsm8k ] && continue
         OUT="$PROD_ART/live_${T}_${M}_${ARM}_b${B}.json"
         [ -e "$OUT" ] && continue
+        [ -f "$PROD_ART/${ALLOC_PREFIX}_${T}_${M}/results.json" ] || { echo "no ${ALLOC_PREFIX}_${T}_${M}/results.json: skipped $M $T"; continue; }
         echo "$M $T $ARM $B $OUT" >> "$LIST"
       done
     done
@@ -42,4 +46,4 @@ echo "$n live checks in $chunks array tasks ($PER_GPU per GPU, at most $MAXJOBS 
 sbatch $EXTRA --job-name=live_all --array="0-$((chunks - 1))%${MAXJOBS}" --gres=gpu:1 \
   --cpus-per-task=$((8 * PER_GPU)) --mem=$((64 * PER_GPU))gb --time="$TIME" \
   --output="$ROOT/logs/live_%A_%a.out" \
-  --wrap="cd '$ROOT' && bash slurm/live_chunk.sh '$LIST' \$SLURM_ARRAY_TASK_ID $PER_GPU"
+  --wrap="cd '$ROOT' && ALLOC_PREFIX='$ALLOC_PREFIX' bash slurm/live_chunk.sh '$LIST' \$SLURM_ARRAY_TASK_ID $PER_GPU"

@@ -31,10 +31,22 @@ def _args(argv=None):
     p.add_argument("--one-se", action="store_true",
                    help="the one-standard-error rule: deviate only on a margin above 1.0 sd, "
                         "whatever --c-gate says")
-    p.add_argument("--n-select", type=int, default=P.DEFAULT_N_SELECT,
-                   help="calibration ids, in id order, that fit the ranking and the multiplier")
-    p.add_argument("--n-verify", type=int, default=P.DEFAULT_N_VERIFY,
-                   help="the ids after those, which measure the gate margin and nothing else")
+    p.add_argument("--n-select", type=int, default=None,
+                   help="calibration ids, in id order, that fit the ranking and the multiplier "
+                        "(default: %.0f%% of the calibration split)" % (100 * P.GATE_SELECT_FRAC))
+    p.add_argument("--n-verify", type=int, default=None,
+                   help="the ids after those, which measure the gate margin and nothing else "
+                        "(default: the rest of the calibration split)")
+    p.add_argument("--n-cal", type=int, default=None,
+                   help="calibration questions; default max(%d, min(%d, %g N)) of the grid's N. "
+                        "Evaluation ids are promoted into calibration, in the dataset's seeded "
+                        "order, until the split holds this many, and the evaluation split shrinks "
+                        "by as many" % (C.N_CAL_MIN, C.N_CAL_MAX, C.N_CAL_FRAC))
+    p.add_argument("--no-families", action="store_true",
+                   help="test only the free set of cells at the gate, as v4 did, instead of the "
+                        "frozen structured families F0 (deepest depth at cap 0), F1 (deepest "
+                        "depth at any cap), F2 (one depth shallower) and F3 (the free set) in "
+                        "that order. The comparison flag, not the default")
     p.add_argument("--n-labels", type=int, default=None)
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--cal-draws", type=int, default=100)
@@ -138,14 +150,25 @@ def main(argv=None):
     bbh_base = a.task in C.BBH_TASKS and a.checkpoint in ("base", "A0_base")
     cs = C.load(a.cells, a.task, a.checkpoint, bbh_base=bbh_base, ks=ks, caps=caps,
                 L=L, L_fixed=L_fixed)
+    # v5: the calibration split is sized from the grid, not fixed at 100. Evaluation ids are
+    # promoted into it in the dataset's seeded order until it holds n_cal, so the evaluation split
+    # shrinks by exactly as many questions; --n-cal overrides the rule.
+    n_cal, why = C.resolve_n_cal(cs, a.n_cal)
+    cs, split_record = C.promote_calibration(cs, n_cal)
+    split_record["reason"] = why
     cards = {cs.name: card(cs, a.n_labels)}
     accs, primary = accountings_of(a)
     gate_kw = dict(gate_mode=a.gate_mode, one_se=bool(a.one_se),
-                   n_select=a.n_select, n_verify=a.n_verify)
+                   n_select=a.n_select, n_verify=a.n_verify,
+                   families=not bool(a.no_families))
     res = {"task": a.task, "checkpoint": a.checkpoint, "reference": a.reference,
            "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
            "gate_mode": a.gate_mode, "one_se": bool(a.one_se),
            "n_select": a.n_select, "n_verify": a.n_verify,
+           "n_cal_rule": {"requested": a.n_cal, "resolved": n_cal,
+                          "n_questions": int(len(cs.idx)), "split": split_record},
+           "families": not bool(a.no_families),
+           "deviation_families": list(P.DEVIATION_FAMILIES),
            "accounting": a.accounting, "accounting_priced": primary,
            "accountings_tabulated": accs, "gain": {}}
     arms = [("lookup", dict(ranking="lookup", c_gate=0.0)),
@@ -160,15 +183,42 @@ def main(argv=None):
     res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
     tables = {acc: E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed,
                             accounting=acc, avg_budget=a.avg_budget, **gate_kw) for acc in accs}
+    # Each table's picks block is lifted out of the table (it is the bulk of the file) into
+    # `picks`, keyed by accounting, beside the calibration ids they were fitted on.
+    picks_by_acc = {acc: t.pop("picks", None) for acc, t in tables.items()}
     t1 = tables[primary]
     res["table1"] = t1
+    # `table1` is priced under the FIRST accounting of --accounting (`cap` under `all`);
+    # the expected-accounting numbers are table1_by_accounting["expected"].
+    res["table1_accounting"] = primary
     res["table1_by_accounting"] = tables
+    cal_ids = sorted(int(cs.idx[n]) for n in cs.select("cal"))
+    promoted = [int(i) for i in split_record.get("promoted_ids", [])]
+    res["picks"] = {
+        "note": "every arm's per-prompt pick, per accounting and budget fraction, as the Table 1 "
+                "row was read; prod.live_check regenerates these and nothing else",
+        "calibration": {"n_cal": int(len(cal_ids)), "ids": cal_ids,
+                        "ids_before_promotion": sorted(set(cal_ids) - set(promoted)),
+                        "promoted_ids": promoted,
+                        "evaluation_ids": sorted(int(cs.idx[n]) for n in cs.select("eval")),
+                        "seed": split_record.get("seed"),
+                        "order_source": split_record.get("order_source"),
+                        "reason": split_record.get("reason")},
+        "by_accounting": picks_by_acc}
+    # The oracle gap per arm at 1.0x of the default cost: the best single EVALUATION cell minus
+    # the arm. A diagnostic -- the price of calibration noise -- never a policy result.
+    res["oracle"] = t1.get("oracle")
+    res["oracle_gap_pts"] = {name: row.get("oracle_gap_pts")
+                             for name, row in t1.get("rows", {}).items()}
 
     if a.reference:
         rdir = a.reference_cells or a.cells
         ref = C.load(rdir, a.task, a.reference, ks=ks, caps=caps, L=L, L_fixed=L_fixed,
                      bbh_base=a.reference_bbh_base or (a.task in C.BBH_TASKS
                                                        and a.reference == "base"))
+        # The reference is re-split to the SAME calibration size, so the two checkpoints still
+        # carry identical evaluation ids and `assert_paired` has something to pair.
+        ref, _rrec = C.promote_calibration(ref, n_cal)
         cards[ref.name] = card(ref, a.n_labels)
         E.assert_paired(cs, ref)
         res["contrasts"] = {

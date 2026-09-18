@@ -1,5 +1,12 @@
-"""The live check's avg_gated_lookup picks are alloc's own picks for the same cells and budget."""
-import json
+"""alloc is the single source of picks: what prod.live_check reads out of alloc.cli's results.json is
+what alloc.evaluate computes for the same cells and budget, for both live arms and every fraction,
+and the recorded prices are the budget's.
+
+Runs alloc.cli on the S33 GSM8K A0 grid (24 layers per loop, no fixed layers), CPU, once per module.
+Skipped when that grid is not beside the package (ALLOC_S33 names it explicitly).
+"""
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -7,45 +14,113 @@ import unittest
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import synth                                                          # noqa: E402
-from alloc import cells as C, evaluate as E, policy as P              # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+PKG = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, PKG)
+from alloc import cells as C, cli, evaluate as E, policy as P        # noqa: E402
+from prod.live_check import check_split, load_picks                   # noqa: E402
+
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+S33 = os.environ.get("ALLOC_S33") or os.path.join(ROOT, "s33_anytime", "artifacts")
+TASK, CKPT, L = "gsm8k", "A0", 24
+ARMS = ("lookup", "avg_gated_lookup")
+_OUT = {}
 
 
-class TestLiveCheckPicks(unittest.TestCase):
-    def test_avg_gated_picks_equal_alloc_picks(self):
-        rows = [r for r in synth.rows(n=60, n_cal=20, production=True) if not r.get("_header")]
+def _run_cli():
+    if "dir" not in _OUT:
         d = tempfile.mkdtemp()
-        for k in synth.KS:
-            with open(os.path.join(d, "cells_ouro_1_4b_base_gsm8k_natural_k%d.jsonl" % k), "w") as f:
-                f.write(json.dumps({"_header": True}) + "\n")
-                for r in rows:
-                    if r["k"] == k:
-                        f.write(json.dumps(r) + "\n")
-        from prod.live_check import avg_gated_picks
-        cs, X, rec, chosen, ev, dc = avg_gated_picks(d, "ouro_1_4b_base", "gsm8k", 0.5, c_gate=0.5,
-                                                     gate_draws=8)
-        # alloc's own computation, independently
-        cs2 = C.load(d, "gsm8k", "ouro_1_4b_base", L=24, L_fixed=0)
-        cost = P.cost_of(cs2, promptfree=False, accounting="expected")
-        ev2, cal2 = cs2.select("eval"), cs2.select("cal")
-        Pm, Rm = P.median_point(cs2, ev2)
-        X2 = 0.5 * E.default_cost(cs2, promptfree=False)["mean"]
-        score = E.cell_scores(cs2, cal2, P.AVG_GATED, cost, Pm, Rm)
-        rec2 = E.avg_gated_vectors(cs2, ev2, cal2, cost, [X2], score, E.default_cell(cs2),
-                                   c_gate=0.5, n_draws=8, seed=7)[0]
-        self.assertAlmostEqual(X, X2)
-        self.assertEqual(bool(rec.get("gate_reverted")), bool(rec2.get("gate_reverted")))
-        if rec2.get("gate_reverted"):
-            dk, dT = E.default_cell(cs2)
-            expect = {int(cs2.idx[n]): (int(dk), int(dT)) for n in ev2}
-        else:
-            a, b = P.avg_picks(np.asarray(score, float), P.price_tensor(cs2, ev2, cost), rec2["lambda"])
-            expect = {int(cs2.idx[n]): (int(cs2.ks[i]), int(cs2.caps[j])) for n, i, j in zip(ev2, a, b)}
-        self.assertEqual(chosen, expect)
-        self.assertEqual(len(chosen), len(ev2))
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.main(["--cells", S33, "--task", TASK, "--checkpoint", CKPT,
+                      "--layers-per-loop", str(L), "--fixed-layers", "0",
+                      "--accounting", "expected", "--avg-budget", "--boot", "20",
+                      "--cal-draws", "2", "--out", d])
+        _OUT["dir"] = d
+    return _OUT["dir"]
+
+
+def _alloc_own_picks():
+    """alloc.evaluate's own computation of both arms' picks, independent of the cli's wiring."""
+    if "own" in _OUT:
+        return _OUT["own"]
+    raw = C.load(S33, TASK, CKPT, L=L, L_fixed=0)
+    n_cal, _why = C.resolve_n_cal(raw)
+    cs, _rec = C.promote_calibration(raw, n_cal)
+    cost = P.cost_of(cs, promptfree=False, accounting="expected")
+    ev, cal = cs.select("eval"), cs.select("cal")
+    Pm, Rm = P.median_point(cs, ev)
+    dc = E.default_cost(cs, promptfree=False)
+    Xs = [f * dc["mean"] for f in E.BUDGET_FRACTIONS]
+    own = {"raw": raw, "cells": cs, "Xs": Xs, "lookup": [], "avg_gated_lookup": []}
+    order, _ = E.make_order(cs, cal, cost, Pm, Rm, "lookup", None)
+    rec = []
+    P.policy_vectors(cs, ev, cost, Xs, order, gate=None, picks=rec)
+    for a, b, _na, _nb in rec:
+        own["lookup"].append({int(cs.idx[n]): (None if a[i] < 0 else (int(cs.ks[a[i]]), int(cs.caps[b[i]])))
+                              for i, n in enumerate(ev)})
+    score = E.cell_scores(cs, cal, P.AVG_GATED, cost, Pm, Rm)
+    for v in E.avg_gated_vectors(cs, ev, cal, cost, Xs, score, E.default_cell(cs)):
+        own["avg_gated_lookup"].append({int(cs.idx[n]): (int(cs.ks[v["k_idx"][i]]), int(cs.caps[v["cap_idx"][i]]))
+                                        for i, n in enumerate(ev)})
+    _OUT["own"] = own
+    return own
+
+
+@unittest.skipUnless(os.path.isdir(S33), "S33 grids not present")
+class TestLiveCheckReadsAllocPicks(unittest.TestCase):
+    def test_reader_picks_equal_alloc_evaluate_for_both_arms_and_all_fractions(self):
+        d = _run_cli()
+        own = _alloc_own_picks()
+        for arm in ARMS:
+            for j, frac in enumerate(E.BUDGET_FRACTIONS):
+                entry, calib, res = load_picks(d, arm, frac)
+                self.assertAlmostEqual(entry["budget"], own["Xs"][j], places=6, msg=arm)
+                got = {int(r["row_idx"]): (None if r["k"] is None else (int(r["k"]), int(r["cap"])))
+                       for r in entry["picks"]}
+                self.assertEqual(got, own[arm][j], "%s at %.2fx" % (arm, frac))
+                self.assertEqual(len(got), len(own["cells"].select("eval")))
+        # the split check accepts the grid the picks came from
+        ev_ids = check_split(own["raw"], calib)
+        self.assertEqual(sorted(ev_ids), sorted(int(own["cells"].idx[n]) for n in own["cells"].select("eval")))
+        self.assertEqual(res["table1_accounting"], "expected")
+
+    def test_reader_refuses_a_foreign_split_and_a_missing_block(self):
+        d = _run_cli()
+        _entry, calib, _res = load_picks(d, "lookup", 1.0)
+        own = _alloc_own_picks()
+        foreign = dict(calib, ids_before_promotion=calib["ids_before_promotion"][:-1])
+        with self.assertRaises(SystemExit):
+            check_split(own["raw"], foreign)
+        with self.assertRaises(SystemExit):
+            load_picks(d, "lookup", 0.33)
+        with self.assertRaises(SystemExit):
+            load_picks(d, "equation_n30x", 1.0)
+        with self.assertRaises(SystemExit):
+            load_picks(d, "lookup", 1.0, accounting="realised")
+        with self.assertRaises(SystemExit):
+            load_picks(tempfile.mkdtemp(), "lookup", 1.0)
+
+    def test_recorded_prices_are_the_budgets(self):
+        """The lookup arm caps every prompt at the budget; the average arm's recorded mean price
+        is the mean of its picks' prices and runs at most 2 percent over the budget (the tolerance
+        alloc itself flags), and within 2 percent of it wherever the multiplier binds."""
+        d = _run_cli()
+        for arm in ARMS:
+            for frac in E.BUDGET_FRACTIONS:
+                entry, _c, res = load_picks(d, arm, frac)
+                X = float(entry["budget"])
+                prices = [r["price"] for r in entry["picks"] if r["price"] is not None]
+                self.assertTrue(prices, "%s at %.2fx has no priced pick" % (arm, frac))
+                self.assertAlmostEqual(entry["mean_price"], float(np.mean(prices)), places=6)
+                if arm == "lookup":
+                    self.assertLessEqual(max(prices), X * (1 + 1e-9), "%s at %.2fx" % (arm, frac))
+                    continue
+                self.assertLessEqual(entry["mean_price"], 1.02 * X, "%s at %.2fx" % (arm, frac))
+                row = res["table1_by_accounting"]["expected"]["rows"][arm]
+                j = E.BUDGET_FRACTIONS.index(frac)
+                self.assertAlmostEqual(row["mean_price_layer_passes"][j], entry["mean_price"], places=6)
+                if row["lambda"][j] > 0 and not row["gate_reverted"][j]:
+                    self.assertGreaterEqual(entry["mean_price"], 0.98 * X, "%s at %.2fx" % (arm, frac))
 
 
 if __name__ == "__main__":

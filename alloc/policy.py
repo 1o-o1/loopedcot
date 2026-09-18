@@ -25,15 +25,71 @@ ONE_SE_C_GATE = 1.0
 # whatever the task's calibration split happens to be, so the margin's SD is comparable across
 # tasks; a fraction would not be.
 #
-# 50/30 is the FROZEN default, swept over {50/50, 100/20, 50/30} on the ten S33 spike grids (five
-# tasks, two checkpoints) at 1.0x of the default cost. 100/20 is unreachable there -- every one of
-# those grids has exactly 100 calibration ids -- and 50/50 closes the one true deviation in the
-# set, MATH500 A0 at depth 3, which is worth +3.3 points for a 21.5 percent saving. 50/30 keeps it,
-# opens no deviation that loses beyond its interval, and spends 8.6 percent under budget against
-# the old whole-set gate's 8.1 at the same mean accuracy.
-DEFAULT_N_SELECT = 50
+# 70/30 is the FROZEN default, re-swept under the MEASURED rule over {50/50, 50/30, 70/30} x
+# c_gate {0.5, 1.0} on twenty grids: the ten Ouro-1.4B base production grids at horizon 4096 (ten
+# tasks, 100 calibration and 300 evaluation questions) and the ten S33 spike grids (five tasks, two
+# checkpoints), both gated arms, expected accounting, 1.0x of the default cost. Objective, in
+# order: no deviation that loses to its fallback beyond the paired evaluation interval, then the
+# largest mean gain at 1.0x, then the largest mean cost saving.
+#
+#   setting      deviations  false  gain@1.0x  saving@1.0x  worst row
+#   50/50 c0.5       19        0      +0.56      12.77%      -10.0
+#   50/50 c1.0       16        0      +0.67      10.35%      -10.0
+#   50/30 c0.5       22        1      +0.64      12.64%      -10.0
+#   50/30 c1.0       19        1      +0.73      11.41%      -10.0
+#   70/30 c0.5       17        0      +0.83      11.10%       -2.0   <- frozen
+#   70/30 c1.0       17        0      +0.80      11.10%       -2.0
+#
+# The single false deviation at 50/30, at both bars, is HellaSwag: its 30 verification questions
+# (ids 50-79) read +6.7 points for the depth-3 deviation against an SD of 6.5, and it then loses
+# 5.7 points over the 300 evaluation questions. Moving the cut to 70 changes both halves -- a
+# policy fitted on 70 questions, verified on ids 70-99 -- and that pair measures +0.0, so the gate
+# reverts. 70/30 also carries the best worst row of the six and the highest mean gain; 50/50 saves
+# more but gains less, and saving is the third criterion, not the first two.
+DEFAULT_N_SELECT = 70
 DEFAULT_N_VERIFY = 30
 GATE_BOOT = 2000                # resamples of the verification questions behind the margin SD
+
+# v5: the split is 70/30 OF the calibration size, which is itself a function of how many questions
+# the grid holds (cells.n_cal_for). At n_cal = 100 that is the frozen 70 and 30 above, so nothing
+# about the production grids here moves; at a larger n_cal both halves grow and the verification
+# margin's sampling error falls, which is the constraint the whole gate rests on. `n_select` and
+# `n_verify` left at None take this proportion; passed as counts they override it, as before.
+GATE_SELECT_FRAC = 0.7
+
+# ---------------------------------------------------------------- structured deviation families
+# v5. The gate's bar has to cover the winner's curse of whatever set the deviating cell was chosen
+# from, and that bias grows with how many cells were in the running. The free set is 40 cells on
+# these grids, so a real 5-point edge can sit under the bar. These families are tested IN ORDER,
+# SMALLEST FIRST, and the first whose verified margin over the fallback clears the bar wins:
+#
+#   F0  the deepest depth at cap 0            1 cell   -- "the chain buys nothing" (HellaSwag)
+#   F1  the deepest depth at any cap          |caps|   -- "the chain is worth less than its length"
+#   F2  one depth shallower, at any cap       |caps|   -- "the last loop pass buys nothing" (MATH500)
+#   F3  the free set                          all      -- v4's behaviour, and the last resort
+#
+# The order is a fixed, pre-registered sequence, not a search: F0 and F2 name the two shapes the
+# twenty grids actually show, and a family is only reached when every smaller one has failed.
+DEVIATION_FAMILIES = ("F0", "F1", "F2", "F3")
+
+
+def family_cells(ks, caps, family):
+    """Return the cells a structured deviation family may pick from, in depth then cap order.
+
+    An empty list means the family does not exist on this grid -- no cap 0 for F0, one depth only
+    for F2 -- and such a family is skipped rather than standing in for another.
+    """
+    ks, caps = list(ks), list(caps)
+    if family not in DEVIATION_FAMILIES:
+        raise ValueError("unknown deviation family %r; expected one of %s"
+                         % (family, ", ".join(DEVIATION_FAMILIES)))
+    if family == "F0":
+        return [(ks[-1], 0)] if 0 in caps else []
+    if family == "F1":
+        return [(ks[-1], T) for T in caps]
+    if family == "F2":
+        return [(ks[-2], T) for T in caps] if len(ks) > 1 else []
+    return [(k, T) for k in ks for T in caps]
 
 # The three ways to price a cell. `cap` and `expected` are decision-time prices; `realised` needs
 # the generation it is pricing and is an audit number only (see Cost).
@@ -255,9 +311,97 @@ def paired_margin_sd(arm, ref, n_boot=GATE_BOOT, seed=7):
     return float(d[idx].mean(axis=1).std())
 
 
+class MeasuredGate(object):
+    """Choose the candidate cell only when its MEASURED margin over the fallback clears the bar.
+
+    The margin is the paired accuracy difference between the two cells over the VERIFICATION
+    questions -- those questions' own labels -- and the bar is c_gate times a paired bootstrap SD
+    of that same difference. Nothing here is predicted: `Gate` above reads its margin off the
+    fitted surface A_hat, so where the equation's assumption fails the gate is told the deviation
+    is worth points it does not have, and opens. This gate can only be told what the questions
+    measured.
+
+    `acc` is (depth, cap, verification question) measured accuracy, 1 or 0 per question, NaN where
+    a question has no label at that cell. A pair with fewer than two defined differences has no
+    measurable spread, `paired_margin_sd` returns NaN, and `gate_passes` refuses it, so the
+    fallback stands.
+    """
+
+    def __init__(self, acc, c_gate=DEFAULT_C_GATE, n_boot=GATE_BOOT, seed=7, pos=None):
+        self.acc = np.asarray(acc, float)
+        # The verification POSITIONS behind `acc`, when the caller has them. The structured
+        # deviation families need to run a whole policy over those same questions, which needs
+        # their prompt lengths and prices, not only their labels.
+        self.pos = None if pos is None else np.asarray(pos, dtype=int)
+        self.n_calls = 0
+        self.n_opened = 0
+        if self.acc.ndim != 3:
+            raise ValueError("the measured gate needs a (depth, cap, question) accuracy block, "
+                             "got shape %r" % (self.acc.shape,))
+        if self.acc.shape[2] < 2:
+            raise ValueError("the measured gate needs at least two verification questions, got %d"
+                             % self.acc.shape[2])
+        self.c_gate = float(c_gate)
+        self.n_boot = int(n_boot)
+        self.seed = int(seed)
+        self.seen = {}
+
+    @property
+    def n_verification(self):
+        """Return how many verification questions every margin below is measured on."""
+        return int(self.acc.shape[2])
+
+    def measure(self, pick, normal):
+        """Return (paired mean margin, paired bootstrap SD) for one cell pair, accuracy fractions.
+
+        Cached: the per-prompt policy asks about the same handful of pairs once per prompt and
+        budget, and the bootstrap behind each SD is the expensive part.
+        """
+        key = (tuple(pick), tuple(normal))
+        if key not in self.seen:
+            arm = self.acc[pick[0], pick[1]]
+            ref = self.acc[normal[0], normal[1]]
+            self.seen[key] = (_nanmean(arm - ref),
+                              paired_margin_sd(arm, ref, n_boot=self.n_boot, seed=self.seed))
+        return self.seen[key]
+
+    def reset_counts(self):
+        """Zero the decision counters, so a caller can read one budget's decisions on their own."""
+        self.n_calls = self.n_opened = 0
+
+    def choose(self, pick, normal):
+        """Return a chosen (depth index,cap index) pair and reversion flag; same contract as `Gate`."""
+        if normal is None:
+            return pick, False
+        if pick is None or pick == normal:
+            return normal, False
+        self.n_calls += 1
+        margin, sd = self.measure(pick, normal)
+        if gate_passes(margin, sd, self.c_gate):
+            self.n_opened += 1
+            return pick, False
+        return normal, True
+
+    def decisions(self):
+        """Return one record per cell pair the gate ruled on, margins and SDs in percentage points."""
+        return [{"pick": list(p), "normal": list(n),
+                 "margin_pts": (100 * m if m == m else None),
+                 "sd_pts": (100 * s if s == s else None),
+                 "bar_pts": (100 * self.c_gate * s if s == s else None),
+                 "opened": bool(gate_passes(m, s, self.c_gate)),
+                 "n_verification": self.n_verification}
+                for (p, n), (m, s) in sorted(self.seen.items())]
+
+
 # ---------------------------------------------------------------- per-prompt policy
-def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None):
-    """Return paired policy/normal accuracy vectors and reversion fractions per layer-token budget; preserve infeasible prompts as NaN."""
+def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None, picks=None):
+    """Return paired policy/normal accuracy vectors and reversion fractions per layer-token budget; preserve infeasible prompts as NaN.
+
+    `picks`, when a list is passed, receives one tuple per budget of four int arrays over
+    `ev_pos`: the picked (depth index, cap index) after the gate, then normal operation's,
+    -1 where that prompt could afford no cell. These are the picks the accuracy vectors were
+    read at, so a caller that records them records the policy exactly.
+    """
     ki = {k: i for i, k in enumerate(cells.ks)}
     bi = {b: i for i, b in enumerate(cells.caps)}
     kmax = cells.ks[-1]
@@ -265,6 +409,7 @@ def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None):
     out, reverted = [], []
     for X in Xs:
         pv, nv, rev = [], [], 0
+        pa, pb, na, nb = [], [], [], []
         for n in ev_pos:
             p, r = cells.ptok[n], cells.reserve[n]
             nf = [T for T in cells.caps if affordable(cost(kmax, T, p, r, n), X)]
@@ -279,8 +424,14 @@ def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None):
                 rev += int(did)
             pv.append(cells.acc[pick[0], pick[1], n] if pick is not None else np.nan)
             nv.append(cells.acc[normal[0], normal[1], n] if normal is not None else np.nan)
+            pa.append(pick[0] if pick is not None else -1)
+            pb.append(pick[1] if pick is not None else -1)
+            na.append(normal[0] if normal is not None else -1)
+            nb.append(normal[1] if normal is not None else -1)
         out.append((np.array(pv, float), np.array(nv, float)))
         reverted.append(rev / max(1, len(ev_pos)))
+        if picks is not None:
+            picks.append((np.array(pa, int), np.array(pb, int), np.array(na, int), np.array(nb, int)))
     return out, reverted
 
 
@@ -413,5 +564,7 @@ def avg_budget_vectors(cells, ev_pos, cal_pos, cost, Xs, score, tol=AVG_TOL):
                     "over_budget": bool(mean_price > float(X) * (1.0 + tol)),
                     "acc": cells.acc[a, b, ev],
                     "price": price,
+                    # the picks the two vectors above were read at, so a record IS the policy
+                    "k_idx": np.asarray(a, int), "cap_idx": np.asarray(b, int),
                     "cells_used": counts})
     return out

@@ -299,8 +299,10 @@ class TestTheGatedEquationArm(unittest.TestCase):
                                               n_select=50, n_verify=50)
         np.testing.assert_array_equal(fit_pos, sel)
         self.assertEqual(sizes["n_verification"], len(ver))
-        # the gate's surface is the verification half's, not the whole set's
-        np.testing.assert_allclose(gate.A_hat, E.surface(cs, ver)[0], equal_nan=True)
+        # the gate reads the verification half's MEASURED labels, not a surface fitted to them
+        self.assertIsInstance(gate, P.MeasuredGate)
+        np.testing.assert_array_equal(gate.acc, cs.acc[:, :, ver])
+        self.assertEqual(gate.n_verification, len(ver))
 
     def test_the_whole_mode_fits_and_measures_on_everything(self):
         cs = planted(null_surface())
@@ -350,9 +352,12 @@ class TestTheWholeSetPathIsUnchanged(unittest.TestCase):
 class TestTheRealGrids(unittest.TestCase):
     """S33 cells, 24 layers per loop and no fixed layers, expected accounting, at 1.0x.
 
-    MATH500 A0 is the true deviation: the lookup ranking puts depth 3 at the top and that cheaper
-    cell is genuinely better, so its margin survives being measured on labels that did not choose
-    it. The reverts are the false deviations the whole-set gate opened.
+    Under the frozen 70/30 the gate reverts every one of these ten grids at 1.0x. MATH500 A0 is
+    where that costs something real: the whole-set gate keeps its depth-3 deviation on a +8.0 point
+    margin in its own score units, and the verification ids 70-99 measure the same policy at -10.0
+    points and close it. The same policy read on ids 50-79 measured +16.7, which is how far thirty
+    questions can move a margin. That a genuine deviation must still survive is held down by the
+    planted `true_surface` grids above, not by these.
     """
     TASKS = ("gsm8k", "math500", "svamp", "aqua", "csqa")
 
@@ -364,17 +369,21 @@ class TestTheRealGrids(unittest.TestCase):
                                    n_labels_grid=(30,), gate_draws=5, n_boot=30, gate_mode=mode)
         return _CACHE[key]
 
-    def test_math500_a0_keeps_its_deviation_under_both_gates(self):
-        for mode in ("whole", "split"):
-            row = self._table("math500", "A0", mode)["rows"][P.AVG_GATED]
-            self.assertFalse(row["gate_reverted"][ONE], mode)
-            self.assertGreater(row["gate_margin_pts"][ONE], 0.5 * row["gate_sd_pts"][ONE], mode)
+    def test_math500_a0_is_the_deviation_the_frozen_split_closes(self):
+        whole = self._table("math500", "A0", "whole")["rows"][P.AVG_GATED]
+        self.assertFalse(whole["gate_reverted"][ONE])
+        self.assertGreater(whole["gate_margin_pts"][ONE], 0.5 * whole["gate_sd_pts"][ONE])
+        split = self._table("math500", "A0", "split")["rows"][P.AVG_GATED]
+        self.assertTrue(split["gate_reverted"][ONE])
+        self.assertLess(split["gate_margin_pts"][ONE], 0.0)
 
-    def test_the_kept_deviation_is_the_cheaper_depth_three_cell(self):
-        row = self._table("math500", "A0", "split")["rows"][P.AVG_GATED]
-        self.assertTrue(any(key.startswith("k3_") for key in row["cells_used"][ONE]),
-                        row["cells_used"][ONE])
-        self.assertGreater(row["cost_saving_pct"][ONE], 10.0)
+    def test_the_deviation_the_whole_set_keeps_is_the_cheaper_depth_three_cell(self):
+        whole = self._table("math500", "A0", "whole")["rows"][P.AVG_GATED]
+        self.assertTrue(any(key.startswith("k3_") for key in whole["cells_used"][ONE]),
+                        whole["cells_used"][ONE])
+        self.assertGreater(whole["cost_saving_pct"][ONE], 10.0)
+        split = self._table("math500", "A0", "split")["rows"][P.AVG_GATED]
+        self.assertEqual(list(split["cells_used"][ONE]), ["k4_T512"])
 
     def test_a_reverted_grid_lands_exactly_on_the_default_cell(self):
         for task in self.TASKS:
@@ -415,19 +424,138 @@ class TestTheRealGrids(unittest.TestCase):
             self.assertEqual(row["gate_n_verification"], P.DEFAULT_N_VERIFY)
             self.assertFalse(row["gate_split_truncated"])
 
-    def test_the_frozen_split_is_fifty_and_thirty(self):
-        """Swept over 50/50, 100/20 and 50/30 on these ten grids: 100/20 cannot run (every grid
-        has exactly 100 calibration ids) and 50/50 closes the MATH500 A0 deviation, which is the
-        one true gain in the set."""
-        self.assertEqual((P.DEFAULT_N_SELECT, P.DEFAULT_N_VERIFY), (50, 30))
+    def test_the_frozen_split_is_seventy_and_thirty(self):
+        """Re-swept under the MEASURED rule over {50/50, 50/30, 70/30} x c_gate {0.5, 1.0} on
+        twenty grids -- the ten Ouro-1.4B base production grids and these ten -- for both gated
+        arms. 50/30 is the only setting with a deviation that loses beyond its paired evaluation
+        interval (HellaSwag, -5.7 points on a +6.7 point margin read off 30 questions), and of the
+        four settings with none, 70/30 at c_gate 0.5 carries the highest mean gain at 1.0x."""
+        self.assertEqual((P.DEFAULT_N_SELECT, P.DEFAULT_N_VERIFY), (70, 30))
+        self.assertEqual(P.DEFAULT_C_GATE, 0.5)
         for task in self.TASKS:
             self.assertEqual(len(C.load(S33, task, "A0", L=24, L_fixed=0).select("cal")), 100)
 
-    def test_fifty_fifty_is_the_setting_that_loses_math500(self):
+    def test_the_math500_deviation_does_not_survive_the_frozen_split(self):
+        """50/30 kept MATH500 A0's depth-3 deviation on a +16.7 point margin measured over ids
+        50-79; the frozen ids 70-99 measure -10.0 on it and the gate reverts, as 50/50 does.
+        Keeping that one deviation was the whole reason 50/30 beat 50/50 in the old sweep, so the
+        re-freeze rests on the twenty-grid objective instead."""
         cs = C.load(S33, "math500", "A0", L=24, L_fixed=0)
-        t1 = E.table1(cs, accounting="expected", avg_budget=True, n_labels_grid=(30,),
-                      gate_draws=5, n_boot=30, gate_mode="split", n_select=50, n_verify=50)
-        self.assertTrue(t1["rows"][P.AVG_GATED]["gate_reverted"][ONE])
+        for ns, nv in ((70, 30), (50, 50)):
+            t1 = E.table1(cs, accounting="expected", avg_budget=True, n_labels_grid=(30,),
+                          gate_draws=5, n_boot=30, gate_mode="split", n_select=ns, n_verify=nv)
+            self.assertTrue(t1["rows"][P.AVG_GATED]["gate_reverted"][ONE], (ns, nv))
+
+
+# ---------------------------------------------------------------- the wrong-signed surface
+# The third case, and the one a gate reading A_hat cannot survive: a surface where the EQUATION has
+# the sign wrong. At depth 1 the model commits -- its cap-0 read-out is already its final read-out
+# -- so every cell of that depth counts as committed and the equation scores them all at that
+# depth's committed mean. One genuinely accurate cell at the horizon drags that mean up, and A_hat
+# lands 7.5 points ABOVE the default cell on a cell whose own labels are 10 points BELOW it. A gate
+# whose margin is A_hat's opens on that deviation; one that reads the labels cannot.
+#
+# Correctness here is a fixed pattern per cell rather than a coin, so the planted margins are exact
+# and the verdict does not ride on a seed. Nothing about the winner's curse is being tested here:
+# the defect is that the margin was predicted at all.
+WS_PICK = (KS.index(1), CAPS.index(0))        # cheapest depth-1 cell: what the equation ranks first
+WS_NORMAL = (len(KS) - 1, len(CAPS) - 1)      # normal operation at a budget that affords its cap
+WS_CHEAP, WS_DEFAULT = 0.30, 0.40             # measured accuracy of the pick and of normal operation
+
+
+def wrong_signed_rows(n=300, n_cal=N_CAL, task=TASK):
+    """Return rows whose equation surface reads the early answer as better than it is measured to be."""
+    budget = C.answer_budget(task)
+    out = []
+    for i in range(n):
+        p = 300 + 20 * (i % 9)
+        for k in KS:
+            for T in CAPS:
+                if k == 1:
+                    # committed at every cap: one read-out, written early and never revised
+                    right = True if T == CAPS[-1] else (i % 10) < 3   # 100% at the horizon, 30% early
+                    pred = "A1"
+                else:
+                    right = ((i + 3) % 10) < 4                        # 40%, out of phase with the pick
+                    pred = ("A%d" % k) if T == CAPS[-1] else ("B%d_%d" % (k, T))
+                out.append({"idx": i, "k": k, "B": T, "split": "cal" if i < n_cal else "eval",
+                            "task": task, "correct": right, "correct_v2": right, "pred": pred,
+                            "gold": pred if right else "Z",
+                            "trace_answer": None, "trace_correct": False,
+                            "n_cut": min(T, STOP), "natural_stop": STOP,
+                            "n_generated": min(T, STOP) + budget,
+                            "n_prompt_tokens": p, "n_suffix_tokens": 4,
+                            "n_answer_tokens": budget})
+    return out
+
+
+def wrong_signed(**kw):
+    return C.Cells(wrong_signed_rows(**kw), TASK, name="wrong_signed", ks=KS, caps=CAPS)
+
+
+class TestTheGateMayNotTakeItsMarginFromTheEquation(unittest.TestCase):
+    """On a wrong-signed surface the predicted margin opens the gate and the measured one reverts."""
+
+    def setUp(self):
+        self.cs = wrong_signed()
+        self.cal = self.cs.select("cal")
+        self.sel, self.ver, _ = E.split_calibration(self.cs, self.cal, 50, 30)
+
+    def test_the_plant_is_wrong_signed(self):
+        """A_hat says the pick beats normal operation by 7.5 points; the labels say it loses 10."""
+        A_hat, _m = E.surface(self.cs, self.ver)
+        self.assertAlmostEqual(A_hat[WS_PICK] - A_hat[WS_NORMAL], 0.075, places=6)
+        arm = self.cs.acc[WS_PICK[0], WS_PICK[1], self.ver]
+        ref = self.cs.acc[WS_NORMAL[0], WS_NORMAL[1], self.ver]
+        self.assertAlmostEqual(float(np.mean(arm)), WS_CHEAP, places=6)
+        self.assertAlmostEqual(float(np.mean(ref)), WS_DEFAULT, places=6)
+        self.assertAlmostEqual(float(np.mean(arm - ref)), -0.10, places=6)
+
+    def test_the_predicted_gate_opens_and_the_measured_gate_reverts(self):
+        """Same questions, same c_gate: only what the margin is read off differs."""
+        predicted, _m = E.gate_for(self.cs, self.ver, c_gate=0.5, n_draws=20, seed=7)
+        self.assertEqual(predicted.choose(WS_PICK, WS_NORMAL), (WS_PICK, False))
+        measured = E.measured_gate(self.cs, self.ver, c_gate=0.5, seed=7)
+        self.assertEqual(measured.choose(WS_PICK, WS_NORMAL), (WS_NORMAL, True))
+        margin, sd = measured.measure(WS_PICK, WS_NORMAL)
+        self.assertAlmostEqual(margin, -0.10, places=6)
+        self.assertGreater(sd, 0.0)
+        self.assertEqual(measured.n_verification, len(self.ver))
+
+    def test_the_split_gate_is_the_measured_one(self):
+        gate, fit_pos, sizes = E.gate_and_fit(self.cs, self.cal, None, 0.5, 20, 7, "split",
+                                              n_select=50, n_verify=30)
+        self.assertIsInstance(gate, P.MeasuredGate)
+        np.testing.assert_array_equal(fit_pos, self.sel)
+        self.assertEqual(sizes["n_verification"], 30)
+        self.assertEqual(gate.choose(WS_PICK, WS_NORMAL), (WS_NORMAL, True))
+
+    def test_the_gated_equation_arm_reverts_at_every_budget(self):
+        """End to end: the order still picks the bad cell, and the gate sends every prompt back."""
+        g = E.gain_over_normal(self.cs, ranking="equation", c_gate=0.5, n_boot=5, n_cal_draws=2,
+                               gate_draws=5, n_select=50, n_verify=30)
+        self.assertEqual(list(g["order_top5"][0]), [1, 0])
+        for b in g["per_budget"]:
+            # every prompt that HAS a normal operation to fall back to is sent back to it; below
+            # the budget where normal is affordable there is no fallback to revert to
+            self.assertAlmostEqual(b["gate_reverted_frac"], b["normal_feasible_frac"], msg=b["X"])
+        self.assertEqual(g["gain_mean_pts"], 0.0)
+        ruled = [d for d in g["gate_decisions"] if d["pick"] == list(WS_PICK)]
+        self.assertTrue(ruled)
+        self.assertFalse(any(d["opened"] for d in ruled))
+        self.assertAlmostEqual(ruled[0]["margin_pts"], -10.0, places=6)
+
+    def test_the_ungated_arm_shows_what_the_gate_is_saving(self):
+        """With no gate the same order loses 10 points wherever normal operation is affordable."""
+        g = E.gain_over_normal(self.cs, ranking="equation", c_gate=0.0, n_boot=5, n_cal_draws=2)
+        self.assertAlmostEqual(g["gain_mean_pts"], -10.0, places=6)
+
+    def test_the_old_whole_set_rule_still_opens_on_it(self):
+        """`whole` keeps the predicted margin, so it is still fooled: this is what was repaired."""
+        g = E.gain_over_normal(self.cs, ranking="equation", c_gate=0.5, n_boot=5, n_cal_draws=2,
+                               gate_draws=5, gate_mode="whole")
+        self.assertIsNone(g["gate_decisions"])
+        self.assertAlmostEqual(g["gain_mean_pts"], -10.0, places=6)
 
 
 if __name__ == "__main__":

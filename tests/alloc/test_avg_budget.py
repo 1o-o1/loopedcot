@@ -366,23 +366,22 @@ class TestRealGrids(unittest.TestCase):
             self.assertGreaterEqual(row["vs_default"][ONE]["hi95_pts"], 0.0, task)
             self.assertGreaterEqual(row["acc_pts"][ONE], default - 1e-9, task)
 
-    def test_the_gate_reverts_where_the_margin_is_noise_and_not_where_it_is_not(self):
-        """Measured on the VERIFICATION half, the 30 calibration ids after the 50 that fit.
+    def test_the_gate_reverts_where_the_verification_half_does_not_back_the_deviation(self):
+        """Measured on the VERIFICATION half, the 30 calibration ids after the 70 that fit.
 
-        GSM8K: the policy's cheaper cell is 10 points BEHIND the default cell on questions that
-        took no part in choosing it, so the arm goes back to the default. MATH500: depth 3 is 16.7
-        points ahead of the default cell there against a 7-point SD, so the policy stands and the
-        row keeps the accuracy it bought.
+        GSM8K: the multiplier already buys the default cell at this budget, so there is no margin
+        to clear and the arm stays on it. MATH500: depth 3 is 10 points BEHIND the default cell on
+        questions that took no part in choosing it, so the deviation the whole-set gate keeps is
+        closed and the row lands exactly on the default row. The case a deviation must SURVIVE is
+        the planted one in test_split_gate, where the cheap cell is genuinely 15 points better.
         """
-        gsm = real_table("gsm8k")["rows"][P.AVG_GATED]
-        self.assertTrue(gsm["gate_reverted"][ONE])
-        self.assertLessEqual(gsm["gate_margin_pts"][ONE], 0.5 * gsm["gate_sd_pts"][ONE])
-        math = real_table("math500")["rows"][P.AVG_GATED]
-        self.assertFalse(math["gate_reverted"][ONE])
-        self.assertGreater(math["gate_margin_pts"][ONE], 0.5 * math["gate_sd_pts"][ONE])
-        self.assertGreater(math["acc_pts"][ONE], real_table("math500")["rows"]["default"]
-                           ["acc_pts"][ONE])
-        for row in (gsm, math):
+        for task in ("gsm8k", "math500"):
+            t1 = real_table(task)
+            row = t1["rows"][P.AVG_GATED]
+            self.assertTrue(row["gate_reverted"][ONE], task)
+            self.assertLessEqual(row["gate_margin_pts"][ONE], 0.5 * row["gate_sd_pts"][ONE], task)
+            self.assertAlmostEqual(row["acc_pts"][ONE], t1["rows"]["default"]["acc_pts"][ONE],
+                                   places=6, msg=task)
             self.assertEqual((row["gate_n_selection"], row["gate_n_verification"]),
                              (P.DEFAULT_N_SELECT, P.DEFAULT_N_VERIFY))
 
