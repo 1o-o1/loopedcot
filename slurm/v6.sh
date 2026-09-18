@@ -5,17 +5,18 @@
 #   bash slurm/v6.sh alloc natural2h  # the same on the horizon-extension grids that are complete -> alloc_v6h_*
 #   bash slurm/v6.sh live             # GPU jobs: prod.live_check, both arms x both fractions, every pair except huginn_0125 and
 #                                     # ouro_2_6b_think on gsm8k/svamp; a Thinking pair reads alloc_v6n2 and waits until it exists;
-#                                     # the first job of a pair carries --preflight; a pair with a live_v6_*.FAILED.json is stopped
+#                                     # the first job of a pair carries --preflight; a pair with a live_${V}_*.FAILED.json is stopped
 #   bash slurm/v6.sh status           # what is done, running, failed; the stderr tail of every FAILED live check
 #   bash slurm/v6.sh collect          # Table 1 rows per pair, the gated deviation lines, the pooled live-minus-grid per arm and fraction
 # Every job log ends with RC=<exit code>, and the batch job exits with it. Re-running any mode only submits what is missing.
-# Knobs: ALLOC_CPUS (4) ALLOC_MEM (32gb) ALLOC_TIME (03:00:00) LIVE_TIME (24:00:00) LIVE_MEM (64gb) SBATCH_EXTRA MODELS TASKS
+# Knobs: V (v6; V=v7 renames every output alloc_v7_* / live_v7_*) ALLOC_CPUS (4) ALLOC_MEM (32gb) ALLOC_TIME (03:00:00) LIVE_TIME (24:00:00) LIVE_MEM (64gb) SBATCH_EXTRA MODELS TASKS
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 source "$ROOT/env.sh"
 mkdir -p logs
 MODE="${1:-}"; PROTO="${2:-natural}"
+V="${V:-v6}"                      # allocator version in every output name: alloc_<V>_*, live_<V>_*; V=v7 for the v7 pass
 MODELS="${MODELS:-ouro_1_4b_base ouro_1_4b_think ouro_2_6b_base ouro_2_6b_think mcleish_llama32_r32 huginn_0125}"
 TASKS="${TASKS:-gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag}"
 ARMS="avg_gated_equation_resolved avg_gated_lookup"
@@ -26,9 +27,9 @@ EXTRA="${SBATCH_EXTRA:-}"
 ALLOC_FLAGS="--model-config prod/config.yaml --accounting all --avg-budget --promptfree --boot 2000"
 
 case "$PROTO" in
-  natural)   PREFIX=alloc_v6 ;;
-  natural2)  PREFIX=alloc_v6n2 ;;
-  natural2h) PREFIX=alloc_v6h ;;
+  natural)   PREFIX=alloc_${V} ;;
+  natural2)  PREFIX=alloc_${V}n2 ;;
+  natural2h) PREFIX=alloc_${V}h ;;
   *) echo "unknown protocol $PROTO (natural, natural2, natural2h)"; exit 1 ;;
 esac
 
@@ -47,7 +48,7 @@ for p in metas:
 sys.exit(0 if ok else 1)
 EOF
 }
-alloc_dir_of() { case "$1" in ouro_*think) echo "$PROD_ART/alloc_v6n2_${2}_${1}" ;; *) echo "$PROD_ART/alloc_v6_${2}_${1}" ;; esac; }
+alloc_dir_of() { case "$1" in ouro_*think) echo "$PROD_ART/alloc_${V}n2_${2}_${1}" ;; *) echo "$PROD_ART/alloc_${V}_${2}_${1}" ;; esac; }
 live_pair_wanted() {  # the pairs the live check runs on
   case "$1" in huginn_0125) return 1 ;; ouro_2_6b_think) case "$2" in gsm8k|svamp) return 1 ;; esac ;; esac; return 0
 }
@@ -76,12 +77,12 @@ case "$MODE" in
       live_pair_wanted "$M" "$T" || continue
       ad=$(alloc_dir_of "$M" "$T")
       [ -f "$ad/results.json" ] || { echo "  waiting $T $M: no $(basename "$ad")/results.json yet"; continue; }
-      if ls "$PROD_ART"/live_v6_${T}_${M}_*.FAILED.json >/dev/null 2>&1; then
-        echo "  STOPPED $T $M: $(ls "$PROD_ART"/live_v6_${T}_${M}_*.FAILED.json | xargs -n1 basename | paste -sd,) (see: bash slurm/v6.sh status)"; continue
+      if ls "$PROD_ART"/live_${V}_${T}_${M}_*.FAILED.json >/dev/null 2>&1; then
+        echo "  STOPPED $T $M: $(ls "$PROD_ART"/live_${V}_${T}_${M}_*.FAILED.json | xargs -n1 basename | paste -sd,) (see: bash slurm/v6.sh status)"; continue
       fi
       first=1
       for ARM in $ARMS; do for B in $BUDGETS; do
-        name="live6_${T}_${M}_${ARM}_b${B}"; out="$PROD_ART/live_v6_${T}_${M}_${ARM}_b${B}.json"
+        name="live_${V}_${T}_${M}_${ARM}_b${B}"; out="$PROD_ART/live_${V}_${T}_${M}_${ARM}_b${B}.json"
         [ -f "$out" ] && { first=0; continue; }
         in_queue "$name" && { first=0; continue; }
         pre=""; [ "$first" = 1 ] && pre="--preflight"; first=0
@@ -93,14 +94,14 @@ case "$MODE" in
     done; done
     echo "live: $n jobs submitted" ;;
   status)
-    for pfx in alloc_v6 alloc_v6n2 alloc_v6h; do
+    for pfx in alloc_${V} alloc_${V}n2 alloc_${V}h; do
       d=$(ls -d "$PROD_ART"/${pfx}_*/ 2>/dev/null | wc -l); ok=0
       for r in "$PROD_ART"/${pfx}_*/results.json; do [ -f "$r" ] && grep -q '"picks"' "$r" && ok=$((ok + 1)); done
       echo "$pfx: $ok pairs with picks ($d directories); array logs failed: $(grep -l '^RC=[1-9]' logs/${pfx}_*_*.out 2>/dev/null | wc -l)"
     done
-    all=$(ls logs/live6_*.out 2>/dev/null | wc -l); fin=$(grep -l "^RC=" logs/live6_*.out 2>/dev/null | wc -l); ok=$(grep -l "^RC=0" logs/live6_*.out 2>/dev/null | wc -l)
-    echo "live: $all started, $fin finished, $ok ok, $((fin - ok)) failed, $((all - fin)) running; results: $(ls "$PROD_ART"/live_v6_*.json 2>/dev/null | grep -vc FAILED); queued/running: $(squeue -u "$USER" -h | wc -l)"
-    for f in "$PROD_ART"/live_v6_*.FAILED.json; do
+    all=$(ls logs/live_${V}_*.out 2>/dev/null | wc -l); fin=$(grep -l "^RC=" logs/live_${V}_*.out 2>/dev/null | wc -l); ok=$(grep -l "^RC=0" logs/live_${V}_*.out 2>/dev/null | wc -l)
+    echo "live: $all started, $fin finished, $ok ok, $((fin - ok)) failed, $((all - fin)) running; results: $(ls "$PROD_ART"/live_${V}_*.json 2>/dev/null | grep -vc FAILED); queued/running: $(squeue -u "$USER" -h | wc -l)"
+    for f in "$PROD_ART"/live_${V}_*.FAILED.json; do
       [ -f "$f" ] || continue
       echo "== FAILED $(basename "$f")"
       $PROD_PYTHON - "$f" <<'EOF'
@@ -116,13 +117,13 @@ def walk(o, path=""):
 walk(j)
 EOF
     done
-    for f in logs/live6_*.out; do [ -f "$f" ] && grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { echo "== log $f"; tail -15 "$f"; }; done ;;
+    for f in logs/live_${V}_*.out; do [ -f "$f" ] && grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { echo "== log $f"; tail -15 "$f"; }; done ;;
   collect)
-    $PROD_PYTHON - "$PROD_ART" <<'EOF'
+    $PROD_PYTHON - "$PROD_ART" "$V" <<'EOF'
 import glob, json, os, re, sys
-art = sys.argv[1]
+art, V = sys.argv[1], sys.argv[2]
 ROWS = ["default", "default_at_budget", "avg_gated_equation_resolved", "avg_gated_lookup", "equation_resolved", "lookup"]
-for pfx in ("alloc_v6", "alloc_v6n2", "alloc_v6h"):
+for pfx in ("alloc_" + V, "alloc_" + V + "n2", "alloc_" + V + "h"):
     paths = sorted(glob.glob(os.path.join(art, pfx + "_*", "results.json")))
     if not paths:
         continue
@@ -144,7 +145,7 @@ for pfx in ("alloc_v6", "alloc_v6n2", "alloc_v6h"):
                     print("   " + line.strip()[:400])
 print("=" * 30, "live minus grid, pooled over pairs (points), realised price over budget (mean of pairs, %)")
 pool = {}
-for p in sorted(glob.glob(os.path.join(art, "live_v6_*.json"))):
+for p in sorted(glob.glob(os.path.join(art, "live_%s_*.json" % V))):
     if p.endswith(".FAILED.json"):
         continue
     j = json.load(open(p))
@@ -157,7 +158,7 @@ for p in sorted(glob.glob(os.path.join(art, "live_v6_*.json"))):
 for (arm, b), (n, la, ga, pairs, pr) in sorted(pool.items()):
     print("%-28s %.2fx  n=%6d over %2d pairs  live %.2f  grid %.2f  delta %+.2f pts  price over budget %+.1f%%"
           % (arm, b, n, len(pairs), 100 * la / n, 100 * ga / n, 100 * (la - ga) / n, (sum(pr) / len(pr)) if pr else float("nan")))
-fails = sorted(glob.glob(os.path.join(art, "live_v6_*.FAILED.json")))
+fails = sorted(glob.glob(os.path.join(art, "live_%s_*.FAILED.json" % V)))
 print("failed live checks: %d %s" % (len(fails), " ".join(os.path.basename(f) for f in fails)))
 EOF
     ;;
