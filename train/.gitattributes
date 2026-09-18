@@ -1,0 +1,4 @@
+# train/config.yaml pins these two files by sha256 and every stage refuses a file whose bytes
+# differ, so git must never rewrite their line endings on add or on checkout.
+data/theory_weights.json -text
+data/pool.jsonl -text

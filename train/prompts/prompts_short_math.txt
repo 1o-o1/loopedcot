@@ -1,0 +1,16 @@
+Problem: How many vertical asymptotes does the graph of $y=\frac{2}{x^2+x-6}$ have?
+Solution: $x^2+x-6=(x-2)(x+3)$ is $0$ at $x = 2$ and $x = -3$, and the numerator is nonzero, so there are $\boxed{2}$ asymptotes.
+Final Answer: 2
+
+Problem: If $5x - 3 = 12$, what is the value of $5x + 3$?
+Solution: Add 6: $5x - 3 + 6 = 12 + 6$, so $5x + 3 = \boxed{18}$.
+Final Answer: 18
+
+Problem: Ryan has 3 red lava lamps and 3 blue lava lamps. He arranges them in a row on a shelf randomly, then turns 3 random lamps on. What is the probability that the leftmost lamp on the shelf is red, and the leftmost lamp which is turned on is also red?
+Solution: $\binom{6}{3}=20$, $\binom{6}{3}=20$, $20\cdot20=400$. On: $\binom{5}{2}=10$ twice, $100$. Off: $\binom{5}{3}=10$, $\binom{4}{1}=4$, $40$. $140/400=\boxed{\dfrac{7}{20}}$.
+Final Answer: \dfrac{7}{20}
+
+Problem: Alice wants to buy $3$ pounds of veal at the grocery store, but the scales at the store only show weight in kilograms. If one kilogram is $2.20$ pounds, how many kilograms of veal should Alice buy?  (You may use a calculator on this problem; answer to the nearest hundredth.)
+Solution: $3$ lb $\cdot \frac{1\ \text{kg}}{2.20\ \text{lb}} = 3/2.20 \approx \boxed{1.36}$ kg.
+Final Answer: 1.36
+

@@ -1,0 +1,133 @@
+# Token budgets, task formats, and optimizer settings shared by all training stages.
+# Read by train/targets.py:load_config(); every other stage imports it from there.
+
+seed: 20260914                      # deterministic data and depth sampling
+base_repo: ByteDance/Ouro-1.4B      # base checkpoint; adapter training freezes base weights
+n_layers: 24                        # layers per loop for layer-token cost accounting
+k_harvest: 4                        # recurrence depth used to harvest chains from the base model
+
+# ---------------------------------------------------------------- pool and harvest sources
+pool_jsonl: train/data/pool.jsonl   # screened read-only question pool, shipped with the package; relative to the repository root
+pool_sha256: 7d5569c32611a90afc57a3655052b0338dd12d30346f4c0938ebb544758d81d3   # stage 2 and gate V9 refuse a pool whose bytes differ
+# The pool is read-only: V9's screening argument is about these exact questions. To re-pin after a
+# deliberate re-screen, run `sha256sum <pool_jsonl>` and paste the digest above; nothing else.
+harvest:                            # source -> evaluation task whose prompt/parser it uses, pool N, format, natural-stop horizon
+  gsm8k: {eval_task: gsm8k,   n: 3000, format: numeric_hash, horizon: 1024}
+  math:  {eval_task: math500, n: 1360, format: math_boxed,   horizon: 2048}
+  csqa:  {eval_task: csqa,    n: 1500, format: letter_paren, horizon: 1024}
+  aqua:  {eval_task: aqua,    n: 1500, format: letter_paren, horizon: 1024}
+# The horizon is per source because the base model's chains are not the same length per task: the
+# 512 horizon of the first draft capped MATH chains that run to 2048, and a checkpoint trained only
+# on chains under 512 learns a length prior its grid cannot be compared with the base grids at.
+harvest_horizon: 1024               # natural-stop horizon for a source without its own (arc, svamp)
+prompt_file_pattern: prompts_short_%s.txt   # short-exemplar block per source; looked up in <run root>/prompts/, then in the package's prompts/
+harvest_batch: 16                   # decode batch size at harvest time
+harvest_correct_only: true          # a chain is kept only if its own answer equals gold under the fixed parser
+# A chain that reaches its horizon without a stop marker is NOT a correct chain, whatever its text
+# parses to: it is an unfinished chain. harvest.py drops those from the kept pool and counts them
+# (`n_hit_horizon`, `n_correct_but_unfinished`), so every target is built from a chain that stopped
+# on its own. That is what makes the no-limit target the FULL chain.
+
+# ---------------------------------------------------------------- block length buckets
+block_lens: [1024, 1536, 2048, 2560, 3072]   # a visit goes in the SMALLEST bucket that fits it
+# One visit per block, right-padded to its bucket. A visit longer than the largest bucket is dropped
+# and counted, never truncated. Micro-batches are homogeneous in depth AND in block length.
+micro_by_block_len: {1024: 4, 1536: 2, 2048: 2, 2560: 2, 3072: 1}   # blocks per micro-batch, per bucket
+effective_batch_blocks: 32          # blocks per optimiser step; accum per bucket = this / its micro
+# Memory, not time, is the binding constraint: the resident forward is micro x block_len positions,
+# so the long buckets take a smaller micro and a longer accumulation for the same 32-block window.
+
+# ---------------------------------------------------------------- the budget line
+budget_grid: [0, 16, 32, 64, 128, 256, 512, 1024, null]   # null = no limit; T is drawn from the source's grid under theory_weights.json
+budget_grid_by_source: {math: [0, 16, 32, 64, 128, 256, 512, 1024, 2048, null]}   # per-source override
+budget_line_with_limit: "\nBudget: %d tokens."      # the control line when T is a number
+budget_line_no_limit: "\nBudget: no limit."         # the control line when T is none
+budget_line_position: after_question_before_answer_prefix   # checked by gate V1; any other value is refused
+# The line goes AFTER the question and BEFORE the answer prefix. The exemplar block is unchanged
+# (exemplars never carry a budget line) and the line is NEVER a loss target. The grid reaches the
+# source's own horizon, so a budget above every chain of that source is a real draw, not a clamp.
+eval_budgets: [0, 32, 128, 512, 2048, null]         # independently generated evaluation token budgets; null = the no-limit pass
+eval_standard_caps: [0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]   # token caps applied to the no-limit chain
+eval_horizon: 4096                  # generation horizon of the no-limit pass; the caps of record are cuts of it
+# The caps and the horizon are the production grid's (work/production/prod/config.yaml caps and
+# horizon), so the no-limit pass is written in the same cells format and can sit beside the base
+# grids in Table 1. The budgeted passes are separate files: they are a different protocol.
+chain_tail_chars: 200               # characters of the cut chain stored per cell as chain_tail
+
+# ---------------------------------------------------------------- target rule per arm (--arm)
+# `draw` selects where T and the block depth come from: `theory` reads that source's tables in
+# train/data/theory_weights.json, `uniform` draws T uniformly over the source's grid and the depth
+# from depth_probabilities below. Only the uniform_longest ablation uses `uniform`.
+arms:
+  budget_longest:                   # THE RECIPE
+    rule: longest_fitting           # T>0: the LONGEST correct chain among {A,B} with at most T tokens
+    budget_line: true
+    fallback: true                  # marked cut-plus-answer when neither chain fits
+    draw: theory
+  budget_shortest:                  # choose the shortest fitting correct chain
+    rule: shortest_fitting
+    budget_line: true
+    fallback: true
+    draw: theory
+  nobudget:                         # same target rule without a control line
+    rule: longest_fitting
+    budget_line: false
+    fallback: true
+    draw: theory
+  nocut:                            # no marked fallback; a visit with no fitting chain is dropped
+    rule: longest_fitting
+    budget_line: true
+    fallback: false
+    draw: theory
+  uniform_longest:                  # ABLATION, not scheduled: the draw before the theory entered it
+    rule: longest_fitting
+    budget_line: true
+    fallback: true
+    draw: uniform                   # uniform T over the source's grid, fixed depth_probabilities
+default_arm: budget_longest
+# Target kinds in every arm: T=0 -> DIRECT (suffix + answer, only answer and EOS supervised);
+# T=none -> the arm-selected full correct chain + EOS, and in a fullplus_p share also the
+# read-out suffix and answer (CHAIN_PLUS).
+# T>0 -> CHAIN (the selected chain + EOS, chain and EOS supervised); otherwise FALLBACK.
+fullplus_p: 0.2                     # share of no-limit targets that also carry the read-out suffix and answer
+fallback_ceiling: 0.35             # stop target construction when fallbacks dominate the mixture
+
+# ---------------------------------------------------------------- the theory in the objective
+theory_weights_sha256: 9c3e1e1acb678cb031cec820bfcadb7fa39db0ef2bb7cbe9b493b0328011785c   # train/data/theory_weights.json is pinned by content, like the pool
+# Stage 0 (train/theory_weights.py) reads the base model's production grid and writes the two
+# tables the draw uses, per source: the budget weights w(T), proportional to the accuracy stopping
+# at T leaves unrealised -- mean over depths of (1 - G_k(T)) * (c_k(>T) - l_k(T)), clipped at zero,
+# then w = 0.5 * uniform + 0.5 * normalised, the no-limit entry at the uniform share -- and the
+# depth weights, the share of calibration prompts an average-budget lookup allocator assigns to
+# each depth over 16 log-spaced budgets, under the same mixture -- w = 0.5 * uniform + 0.5 *
+# normalised usage -- and then with the DEEPEST depth raised to at least 0.20, the shallower depths
+# rescaled to 1 - 0.20, because the deepest depth is the released default Table 1 checks at 1.0x.
+# targets.py refuses a file whose sha256 is not the digest above, exactly as it refuses an edited pool.
+
+# ---------------------------------------------------------------- mixture and balance
+depth_probabilities: {1: 0.10, 2: 0.30, 3: 0.20, 4: 0.40}   # the uniform_longest arm's fixed depth mix; theory arms read theory_weights.json
+supervised_token_budget: 1200000    # count only loss-target tokens, excluding prompt and padding
+source_max_share: 0.3333333333      # no source above one third of supervised tokens
+format_max_share: 0.5               # no answer format above one half of supervised tokens
+drop_share_warn: 0.05               # flag in the manifest if more than this share of draws is dropped for length
+
+# ---------------------------------------------------------------- optimisation
+lr: 0.0002                          # peak learning rate before cosine decay
+schedule: cosine                    # learning-rate shape after warmup; cosine is the only one implemented
+warmup_frac: 0.03                   # warmup is 3 percent of the optimiser steps
+weight_decay: 0.0
+betas: [0.9, 0.95]
+grad_clip: 1.0
+lora: {r: 16, alpha: 32, dropout: 0.0,
+       targets: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]}
+# LoRA on the seven projections of all 24 layers; base, norms, embeddings, lm_head and the exit
+# gate stay frozen; LoRA parameters are fp32 under a bf16 autocast.
+ckpt_every: 100                     # optimiser steps between checkpoints
+loss: ce_sum_over_window_supervised # the only implemented objective; train.py refuses any other value
+# CE SUM from lm_head(hidden_states_list[d-1]) on the masked target tokens, divided by the
+# accumulation window's own supervised-token count. Padding is mask 0 and never enters the sum.
+
+# ---------------------------------------------------------------- evaluation
+n_answer_tokens: {gsm8k: 12, math500: 32, svamp: 8, aqua: 8, csqa: 8, arc: 8}  # task read-out token limits
+protocol: v2                        # own answer when it parses inside the cut, else the forced read-out
+eos_strip: true                     # strip the end-of-text string before every parse
