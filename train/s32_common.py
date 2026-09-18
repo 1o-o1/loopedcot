@@ -88,8 +88,32 @@ def gpu_procs():
 
 
 # ------------------------------------------------------------------ data
+def _harness_rows(task):
+    """The evaluation harness's frozen rows of `task` (prod/tasks/data/rows_<task>.jsonl, dataset
+    order, sha-pinned in hashes.json) in this module's row shape, or None outside the checkout.
+    They are the rows every production grid was generated on, and they need no network."""
+    path = os.path.join(os.path.dirname(HERE), "prod", "tasks", "data", "rows_%s.jsonl" % task)
+    if not os.path.exists(path):
+        return None
+    out = []
+    for line in open(path, encoding="utf-8"):
+        r = json.loads(line)
+        row = {"idx": int(r["idx"]), "input": r["input"], "target": r["target"],
+               "options": None, "gold_text": None}
+        if "solution" in r:
+            row["solution"] = r["solution"]
+        out.append(row)
+    return out
+
+
 def gsm8k_rows(split, lo=0, hi=None):
-    """S9a's loader, verbatim semantics: openai/gsm8k main, dataset order."""
+    """S9a's loader, verbatim semantics: openai/gsm8k main, dataset order (the harness's frozen
+    test rows when the package sits inside the checkout, the Hub otherwise)."""
+    if split == "test":
+        rows = _harness_rows("gsm8k")
+        if rows is not None:
+            hi = len(rows) if hi is None else min(hi, len(rows))
+            return rows[lo:hi]
     from datasets import load_dataset
     d = load_dataset("openai/gsm8k", "main", split=split)
     hi = len(d) if hi is None else min(hi, len(d))
@@ -99,7 +123,12 @@ def gsm8k_rows(split, lo=0, hi=None):
 
 
 def math500_rows(lo=0, hi=None):
-    """S13's loader, verbatim semantics: HuggingFaceH4/MATH-500 test, dataset order."""
+    """S13's loader, verbatim semantics: HuggingFaceH4/MATH-500 test, dataset order (the
+    harness's frozen rows inside the checkout, the Hub otherwise)."""
+    rows = _harness_rows("math500")
+    if rows is not None:
+        hi = len(rows) if hi is None else min(hi, len(rows))
+        return rows[lo:hi]
     from datasets import load_dataset
     d = load_dataset("HuggingFaceH4/MATH-500", split="test")
     hi = len(d) if hi is None else min(hi, len(d))
