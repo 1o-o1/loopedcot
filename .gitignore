@@ -1,6 +1,14 @@
 # results and logs stay local; only the job list travels
 artifacts/*
 !artifacts/manifest.json
+# results travel: every grid (natural and forced), job records, score tables, allocator runs, live checks;
+# generation checkpoints (trace_*), queue state and figures stay local
+!artifacts/cells_*.jsonl
+!artifacts/meta_*.json
+!artifacts/score_*.json
+!artifacts/alloc_*/
+!artifacts/alloc_*_all_tables_*.md
+!artifacts/live_*.json
 logs/
 __pycache__/
 *.pyc
