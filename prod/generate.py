@@ -5,11 +5,23 @@
       [--caps=0,16,32,64,128,256,512] [--extra-caps=48,96,192,384] [--horizon=512] \
       [--batch-cap=32] [--mem-fraction=0.85] [--tag-loops --tag-tokens] [--out=DIR] \
       [--batch-width=N] [--no-mask] [--wall-clock] [--resume-from-chains]
+      [--continue-chains=think_tag|horizon] [--protocol-tag=natural2]
+      [--continue-from-cells=FILE] [--old-horizon=N]
 
 Protocol (natural stop), ported from s32_run.py and s28_common:
   generate once at the horizon with the model's own stop rule, then cut(B) = trace[:min(B, natural
   stop)] and run ONE forced read-out per DISTINCT cut length, serving every budget that shares it.
   Both parses are stored per cap, and protocol v2 is computed from the stored fields (decision D1).
+
+Protocol (continuation of a stored chain), `--continue-chains=<mode>` on the natural protocol:
+  the chains sidecar of a finished natural-stop job is replayed as the prefix (prefill, exactly as
+  --resume-from-chains does) and greedy decoding CARRIES ON: think_tag continues the rows whose
+  chain ended at the closing think tag past it, horizon continues the rows that reached the old
+  horizon out to the new one. The cuts and the forced read-outs are recomputed at every cap for
+  those rows; every other row, and every cap at or below a continued row's old stop, is copied from
+  the old cells file, whose prefix is identical there. The output is a SEPARATE grid under
+  --protocol-tag (default natural2), and neither the source cells file nor the chains sidecar is
+  ever written.
 
 Protocol (forced continuation), ported from s13_common.decode(stopper=...) / make_stopper:
   no row ever stops; a token that would stop is replaced by the "Wait," tokens, so every row emits
@@ -43,7 +55,7 @@ import torch
 from . import config as cfgmod
 from .common import (ART, Appender, BATCH_WIDTH, CAPS_EXTRA, CAPS_STANDARD, FORCED_BUDGETS,
                      FORCED_HORIZON, FORCED_N, HORIZON, env_report, gpu_procs, load_ckpt, nvsmi,
-                     read_jsonl, save_json, sha256_text)
+                     read_header, read_jsonl, save_json, sha256_text)
 from .models import depths_for, get
 from .tasks import (ans_eq, build_prompts, data_hashes, make_find_cut, parse_forced, parse_own,
                     row_kind, row_n_answer, rows as task_rows_of, split_labels, task_cfg)
@@ -95,6 +107,28 @@ def build_parser():
                         "re-prefill prompt + its stored chain_ids instead of regenerating that span, "
                         "then apply the existing Wait injection and continue to the horizon; falls "
                         "back to full generation for a row missing from the file")
+    p.add_argument("--continue-chains", dest="continue_chains", default=None,
+                   choices=CONTINUE_MODES,
+                   help="natural protocol only: instead of generating, replay the stored "
+                        "chains_<model>_<task>_k<k>.jsonl as the prefix and CONTINUE the rows this "
+                        "mode selects -- think_tag: the rows whose chain ended at the closing "
+                        "think tag (the tag is put back and decoding carries on past it to the "
+                        "task's "
+                        "stop strings, the eos or the horizon); horizon: the rows whose chain "
+                        "reached the old horizon (decoding carries on to --horizon). The cuts and "
+                        "forced read-outs are recomputed at every cap for those rows; every other "
+                        "row, and every cap at or below the old stop, is copied from the old cells "
+                        "file. Output goes to a NEW cells file named by --protocol-tag")
+    p.add_argument("--protocol-tag", dest="protocol_tag", default="natural2",
+                   help="the protocol tag in the output filenames of a --continue-chains job "
+                        "(default natural2); ignored without --continue-chains, and it must differ "
+                        "from --protocol so the source grid can never be overwritten")
+    p.add_argument("--continue-from-cells", dest="continue_from_cells", default=None,
+                   help="the source cells file of a --continue-chains job (default: the same job's "
+                        "own cells_<model>_<task>_<protocol>_k<k>...jsonl in the artifacts dir)")
+    p.add_argument("--old-horizon", dest="old_horizon", type=int, default=None,
+                   help="the horizon the source grid ran at (default: the `horizon` its cells "
+                        "file's _header row records)")
     p.add_argument("--save-traces", dest="save_traces", default="1")
     p.add_argument("--no-eos-cut", dest="eos_cut", action="store_false", default=True,
                    help="use the older S9a cut rule with no eos branch, which S9c and S9f "
@@ -198,6 +232,302 @@ def seed_from_chain(chain_row, pieces, tail_window, stopper=None):
     return ids, tail_seed, n_truncated
 
 
+# ------------------------------------------------------------------ continuation of a stored chain
+# `--continue-chains=<mode>` (natural protocol): the cluster holds a chains sidecar for every
+# (model, task, k) of the natural-stop grids, so a chain that stopped too early can be CONTINUED
+# instead of regenerated. The stored ids are replayed as the prefix (prefill, exactly as
+# --resume-from-chains does for the forced protocol) and greedy decoding carries on to a new stop
+# rule. Output goes to its own cells file, named by --protocol-tag (default natural2); the source
+# grid and the chains sidecar are only ever READ.
+#:  think_tag  rows whose chain ended at the closing think tag: put the tag back (the stored ids end
+#:             one token short of it, because write_chains cuts at the marker POSITION) and continue
+#:             past it to the task's stop strings, the tokenizer eos, or the horizon.
+#:  horizon    rows whose chain reached the old horizon: continue to the new --horizon.
+CONTINUE_MODES = ("think_tag", "horizon")
+#: characters of the cut text stored per row as `chain_tail`
+CHAIN_TAIL_CHARS = 200
+
+
+def iter_jsonl(path):
+    """Stream a jsonl artifact row by row, header skipped. `common.read_jsonl` holds the whole file,
+    and a chains sidecar (or a cells file) for a 2,290-problem job is tens of MB."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except Exception:                                 # noqa: BLE001
+                continue                                      # truncated last line after a kill
+            if isinstance(r, dict) and not r.get("_header"):
+                yield r
+
+
+def job_tag(model, task, protocol, k, tagstr="", shardstr=""):
+    """The one place a job's artifact tag is spelled. `protocol` is the PROTOCOL TAG, which is the
+    protocol itself for an ordinary job and --protocol-tag for a continuation job."""
+    return "%s_%s_%s_k%d%s%s" % (model.replace("+", "-"), task, protocol, int(k), tagstr, shardstr)
+
+
+def check_not_overwriting(new_path, old_path):
+    """A continuation job must never write over the grid it reads."""
+    if os.path.abspath(new_path) == os.path.abspath(old_path):
+        raise SystemExit("--continue-chains would write over its own source, %s; pass a "
+                         "--protocol-tag that differs from --protocol" % old_path)
+
+
+def select_continuation_rows(mode, chain_stop, cells_marker, old_horizon, think_text="</think>"):
+    """Which stored chains this job continues, and where each one's OLD stop was.
+
+    `chain_stop`   {row_idx: the chains sidecar's `natural_stop`} -- the rows that HAVE a chain.
+    `cells_marker` {row_idx: the old cells row's `stop_marker`}.
+
+    The selection field differs by mode, and which one is used matters:
+      think_tag  `stop_marker` from the OLD CELLS rows. The chains sidecar stores the stop POSITION
+                 but not which marker produced it, and for a Thinking checkpoint the natural cut
+                 rule (tasks.make_find_cut's find_cut_think) fires on the first token in the eos
+                 set, which is either the tokenizer eos or `</think>`; only the cells row says
+                 which. `stop_marker` is the decoded stop token, so it is compared to `think_text`.
+      horizon    `natural_stop` from the CHAINS file: missing, or at/above the old horizon.
+
+    Returns {"mode", "field", "selected": {row_idx: old_stop}, "n_candidates", "no_chain"}.
+    """
+    if mode not in CONTINUE_MODES:
+        raise ValueError("--continue-chains must be one of %s, not %r" % (CONTINUE_MODES, mode))
+    sel, cand, no_chain = {}, [], []
+    if mode == "think_tag":
+        field = "old cells stop_marker == %r" % think_text
+        for ridx, mk in cells_marker.items():
+            if mk is None or str(mk).strip() != str(think_text).strip():
+                continue
+            cand.append(ridx)
+            if ridx in chain_stop:
+                s = chain_stop[ridx]
+                sel[ridx] = int(old_horizon) if s is None else int(s)
+            else:
+                no_chain.append(ridx)
+    else:
+        field = "chains natural_stop missing or >= the old horizon %d" % int(old_horizon)
+        for ridx, s in chain_stop.items():
+            if s is None or int(s) >= int(old_horizon):
+                cand.append(ridx)
+                sel[ridx] = int(old_horizon) if s is None else int(s)
+    return {"mode": mode, "field": field, "selected": sel, "n_candidates": len(cand),
+            "no_chain": sorted(no_chain)}
+
+
+def find_cut_after(tok, ids, boundary, stop_strings, stop_ids):
+    """The natural cut of a CONTINUED trace: the earliest stop at or after `boundary`.
+
+    `tasks.make_find_cut` scans from 0, which on a continued trace re-finds the marker that stopped
+    the OLD chain -- it sits at the end of the replayed prefix -- and cuts the continuation away
+    again. This is that rule with a floor: the same eos-token scan and the same bisect from a stop
+    string's character position onto a token count (s9a/s26/s28 find_cut_base), both restricted to
+    the continuation. Returns (cut, marker), or (len(ids), None) when nothing stopped it.
+    """
+    boundary = max(0, int(boundary))
+    best, mk = None, None
+    sset = {int(x) for x in (stop_ids or ())}
+    for j in range(boundary, len(ids)):
+        if int(ids[j]) in sset:
+            best, mk = j, tok.decode([int(ids[j])], clean_up_tokenization_spaces=False)
+            break
+    if stop_strings:
+        head = 0 if not boundary else len(
+            tok.decode(ids[:boundary], clean_up_tokenization_spaces=False))
+        full = tok.decode(ids, clean_up_tokenization_spaces=False)
+        hits = [full.find(s, head) for s in stop_strings]
+        hits = [h for h in hits if h >= 0]
+        if hits:
+            pos = min(hits)
+            lo, hi = boundary, len(ids)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if len(tok.decode(ids[:mid], clean_up_tokenization_spaces=False)) > pos:
+                    hi = mid
+                else:
+                    lo = mid + 1
+            c = max(boundary, lo - 1)
+            if best is None or c < best:
+                best, mk = c, full[pos:pos + 16]
+    return (len(ids), None) if best is None else (best, mk)
+
+
+def cont_seed(cont, rws, enc, cur, horizon):
+    """Seed `cur` from the stored chains for a --continue-chains job, and fill `cont["boundary"]`.
+
+    A selected row's trace starts as its stored ids (plus `cont["tag_ids"]` in think_tag mode, the
+    stop token the stored ids end one short of), and its boundary is the length of that prefix: no
+    stop before it counts, and the read-outs below the old stop are the OLD ones (copy_old_rows).
+    A row whose stored prompt fingerprint no longer matches this job's prompt, or that has no chain,
+    is NOT generated -- the prefix would be the wrong context -- and is copied from the old grid
+    instead, exactly like a row this mode did not select (`_copy`). A row that already has ids (a
+    killed continuation job resuming off its own trace checkpoint) is left alone, but its boundary
+    is recomputed from the chain, never read back from the checkpoint.
+    """
+    sel = cont["selected"]
+    tag_ids = [int(x) for x in (cont.get("tag_ids") or [])]
+    cont.setdefault("boundary", {})
+    out = {"continued": [], "prompt_mismatch": [], "no_chain": [], "not_selected": 0}
+    for i, r in enumerate(rws):
+        ridx = int(r["idx"])
+        cr = (cont.get("chains") or {}).get(ridx)
+        if ridx not in sel or cr is None:
+            if ridx in sel:
+                out["no_chain"].append(ridx)
+            else:
+                out["not_selected"] += 1
+            cur[i] = {"ids": cur[i].get("ids") or [], "done": True, "_copy": True}
+            continue
+        if cr.get("prompt_sha256") != sha256_text(json.dumps(enc[i])):
+            out["prompt_mismatch"].append(ridx)
+            cur[i] = {"ids": [], "done": True, "_copy": True}
+            continue
+        ids = [int(x) for x in cr["chain_ids"]]
+        if tag_ids and ids[-len(tag_ids):] != tag_ids:
+            ids = ids + tag_ids
+        cont["boundary"][i] = len(ids)
+        if not cur[i].get("ids"):
+            cur[i] = {"ids": ids, "done": len(ids) >= int(horizon)}
+        out["continued"].append(ridx)
+    return out
+
+
+def fill_shared_cuts(ap, caps, rows_by_cap, is_extra):
+    """Write the caps a copied problem is missing by SHARING an identical cut.
+
+    A continuation job may run a wider cap set than the grid it copies from (horizon mode adds the
+    new horizon as a cap). For a problem it did NOT continue, cut(B) = min(natural stop, B) is the
+    same number at the new cap as at the highest old one, so the read-out already copied at that cut
+    serves the new cap too -- the protocol's own rule of ONE read-out per distinct cut, serving
+    every budget that shares it. Returns the rows written (the caller records them as done).
+    """
+    by_cut, stop = {}, None
+    for B in sorted(rows_by_cap):
+        r = rows_by_cap[B]
+        by_cut.setdefault(int(r["n_cut"]), r)
+        if stop is None:
+            stop = r.get("natural_stop")
+    out = []
+    for B in caps:
+        if int(B) in rows_by_cap:
+            continue
+        cut = int(B) if stop is None else min(int(stop), int(B))
+        src = by_cut.get(cut)
+        if src is None:
+            continue                       # no identical cut was copied: it must be regenerated
+        r = dict(src)
+        r["B"] = int(B)
+        r["extra"] = bool(is_extra(int(B)))
+        r["shared_cut_from_B"] = int(src["B"])
+        ap.write(r)
+        out.append(r)
+    return out
+
+
+def copy_old_rows(old_path, ap, idx_of, done, copy_all, copy_upto, extra_of):
+    """Copy the rows a continuation job does not regenerate out of the OLD cells file.
+
+    `copy_all`   row_idx values whose every cap is copied (the rows this job did not continue).
+    `copy_upto`  {row_idx: old stop} for the rows it DID continue: a cap at or below the old
+                 stop was produced from a byte-identical prefix (cut(B) = min(stop, B) = B on both
+                 sides, and the chain's first B ids are the same ids), so its read-out is the old
+                 row; a cap above it is regenerated.
+    Every field is kept as it was, with `idx` re-stamped to this job's own local index (the resume
+    key of the new cells file is (idx, B)) and `extra_of` adding the provenance fields.
+    Streams the old file, so a 17 MB cells file is never held in memory.
+    """
+    n_copy, n_skip = 0, 0
+    for row in iter_jsonl(old_path):
+        try:
+            ridx, B = int(row["row_idx"]), int(row["B"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        i = idx_of.get(ridx)
+        if i is None:
+            continue                                  # not a problem of this job (shard, --n)
+        if ridx not in copy_all:
+            lim = copy_upto.get(ridx)
+            if lim is None or B > int(lim):
+                n_skip += 1
+                continue
+        if (i, B) in done:
+            continue
+        out = dict(row)
+        out["idx"] = int(i)
+        out.update(extra_of(i, ridx, B, row) or {})
+        ap.write(out)
+        done[(i, B)] = out
+        n_copy += 1
+    return n_copy, n_skip
+
+
+# ------------------------------------------------------------------ per-row text diagnostics
+# Added to every row generate.py writes (the artifacts of record stored no chain text at all, so a
+# text-level diagnosis of a wrong label was impossible without regenerating the job).
+def stop_reason_of(marker, n_trace, horizon, stops=None, think_text=None, think_id=None,
+                   eos_texts=None, eos_ids=None, forced=False):
+    """Why the trace stopped, as one of eos / stop_string:<which> / think_tag / horizon.
+
+    `marker` is the cut rule's own marker: the decoded stop token (find_cut_think), the literal
+    "eos", or the first 16 characters at a stop string's match (find_cut_base) -- and under the
+    forced protocol the stopper's reason ("tok_<id>", "hash_line", "final_answer", ...).
+    """
+    if marker is None:
+        return "horizon" if int(n_trace or 0) >= max(1, int(horizon or 0)) else "none"
+    mk = str(marker)
+    eset = {int(x) for x in (eos_ids or ())}
+    if forced:
+        if mk.startswith("tok_"):
+            try:
+                t = int(mk[4:])
+            except ValueError:
+                t = None
+            if t is not None and think_id is not None and t == int(think_id):
+                return "think_tag"
+            if t is not None and t in eset:
+                return "eos"
+        return "eos" if mk == "eos" else "stop_string:%s" % mk
+    if mk == "eos":
+        return "eos"
+    if think_text is not None and mk.strip() == str(think_text).strip():
+        return "think_tag"
+    if eos_texts and mk in set(eos_texts):
+        return "eos"
+    for s in (stops or []):
+        if mk.startswith(s) or s in mk:
+            return "stop_string:%s" % s
+    return "stop_string:%s" % mk[:16]
+
+
+def own_answer_span(cut_text, own, own_marker):
+    """Character offsets [start, end) of the parsed own answer inside the cut text.
+
+    The parsers normalise (commas, "$", brackets), so the exact string is not always present; then
+    the span is the region the parser read -- the last own marker to the end of its line -- which is
+    what a text-level diagnosis needs. None when there is nothing to point at.
+    """
+    if own is None or not cut_text:
+        return None
+    own = str(own)
+    p = cut_text.rfind(str(own_marker)) if own_marker else -1
+    # the parsers read the LAST marker's line, so the offset is searched from there, never before it
+    start = cut_text.find(own, p) if p >= 0 else cut_text.rfind(own)
+    if start >= 0:
+        return [int(start), int(start + len(own))]
+    if p < 0:
+        return None
+    e = cut_text.find("\n", p)
+    return [int(p), int(len(cut_text) if e < 0 else e)]
+
+
+def chain_tail_of(cut_text, n=CHAIN_TAIL_CHARS):
+    return "" if not cut_text else str(cut_text)[-int(n):]
+
+
 # ------------------------------------------------------------------ forced state checkpointing
 # A forced row's whole protocol state lives in its `fstate`: where its natural stop was and why, how
 # many injections it has had and at which positions, the wait tokens still draining, the stopper's
@@ -241,6 +571,16 @@ def main(argv=None):
     a = build_parser().parse_args(argv)
     cfg = cfgmod.from_args(a)
     forced = a.protocol == "forced"
+    # ---- continuation of a stored chain (--continue-chains). The output is a SEPARATE grid under
+    # its own protocol tag; the source cells file and the chains sidecar are only ever READ.
+    cmode = a.continue_chains
+    if cmode and forced:
+        raise SystemExit("--continue-chains is for the natural protocol only; the forced protocol "
+                         "resumes a stored chain with --resume-from-chains")
+    ptag = a.protocol_tag if cmode else a.protocol
+    if cmode and str(ptag) == str(a.protocol):
+        raise SystemExit("--protocol-tag must differ from --protocol (%s), else the continuation "
+                         "would be written over the grid it reads" % a.protocol)
     caps = sorted(set(cfg["forced_budgets"] if forced else cfg["caps"]))
     extra = [] if forced else sorted({int(x) for x in (a.extra_caps or "").split(",")
                                       if x.strip() != ""})
@@ -261,6 +601,11 @@ def main(argv=None):
         # PP3 decision 4: fn None means FULL N, which is the default of record.
     all_caps = sorted(set(caps) | set(extra))
     horizon = int(cfg["forced_horizon"] if forced else cfg["horizon"])
+    # Is the closing think tag a natural stop (config `think_tag_is_stop`, default True)? With it
+    # False a chat-template Thinking chain runs PAST the reasoning block to the task's stop strings
+    # or the eos token, and the own answer is read through the tag. The flag is recorded in the
+    # header of every cells file, so a grid says which rule produced it.
+    think_stop = bool(cfg.get("think_tag_is_stop", True))
     # A cap above the horizon cannot be honoured: its cut would be the horizon, and the row would
     # claim a budget it never spent. Drop it loudly rather than write a mislabelled row. (Under the
     # natural-stop protocol a trace that STOPS before a cap is a different matter: the cut is the
@@ -311,8 +656,8 @@ def main(argv=None):
     shardstr = "" if a.shards == 1 else "_s%dof%d" % (a.shard, a.shards)
     if a.only_rows:
         shardstr += "_sub%d" % N
-    tag = "%s_%s_%s_k%d%s%s" % (a.model.replace("+", "-"), a.task, a.protocol, a.k, tagstr,
-                                shardstr)
+    tag = job_tag(a.model, a.task, ptag, a.k, tagstr, shardstr)
+    old_tag = job_tag(a.model, a.task, a.protocol, a.k, tagstr, shardstr)
     t0 = time.time()
     print("[%s] N=%d caps=%s horizon=%d | %s | %s"
           % (tag, N, all_caps, horizon, nvsmi(), gpu_procs()), flush=True)
@@ -332,9 +677,71 @@ def main(argv=None):
     nans_row = [row_n_answer(a.task, r) for r in rws]
     nans = max(nans_row) if nans_row else task_cfg(a.task)["n_answer"]
 
+    # ---- --continue-chains: which stored chains this job continues, and where each one's old stop
+    # was. Read out of the source cells file and the chains sidecar, both read-only, BEFORE the
+    # output file exists, so its header row can record the source, the mode, the old horizon and the
+    # count continued.
+    cont, cont_sel = None, None
+    if cmode:
+        if a.tag_loops or a.tag_tokens:
+            raise SystemExit("--continue-chains cannot continue a tagged arm: its prompt carries "
+                             "the cap, so one stored chain does not belong to the new prompt")
+        cpath = chain_path(out_dir, a.model, a.task, a.k)
+        old_cells = a.continue_from_cells or os.path.join(out_dir, "cells_%s.jsonl" % old_tag)
+        for p, what in ((cpath, "chains sidecar"), (old_cells, "source cells file")):
+            if not os.path.exists(p):
+                raise SystemExit("--continue-chains needs the %s %s" % (what, p))
+        check_not_overwriting(os.path.join(out_dir, "cells_%s.jsonl" % tag), old_cells)
+        hdr = read_header(old_cells) or {}
+        old_hor = int(a.old_horizon or hdr.get("horizon")
+                      or (hdr.get("config") or {}).get("horizon") or 0)
+        if not old_hor:
+            raise SystemExit("%s records no horizon in its _header row; pass --old-horizon"
+                             % old_cells)
+        if cmode == "horizon" and int(horizon) <= old_hor:
+            raise SystemExit("--continue-chains=horizon needs --horizon above the old "
+                             "horizon (%d); at %d every selected row is already at its stop"
+                             % (old_hor, horizon))
+        if cmode == "horizon" and int(horizon) > max(all_caps):
+            print("[warn] the new horizon %d is above every cap %s, so the continued tail is "
+                  "generated but no cap scores it: put it in --caps" % (horizon, all_caps),
+                  flush=True)
+        think_id = tok.convert_tokens_to_ids("</think>") if ad.chat_template else None
+        think_text = None if think_id is None else tok.decode([int(think_id)],
+                                                              clean_up_tokenization_spaces=False)
+        if cmode == "think_tag" and think_id is None:
+            raise SystemExit("--continue-chains=think_tag needs a chat-template checkpoint; %s has "
+                             "no closing think tag" % a.model)
+        # the stop MARKER is only in the old cells rows, the stop POSITION only in the chains file
+        cells_marker, chain_stop = {}, {}
+        if cmode == "think_tag":
+            for r in iter_jsonl(old_cells):
+                if "row_idx" in r and "stop_marker" in r:
+                    cells_marker[int(r["row_idx"])] = r.get("stop_marker")
+        for r in iter_jsonl(cpath):
+            chain_stop[int(r["idx"])] = r.get("natural_stop")
+        cont_sel = select_continuation_rows(cmode, chain_stop, cells_marker, old_hor,
+                                            think_text=think_text or "</think>")
+        mine = {int(r["idx"]) for r in rws} & set(cont_sel["selected"])
+        cont = {"mode": cmode, "old_horizon": old_hor, "old_cells": old_cells,
+                "chains_path": cpath, "think_id": think_id, "think_text": think_text,
+                "selected": {i: cont_sel["selected"][i] for i in mine}, "boundary": {},
+                "tag_ids": [int(think_id)] if cmode == "think_tag" else [],
+                # only the selected rows' ids are held: a whole 4096-token chains file for 2,290
+                # problems is hundreds of MB of Python ints
+                "chains": {int(r["idx"]): r for r in iter_jsonl(cpath) if int(r["idx"]) in mine}}
+        print("[%s] --continue-chains=%s: %d of %d rows selected by %s; old horizon %d, new %d; "
+              "source %s" % (tag, cmode, len(mine), N, cont_sel["field"], old_hor, horizon,
+                             os.path.basename(old_cells)), flush=True)
+
     meta_path = os.path.join(out_dir, "meta_%s.json" % tag)
     meta = json.load(open(meta_path, encoding="utf-8")) if os.path.exists(meta_path) else {}
-    meta.update({"tag": tag, "model": a.model, "task": a.task, "k": a.k, "protocol": a.protocol,
+    # `protocol` is the protocol TAG of this grid (a continuation grid is its own protocol: a
+    # different stop rule over the same prompts), and `protocol_base` the protocol it decodes under.
+    # Every meta-driven consumer -- cost.py's reference cell, checks.py's throughput table --
+    # keys on `protocol`, and must see a continuation grid as separate from the grid it reads.
+    meta.update({"tag": tag, "model": a.model, "task": a.task, "k": a.k, "protocol": ptag,
+                 "protocol_base": a.protocol,
                  "adapter": a.adapter, "caps": caps, "extra_caps": extra, "horizon": horizon,
                  "n_problems": N, "shard": a.shard, "shards": a.shards,
                  "n_eval": sum(1 for s in spl if s == "eval"),
@@ -351,7 +758,16 @@ def main(argv=None):
                  "load_seconds": load_seconds,
                  "batch_width_pinned": bw or "adaptive (KV ceiling)",
                  "strip_at_eos": True, "eos_cut": bool(a.eos_cut),
-                 "resume_from_chains": bool(a.resume_from_chains)})
+                 "resume_from_chains": bool(a.resume_from_chains),
+                 "protocol_tag": ptag, "continue_chains": cmode})
+    if cont:
+        meta["continue"] = {"mode": cmode, "chains_path": cont["chains_path"],
+                            "source_cells": cont["old_cells"], "old_horizon": cont["old_horizon"],
+                            "new_horizon": horizon, "selection_field": cont_sel["field"],
+                            "n_candidates": cont_sel["n_candidates"],
+                            "n_candidates_without_a_chain": len(cont_sel["no_chain"]),
+                            "n_selected": len(cont["selected"]),
+                            "think_id": cont["think_id"], "think_text": cont["think_text"]}
     meta.setdefault("oom_events", [])
     meta.setdefault("errors", {})
     meta.setdefault("passes", {})
@@ -366,29 +782,38 @@ def main(argv=None):
     if fresh:
         # PP3 decision 2: the effective config is the FIRST LINE of every cells file. Every reader
         # in the package skips a row with `_header` (common.read_jsonl / load_ckpt / count_cells).
-        apc.write(cfgmod.header_row(cfg, tag, {"model": a.model, "task": a.task, "k": a.k,
-                                               "protocol": a.protocol, "n_problems": N,
-                                               "horizon": horizon, "caps": all_caps,
-                                               "data_hashes": data_hashes()}))
+        hx = {"model": a.model, "task": a.task, "k": a.k,
+              "protocol": ptag, "protocol_base": a.protocol, "n_problems": N,
+              "horizon": horizon, "caps": all_caps, "data_hashes": data_hashes()}
+        if cont:
+            # what this grid is: the chains it continued, the rule that picked them, the horizon
+            # they were produced at, and how many rows were continued
+            hx.update({"continue_chains": cmode, "continue_chains_path": cont["chains_path"],
+                       "continue_source_cells": cont["old_cells"],
+                       "continue_old_horizon": cont["old_horizon"],
+                       "continue_selection_field": cont_sel["field"],
+                       "continue_n_continued": len(cont["selected"])})
+        apc.write(cfgmod.header_row(cfg, tag, hx))
 
     # ---------------------------------------------------------------- phase A: traces
     def gen_pass(T_cap, hor, key):
         """Generate traces for one pass. Returns (enc, cur, plen, stop_table, suffix_ids)."""
         tl = tag_line(a.k, T_cap, a.tag_loops, a.tag_tokens)
         prompts, suf, stops, eos_ids, extra_meta = build_prompts(
-            tok, a.task, rws, chat_template=ad.chat_template, suffix_text=a.suffix)
+            tok, a.task, rws, chat_template=ad.chat_template, suffix_text=a.suffix,
+            think_tag_is_stop=think_stop)
         if tl:
             # the tag line goes between the few-shot prompt and the question (s32_common)
             prompts = [_insert_tag(p, tl, a.task, ad.chat_template) for p in prompts]
             extra_meta["tag_line"] = tl
         find_cut = make_find_cut(tok, stops or [], eos_ids, chat_template=ad.chat_template,
-                                 eos_cut=bool(a.eos_cut))
+                                 eos_cut=bool(a.eos_cut), think_tag_is_stop=think_stop)
         if ad.family in ("huginn", "mcleish"):
             # the family's stop ids of record (S9c: end_text, end_turn, begin_text for Huginn) join
             # the tokenizer eos, for the decoder, the cut rule and the strip alike
             eos_ids = sorted(set(eos_ids) | set(ad.stop_ids()))
             find_cut = make_find_cut(tok, stops or [], eos_ids, chat_template=ad.chat_template,
-                                     eos_cut=bool(a.eos_cut))
+                                     eos_cut=bool(a.eos_cut), think_tag_is_stop=think_stop)
         enc = [tok(p, add_special_tokens=ast)["input_ids"] for p in prompts]
         plen = [len(e) for e in enc]
         maxpos = getattr(ad, "max_positions", None)
@@ -405,6 +830,8 @@ def main(argv=None):
                                "max_positions": maxpos, "suffix_text":
                                extra_meta["suffix_text"], "stop_strings": stops,
                                "eos_ids": eos_ids,
+                               "end_think_id": extra_meta.get("end_think_id"),
+                               "think_tag_is_stop": bool(think_stop),
                                "prompt_tokens_mean": sum(plen) / max(1, len(plen)),
                                "prompt_tokens_min_max": [min(plen), max(plen)]}
         tp = os.path.join(out_dir, "trace_%s_%s.jsonl" % (tag, key))
@@ -418,6 +845,42 @@ def main(argv=None):
                     cur[i]["fstate"] = fstate_from_json(r["fstate"])
         apt = Appender(tp) if a.save_traces != "0" else None
         gen_tokens, gen_seconds = 0, 0.0
+
+        # ---- --continue-chains: replay the stored chains as the prefix, and give the CONTINUATION
+        # its own stop rule. `dec_eos`/`dec_stops` are what the decoder stops on and what the strip
+        # uses; the cut of a continued row is measured from its boundary (find_cut_after).
+        dec_eos, dec_stops = eos_ids, stops
+        if cont:
+            tid = cont["think_id"]
+            if cont["mode"] == "think_tag":
+                # continue PAST the tag: it leaves the stop set, and the task's stop strings (which
+                # the chat-template branch of build_prompts does not use) become the continuation's
+                # stop rule beside the tokenizer eos.
+                dec_eos = [e for e in eos_ids if tid is None or int(e) != int(tid)]
+                dec_stops = list(task_cfg(a.task)["stops"] or [])
+            cont["stop_ids"], cont["stops"] = dec_eos, dec_stops
+            cs = cont_seed(cont, rws, enc, cur, hor)
+            cont["chains"] = {}                       # the ids live in `cur` now
+            cont["seeded"] = cs
+            meta["passes"][key].update({
+                "continue_chains": cont["mode"], "continue_rows": len(cont["boundary"]),
+                "continue_stop_ids": dec_eos, "continue_stop_strings": dec_stops,
+                "continue_not_selected": cs["not_selected"],
+                "continue_prompt_mismatch": cs["prompt_mismatch"][:500],
+                "continue_no_chain": cs["no_chain"][:500]})
+            if cs["prompt_mismatch"]:
+                print("[warn] %d stored chain(s) no longer match this job's prompt and are copied, "
+                      "not continued: %s" % (len(cs["prompt_mismatch"]),
+                                             cs["prompt_mismatch"][:10]), flush=True)
+
+        def cut_of(i, idsx):
+            """This pass's cut rule for row i: from the boundary on a continued row, so the marker
+            that stopped the OLD chain -- the last token of the replayed prefix -- cannot cut the
+            continuation away again."""
+            if cont and i in cont["boundary"]:
+                return find_cut_after(tok, idsx, cont["boundary"][i], cont["stops"],
+                                      cont["stop_ids"])
+            return find_cut(idsx)
 
         if forced:
             from .models.ouro import TAIL_WINDOW, make_stopper, new_forced_states
@@ -470,8 +933,18 @@ def main(argv=None):
                 if not todo or stuck > 2:
                     break
                 Tn = min(len(cur[i]["ids"]) for i in todo)
-                at_T = sorted([i for i in todo if len(cur[i]["ids"]) == Tn],
-                              key=lambda i: plen[i])
+                if cont:
+                    # A continuation replays chains of MANY different lengths, and the exact-length
+                    # grouping below would then decode at width one or two and cost more than the
+                    # regeneration it replaces. Continued rows are grouped by the wave's own target
+                    # instead: every row of the group is asked for the same T_next - Tn tokens and
+                    # each row's output is trimmed to its OWN remaining budget just below, so no
+                    # trace ever runs past the wave. Greedy decoding is deterministic, so a trimmed
+                    # tail is simply regenerated by the next wave when it is needed.
+                    at_T = sorted(todo, key=lambda i: plen[i] + len(cur[i]["ids"]))
+                else:
+                    at_T = sorted([i for i in todo if len(cur[i]["ids"]) == Tn],
+                                  key=lambda i: plen[i])
                 before = sum(len(cur[i]["ids"]) for i in range(N))
                 b = bw or ad.batch_cap
                 gi = 0
@@ -508,8 +981,8 @@ def main(argv=None):
                             kwd = {}
                             if ad.family in ("huginn", "mcleish") and a.no_mask:
                                 kwd["use_mask"] = False
-                            g, dt = ad.decode(seqs, T_next - Tn, a.k, eos_ids,
-                                              stop_strings=stops,
+                            g, dt = ad.decode(seqs, T_next - Tn, a.k, dec_eos,
+                                              stop_strings=dec_stops,
                                               row_ids=[rws[i]["idx"] for i in grp], **kwd)
                     except torch.OutOfMemoryError as e:
                         line = "OOM A %s b=%d %d->%d: %s" % (key, len(grp), Tn, T_next,
@@ -536,7 +1009,11 @@ def main(argv=None):
                     gen_widths.setdefault(len(grp), 0)
                     gen_widths[len(grp)] += 1
                     if not forced:
-                        g = strip_tail(g, eos_ids)
+                        g = strip_tail(g, dec_eos)
+                    if cont:
+                        # each continued row keeps only its own remaining budget for this wave
+                        g = [list(gj)[:max(0, T_next - len(cur[i]["ids"]))]
+                             for gj, i in zip(g, grp)]
                     for j, i in enumerate(grp):
                         if forced:
                             # decode works on COPIES of the forced states and returns the new ones
@@ -548,7 +1025,7 @@ def main(argv=None):
                         cur[i]["width"] = max(cur[i].get("width") or 0, len(grp))
                         cur[i]["ids"] = cur[i]["ids"] + g[j]
                         gen_tokens += len(g[j])
-                        c, mk = find_cut(cur[i]["ids"])
+                        c, mk = cut_of(i, cur[i]["ids"])
                         cur[i]["done"] = bool(forced is False and (mk is not None)) or \
                             len(cur[i]["ids"]) >= hor
                         if apt is not None:
@@ -579,7 +1056,7 @@ def main(argv=None):
                 fs = cur[i].get("fstate") or {}
                 st[i] = (fs.get("natural_stop_pos"), fs.get("natural_stop_reason"))
             else:
-                c, mk = find_cut(cur[i]["ids"])
+                c, mk = cut_of(i, cur[i]["ids"])
                 st[i] = (min(c, hor), mk)
         nat = [st[i][0] for i in range(N) if st[i][0] is not None]
         meta["passes"][key].update({
@@ -603,6 +1080,16 @@ def main(argv=None):
         jobs.sort(key=lambda t: plen[t[0]] + t[1])
         b = bw or ad.batch_cap
         gi, nrows = 0, 0
+        # what the three text-level diagnostic fields need: this pass's stop rule, its horizon, the
+        # think tag, and the task's own-answer marker
+        pm = meta["passes"].get(key) or {}
+        p_stops, p_hor = pm.get("stop_strings") or [], int(pm.get("horizon") or 0)
+        p_think = pm.get("end_think_id")
+        p_think_txt = None if p_think is None else tok.decode(
+            [int(p_think)], clean_up_tokenization_spaces=False)
+        eos_txt = [tok.decode([int(e)], clean_up_tokenization_spaces=False)
+                   for e in (eos_ids or [])]
+        own_mk = task_cfg(a.task)["own_marker"]
         while gi < len(jobs):
             grp = jobs[gi:gi + b]
             max_seq = max(plen[i] + c for (i, c, _x) in grp) + len(suf) + nans
@@ -651,7 +1138,7 @@ def main(argv=None):
                 gold = rws[i]["target"]
                 kind = row_kind(a.task, rws[i])
                 pred = parse_forced(atxt, a.task, opts, kind)
-                own = parse_own(ctxt, a.task, opts, kind)
+                own = parse_own(ctxt, a.task, opts, kind, think_tag_is_stop=think_stop)
                 # Q8: what the answer would have been WITHOUT the eos strip, stored only when the
                 # strip actually removed something. Gate G1 needs it to prove that the strip rule is
                 # the whole difference from the S9a-family spikes without a second generation.
@@ -664,13 +1151,23 @@ def main(argv=None):
                     nostrip["correct"] = bool(ans_eq(nostrip["pred"], gold, a.task, kind))
                 ngen = c + len(o[j])
                 ppt = ad.passes_per_token(a.k)
+                # the artifacts of record stored no chain text, so a wrong label could not be
+                # diagnosed without regenerating the job: every row now says why the chain stopped,
+                # what its last 200 characters before the cut were, and where in the cut text the
+                # own answer was parsed from.
+                sreason = stop_reason_of(st[i][1], len(cur[i]["ids"]), p_hor, stops=p_stops,
+                                         think_text=p_think_txt, think_id=p_think,
+                                         eos_texts=eos_txt, eos_ids=eos_ids, forced=forced)
+                ctail = chain_tail_of(ctxt)
+                ospan = own_answer_span(ctxt, own, own_mk)
                 for B in bs:
                     if (i, B) in done:
                         continue
                     row = {"idx": i, "row_idx": rws[i]["idx"], "split": spl[i],
                            "model": a.model, "adapter": a.adapter, "task": a.task, "k": a.k,
                            "B": B, "extra": bool(B in extra and B not in caps),
-                           "protocol": a.protocol, "tag_line": meta["passes"][key]["tag_line"],
+                           "protocol": ptag, "protocol_base": a.protocol,
+                           "tag_line": meta["passes"][key]["tag_line"],
                            "pred": pred, "gold": gold, "kind": kind,
                            "subtask": rws[i].get("subtask"),
                            "subject": rws[i].get("subject"),
@@ -694,7 +1191,15 @@ def main(argv=None):
                            "batch_width": bw or 0,
                            "batch_width_readout": len(grp),
                            "batch_width_gen": cur[i].get("width"),
-                           "strip_at_eos": True}
+                           "strip_at_eos": True,
+                           "stop_reason": sreason, "chain_tail": ctail,
+                           "own_answer_span": ospan}
+                    if cont:
+                        row.update({"continue_chains": cont["mode"],
+                                    "continued": bool(i in cont["boundary"]),
+                                    "continue_boundary": cont["boundary"].get(i),
+                                    "continue_old_stop": cont["selected"].get(
+                                        int(rws[i]["idx"]))})
                     if nostrip is not None:
                         row["nostrip"] = nostrip
                     if forced and "fstate" in cur[i]:
@@ -745,13 +1250,19 @@ def main(argv=None):
                          [(i, min(st[i][0], T), [T]) for i in range(N)], "T%d" % T)
     else:
         enc, cur, plen, st, suf, eos_ids, _fc = gen_pass(None, horizon, "single")
-        if not forced:
+        if not forced and not cont:
             # Fix 1 (PP3b): the natural-stop pass's own trace is the chain a later forced job on
             # the same (model, task, k) can resume from instead of regenerating it.
             n_chain, chain_p = write_chains(out_dir, a.model, a.task, a.k, rws, enc, cur, st, bw)
             meta["chains_written"] = meta.get("chains_written", 0) + n_chain
             meta["chains_path"] = chain_p
             save_meta()
+        elif cont:
+            # A continuation job never writes chains: the sidecar is keyed by problem id, so a
+            # continued trace would either be dropped (the id is already there) or stored beside
+            # chains cut by a different rule. It is read-only here, and cleanup never deletes it.
+            meta["chains_written"] = 0
+            meta["chains_path"] = cont["chains_path"]
         jobs = []
         incomplete = {i for i in range(N) if not cur[i]["done"]}
         if incomplete:
@@ -760,11 +1271,82 @@ def main(argv=None):
             print("[warn] %d row(s) have truncated traces (OOM or stalled wave) and are left "
                   "unscored; the job will exit 3" % len(incomplete), flush=True)
             save_meta()
+        cont_i = set(cont["boundary"]) if cont else set()
+        if cont:
+            # The copy runs BEFORE the read-outs, so a job killed in phase B has already written
+            # every row it was never going to regenerate.
+            idx_of = {int(rws[i]["idx"]): i for i in range(N)}
+            copy_all = {int(rws[i]["idx"]) for i in range(N) if i not in cont_i}
+            copy_upto = {int(rws[i]["idx"]): cont["selected"][int(rws[i]["idx"])] for i in cont_i}
+            oldbase = os.path.basename(cont["old_cells"])
+            own_mk_c = task_cfg(a.task)["own_marker"]
+            eos_txt_c = [tok.decode([int(e)], clean_up_tokenization_spaces=False)
+                         for e in (eos_ids or [])]
+
+            def extra_of(i, ridx, B, row):
+                """The provenance a copied row carries, and the text fields that CAN be recomputed
+                for it. A row of a continued problem below the old stop has its prefix in memory (it
+                is the stored chain), so its chain tail and own-answer offsets are filled; a
+                row of a problem this job did not continue keeps them null, because its chain text
+                exists in no artifact this job read."""
+                # the row is copied field for field; only its provenance is added, and `protocol`
+                # becomes this grid's tag (it is a row OF this grid now) with the old value kept
+                ex = {"protocol": ptag, "protocol_base": a.protocol,
+                      "copied_protocol": row.get("protocol"),
+                      "continue_chains": cmode, "copied_from": oldbase,
+                      "continued": False, "continued_problem": bool(i in cont_i),
+                      "stop_reason": stop_reason_of(row.get("stop_marker"), row.get("n_trace"),
+                                                    cont["old_horizon"],
+                                                    stops=task_cfg(a.task)["stops"],
+                                                    think_text=cont["think_text"],
+                                                    think_id=cont["think_id"],
+                                                    eos_texts=eos_txt_c, eos_ids=eos_ids),
+                      "chain_tail": None, "own_answer_span": None}
+                if i in cont_i:
+                    ex["continue_old_stop"] = cont["selected"].get(ridx)
+                    nc = int(row.get("n_cut", B) or 0)
+                    ctx = tok.decode(cur[i]["ids"][:nc], clean_up_tokenization_spaces=False)
+                    ex["chain_tail"] = chain_tail_of(ctx)
+                    ex["own_answer_span"] = own_answer_span(ctx, row.get("trace_answer"), own_mk_c)
+                return ex
+
+            n_copy, n_skip = copy_old_rows(cont["old_cells"], apc, idx_of, done, copy_all,
+                                           copy_upto, extra_of)
+            # a cap this job runs that the source grid never had (horizon mode adds the new horizon)
+            n_share = 0
+            for i in range(N):
+                if i in cont_i:
+                    continue
+                have = {int(B): r for (ii, B), r in done.items() if ii == i}
+                if not have:
+                    continue
+                for r in fill_shared_cuts(apc, all_caps, have,
+                                          lambda B: bool(B in extra and B not in caps)):
+                    done[(i, int(r["B"]))] = r
+                    n_share += 1
+            n_copy += n_share
+            meta["continue"].update({"cells_shared_cut": n_share,
+                                     "rows_continued": len(cont_i), "cells_copied": n_copy,
+                                     "cells_above_the_old_stop": n_skip,
+                                     "rows_copied_whole": len(copy_all)})
+            save_meta()
+            print("  continue: %d row(s) continued, %d copied whole; %d cell(s) copied from %s, "
+                  "%d to regenerate" % (len(cont_i), len(copy_all), n_copy, oldbase, n_skip),
+                  flush=True)
         for i in range(N):
             if i in incomplete:
                 continue
+            if cont and i not in cont_i:
+                continue                          # copied verbatim, never regenerated
+            old_stop = int(cont["selected"].get(int(rws[i]["idx"]), -1)) if cont else -1
             m = {}
             for B in all_caps:
+                if cont and B <= old_stop:
+                    # cut(B) = min(stop, B) = B under BOTH stop rules and the first B ids are the
+                    # same ids, so the read-out is byte-identical to the old one: it was copied, not
+                    # regenerated (and it stays comparable to the published grid, which a
+                    # regeneration at a different batch composition would not be).
+                    continue
                 cut = min(st[i][0], B) if not forced else min(len(cur[i]["ids"]), B)
                 m.setdefault(cut, []).append(B)
             for c, bs in m.items():

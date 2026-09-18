@@ -36,9 +36,29 @@ PRIORITY_MODELS = {"ouro_1_4b_base": 1, "ouro_1_4b_think": 1,
                    "mcleish_llama32_r32": 3, "huginn_0125": 4}
 
 
+#: the protocol tags a cells filename may carry. "natural2" is the default tag of a CONTINUATION job
+#: (`prod.generate --continue-chains`), which replays a finished natural-stop grid's stored chains
+#: and continues them: its own grid in its own files, never a shard of the natural grid it reads, so
+#: it is listed apart and never merged into a natural-protocol job's rows.
+#: "natural2h" is the same thing for the horizon mode: a (model, task, k) can have BOTH a think-tag
+#: and a horizon continuation, and one tag per mode keeps them in separate files.
+PROTOCOL_TAGS = ("natural2h", "natural2", "natural", "forced")
+CONTINUATION_TAGS = ("natural2", "natural2h")
+_PROTO_RE = re.compile(r"_(%s)_k\d+" % "|".join(PROTOCOL_TAGS))
+
+
+def protocol_of_tag(tag):
+    """The protocol tag inside an artifact tag (`<model>_<task>_<protocol>_k<k>...`), or None."""
+    m = _PROTO_RE.search(str(tag))
+    return m.group(1) if m else None
+
+
 def priority_of(model, task, protocol):
     """Queue priority. Forced continuation (Q15: its own queue, priced separately) sorts after
-    every natural-stop job regardless of model."""
+    every natural-stop job regardless of model, and a chain-continuation job after that: it can only
+    run once the natural-stop grid whose chains it reads is finished."""
+    if protocol in CONTINUATION_TAGS:
+        return 6
     if protocol == "forced":
         return 5
     return PRIORITY_MODELS.get(model, 4)
@@ -275,7 +295,14 @@ def check(cells_dir, man):
     for r in rows:
         counts[r["state"]] += 1
     extra = sorted(set(have) - {j["tag"] for j in man["shard_jobs"]})
-    return {"counts": counts, "rows": rows, "files_not_in_manifest": extra,
+    # a continuation grid (--continue-chains, protocol tag natural2) is not a manifest job: it is
+    # listed on its own rather than reported as an unknown file
+    cont = [{"tag": t, "rows_found": have[t], "protocol_tag": protocol_of_tag(t)}
+            for t in extra if protocol_of_tag(t) in CONTINUATION_TAGS]
+    seen = {c["tag"] for c in cont}
+    return {"counts": counts, "rows": rows,
+            "files_not_in_manifest": [t for t in extra if t not in seen],
+            "continuation_files": cont,
             "complete": counts["partial"] == 0 and counts["absent"] == 0}
 
 

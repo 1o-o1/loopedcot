@@ -22,7 +22,7 @@ import os
 import numpy as np
 
 from .common import ART, BATCH_WIDTH, N_CAL, load_json, package_hashes, save_json
-from .manifest import check as manifest_check, manifest
+from .manifest import check as manifest_check, manifest, protocol_of_tag
 from .score import Cells, load_cells
 from .tasks import TASK_ORDER, data_hashes, task_cfg
 
@@ -32,26 +32,34 @@ def parse_cells_name(fn):
     The task is matched against the registry rather than by a regex: both model names and task names
     contain underscores ("ouro_1_4b_base", "bbh_date_understanding"), so a non-greedy regex split
     puts the boundary in the wrong place (it read "ouro" / "1_4b_base_gsm8k").
+
+    The protocol tag is whatever `manifest.protocol_of_tag` recognises, which is the one list of
+    tags in the package (`manifest.PROTOCOL_TAGS`). This function used to know only "natural" and
+    "forced", so a continuation grid (`natural2`, `natural2h`) parsed as no file at all and was
+    dropped from the run silently -- unchecked rather than failed. A continuation grid is now
+    checked by exactly the rules its natural-stop parent is checked by, under its own key, because
+    it is its own grid and never a shard of that parent.
     """
     if not (fn.startswith("cells_") and fn.endswith(".jsonl")):
         return None
     body = fn[len("cells_"):-len(".jsonl")]
-    for proto in ("natural", "forced"):
-        marker = "_%s_k" % proto
-        i = body.rfind(marker)
-        if i < 0:
-            continue
-        head, tail = body[:i], body[i + len(marker):]
-        kpart = tail.split("_", 1)
-        try:
-            k = int(kpart[0])
-        except ValueError:
-            continue
-        rest = kpart[1] if len(kpart) > 1 else ""
-        for t in sorted(TASK_ORDER, key=len, reverse=True):
-            if head.endswith("_" + t):
-                return head[:-(len(t) + 1)], t, proto, k, rest
+    proto = protocol_of_tag(body)
+    if proto is None:
         return None
+    marker = "_%s_k" % proto
+    i = body.rfind(marker)
+    if i < 0:
+        return None
+    head, tail = body[:i], body[i + len(marker):]
+    kpart = tail.split("_", 1)
+    try:
+        k = int(kpart[0])
+    except ValueError:
+        return None
+    rest = kpart[1] if len(kpart) > 1 else ""
+    for t in sorted(TASK_ORDER, key=len, reverse=True):
+        if head.endswith("_" + t):
+            return head[:-(len(t) + 1)], t, proto, k, rest
     return None
 
 

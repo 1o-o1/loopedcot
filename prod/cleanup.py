@@ -28,6 +28,13 @@ how the two are told apart.
 
 Nothing here reads or writes `prod/tasks/data/`, `s33/`, or a cells directory's `*.slim.jsonl` twice
 (a tag already slimmed is skipped, not re-processed).
+
+A `chains_<model>_<task>_k<k>.jsonl` sidecar is NEVER deleted or rewritten, whatever state its jobs
+are in: it carries no tag, so it can be neither a `cells_<tag>.jsonl` nor a `trace_<tag>_*.jsonl`,
+and `trace_files_for` filters it out a second time on purpose. A continuation job
+(`prod.generate --continue-chains`) reads it long after the job that wrote it is complete and
+slimmed, so deleting it would cost a full regeneration. The regression tests are in
+`tests/test_cleanup_preserves_chains.py`, including one for a completed continuation grid.
 """
 import argparse
 import gzip
@@ -40,6 +47,9 @@ import time
 
 from .common import ART, LOGS, load_json, save_json
 
+#: the only fields a slim pass drops. `chain_tail` (200 characters), `stop_reason` and
+#: `own_answer_span` are NOT among them and must stay: they are the whole text-level diagnosis a
+#: finished job leaves behind, and the artifacts that had none are why they were added.
 LONG_TEXT_FIELDS = ("answer_text", "trace_text")
 CELLS_RE = re.compile(r"^cells_(?P<tag>.+)\.jsonl$")
 

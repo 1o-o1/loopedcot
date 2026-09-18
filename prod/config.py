@@ -45,6 +45,10 @@ HORIZON = int(_RAW["horizon"])
 FORCED_HORIZON = int(_RAW["forced_horizon"])
 #: budgets scored on a forced-continuation trace
 FORCED_BUDGETS = list(_RAW["forced_budgets"])
+#: is the closing think tag a natural stop on a chat-template Thinking checkpoint? True is what
+#: every grid was generated under; False lets the chain run past the reasoning block to the task's
+#: stop strings or the eos token (see config.yaml and prod/tasks/build_prompts).
+THINK_TAG_IS_STOP = bool(_RAW.get("think_tag_is_stop", True))
 
 #: the forced-continuation block (decision 4): a SEPARATE protocol block, limited by default to
 #: GSM8K and MATH500 on the four Ouro checkpoints at full N, switchable by config.
@@ -107,6 +111,7 @@ def defaults():
         "horizon": HORIZON,
         "forced_horizon": FORCED_HORIZON,
         "forced_budgets": list(FORCED_BUDGETS),
+        "think_tag_is_stop": THINK_TAG_IS_STOP,
         "forced_block": json.loads(json.dumps(FORCED_BLOCK)),
         "batch_width": BATCH_WIDTH,
         "batch_cap": BATCH_CAP,
@@ -147,6 +152,15 @@ def add_args(p):
     g.add_argument("--horizon", type=int, default=None)
     g.add_argument("--forced-horizon", dest="forced_horizon", type=int, default=None)
     g.add_argument("--forced-budgets", dest="forced_budgets", default=None)
+    g.add_argument("--think-tag-is-stop", dest="think_tag_is_stop", action="store_true",
+                   default=None,
+                   help="the closing think tag ends a chat-template Thinking chain (the default, "
+                        "and what every grid was generated under)")
+    g.add_argument("--no-think-tag-is-stop", dest="think_tag_is_stop", action="store_false",
+                   help="the closing think tag is an ordinary token: the chain runs on to the "
+                        "task's stop strings or the eos token and the own answer is read through "
+                        "the tag. Every chat-template Thinking natural-stop grid must be "
+                        "REGENERATED to be comparable under this")
     g.add_argument("--batch-width", dest="batch_width", type=int, default=None,
                    help="0 = adaptive KV-ceiling width (gates only); default %d" % BATCH_WIDTH)
     g.add_argument("--batch-cap", dest="batch_cap", type=int, default=None)
@@ -203,6 +217,8 @@ def from_args(a):
         cfg["forced_horizon"] = int(a.forced_horizon)
     if v("forced_budgets") is not None:
         cfg["forced_budgets"] = sorted(set(_ints(a.forced_budgets)))
+    if v("think_tag_is_stop") is not None:
+        cfg["think_tag_is_stop"] = bool(a.think_tag_is_stop)
     if v("batch_width") is not None:
         cfg["batch_width"] = int(a.batch_width)
     if v("batch_cap") is not None:

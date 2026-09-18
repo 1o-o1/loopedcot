@@ -22,6 +22,15 @@ forced_horizon: 4096
 # budgets scored on a forced-continuation trace
 forced_budgets: [0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
 
+# Is the closing think tag a natural stop? On a chat-template Thinking checkpoint `</think>` joins
+# the eos set, so the natural-stop cut lands ON the tag: the chain is cut at the end of the reasoning
+# block and the answer written after it is discarded (ouro_2_6b_think GSM8K natural k=4: 21.7 against
+# 56.8 forced, 98% of rows cut at the tag). `true` is that behaviour and the default, so every grid
+# already generated stays reproducible. `false` makes the tag an ordinary token: the chain runs on to
+# the task's stop strings or the eos token and the own-answer parser reads through the tag. Switching
+# it off requires REGENERATING every chat-template Thinking natural-stop grid.
+think_tag_is_stop: true
+
 # the forced-continuation block: a SEPARATE protocol block ("Wait" injection to the horizon, S13),
 # GSM8K and MATH500 on the four Ouro checkpoints at full N. OFF by default: it is its own queue,
 # priced separately (protocol decision Q15). Set `enabled: true` and re-plan with a fresh --root to run it.

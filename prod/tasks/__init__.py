@@ -295,12 +295,21 @@ def _stratified_split_labels(task, n, seed, n_cal, key):
 
 
 # ------------------------------------------------------------------ prompt construction
-def build_prompts(tok, task, task_rows, chat_template=False, suffix_text=None):
+def build_prompts(tok, task, task_rows, chat_template=False, suffix_text=None,
+                  think_tag_is_stop=True):
     """(prompts, suffix_ids, stop_strings, eos_ids, extra).
 
     `chat_template=False` is the base branch of every spike. `chat_template=True` is the Ouro
     Thinking branch of S26/S28/S13: the exemplars go in the user turn, the forced suffix is
     prefixed with </think>, there are no stop strings and </think> joins the eos set.
+
+    `think_tag_is_stop=False` (config `think_tag_is_stop`) takes the closing tag OUT of the eos set
+    and gives the chain the task's stop strings instead, so generation runs past the reasoning block
+    to the answer the model writes after it. With the tag in the eos set -- the default, and what
+    every grid of record was generated under -- the natural-stop cut lands ON the tag and that
+    answer is discarded (ouro_2_6b_think GSM8K natural k=4: 21.7 against 56.8 forced, 98% of rows
+    cut at the tag). The forced read-out suffix still opens with the tag either way: closing the
+    block is how the read-out is asked for.
     """
     c = task_cfg(task)
     # PP3: the exemplar block can differ per row (pooled BBH, MMLU), so the head is built per row.
@@ -324,10 +333,11 @@ def build_prompts(tok, task, task_rows, chat_template=False, suffix_text=None):
                    for u in user]
         end_think = tok.convert_tokens_to_ids("</think>")
         suffix_ids = [end_think] + tok(stext, add_special_tokens=False)["input_ids"]
-        stops = None
-        eos_ids = [tok.eos_token_id, end_think]
+        stops = None if think_tag_is_stop else list(c["stops"])
+        eos_ids = [tok.eos_token_id, end_think] if think_tag_is_stop else [tok.eos_token_id]
         extra = {"end_think_id": int(end_think)}
-    extra.update({"suffix_text": stext, "chat_template": bool(chat_template),
+    extra.update({"think_tag_is_stop": bool(think_tag_is_stop),
+                  "suffix_text": stext, "chat_template": bool(chat_template),
                   "own_marker": c["own_marker"], "kind": c["kind"],
                   "per_row_kind": bool(c.get("per_row_kind")),
                   "n_answer_tokens": c["n_answer"]})
@@ -335,7 +345,8 @@ def build_prompts(tok, task, task_rows, chat_template=False, suffix_text=None):
 
 
 # ------------------------------------------------------------------ natural stop
-def make_find_cut(tok, stop_strings, eos_ids, chat_template=False, eos_cut=True):
+def make_find_cut(tok, stop_strings, eos_ids, chat_template=False, eos_cut=True,
+                  think_tag_is_stop=True):
     """s26_common.make_find_cut / s28_common.make_find_cut, verbatim (both are S9a's).
 
     Returns f(ids) -> (cut_length, marker_or_None): decode once, find the earliest stop string,
@@ -345,6 +356,11 @@ def make_find_cut(tok, stop_strings, eos_ids, chat_template=False, eos_cut=True)
     (Huginn) copied: there, a trace that ends at eos with no stop string is cut at `len(ids)`, eos
     token included. Gate G1 uses `eos_cut=False` on those two paths to show that this is the only
     difference from the S26/S28/S32 rule the production package uses everywhere.
+
+    `think_tag_is_stop=False` on a chat-template path uses the BASE cut rule, so the cut is the
+    task's first stop string (or the eos), past the closing think tag rather than on it. The tag is
+    then not in `eos_ids` either (build_prompts), so nothing cuts the chain at the end of the
+    reasoning block.
     """
     def find_cut_base(ids):
         full = tok.decode(ids, clean_up_tokenization_spaces=False)
@@ -377,7 +393,7 @@ def make_find_cut(tok, stop_strings, eos_ids, chat_template=False, eos_cut=True)
                 return j, tok.decode([v])
         return len(ids), None
 
-    return find_cut_think if chat_template else find_cut_base
+    return find_cut_think if (chat_template and think_tag_is_stop) else find_cut_base
 
 
 # ------------------------------------------------------------------ parsers
@@ -568,8 +584,27 @@ def parse_forced(text, task, options=None, kind=None):
     return t or None
 
 
-def parse_own(cut_text, task, options=None, kind=None):
-    """The model's own answer inside the cut trace, after the LAST own marker."""
+THINK_CLOSE = "</think>"
+
+
+def parse_own(cut_text, task, options=None, kind=None, think_tag_is_stop=True):
+    """The model's own answer inside the cut trace, after the LAST own marker.
+
+    `think_tag_is_stop=False` reads THROUGH the closing think tag: with the tag no longer a stop the
+    cut trace holds the reasoning block AND the answer written after it, and that answer is the own
+    answer. What follows the last tag is parsed first; the whole trace is still parsed when nothing
+    after the tag gives an answer, so the switch can never turn an answer into no answer.
+    """
+    if not think_tag_is_stop and cut_text and THINK_CLOSE in cut_text:
+        tail = cut_text.split(THINK_CLOSE)[-1]
+        if tail.strip():
+            after = _parse_own(tail, task, options, kind)
+            if after is not None:
+                return after
+    return _parse_own(cut_text, task, options, kind)
+
+
+def _parse_own(cut_text, task, options=None, kind=None):
     c = task_cfg(task)
     kind = kind or c["kind"]
     if not cut_text:
