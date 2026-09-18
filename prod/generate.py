@@ -405,18 +405,27 @@ def fill_shared_cuts(ap, caps, rows_by_cap, is_extra):
     serves the new cap too -- the protocol's own rule of ONE read-out per distinct cut, serving
     every budget that shares it. Returns the rows written (the caller records them as done).
     """
-    by_cut, stop = {}, None
+    by_cut = {}
     for B in sorted(rows_by_cap):
         r = rows_by_cap[B]
         by_cut.setdefault(int(r["n_cut"]), r)
-        if stop is None:
-            stop = r.get("natural_stop")
+    # The problem's stop is the one its HIGHEST copied cap reports. A source grid that was itself
+    # a continuation (natural2) carries the OLD stop on the caps it copied from below the old
+    # boundary and the final stop on the caps it regenerated above it, so the lowest cap's
+    # natural_stop can name a cut no row has, and every cap above the old horizon would be
+    # left unwritten (the 2026-09-18 INCOMPLETE c2 jobs, one missing cell per copied row).
+    top = max(rows_by_cap) if rows_by_cap else None
+    stop = rows_by_cap[top].get("natural_stop") if top is not None else None
     out = []
     for B in caps:
         if int(B) in rows_by_cap:
             continue
         cut = int(B) if stop is None else min(int(stop), int(B))
         src = by_cut.get(cut)
+        if src is None and top is not None and stop is not None \
+                and int(stop) <= int(top) < int(B):
+            # the top cap already reads out at the natural stop, whatever its n_cut bookkeeping
+            src = rows_by_cap[top]
         if src is None:
             continue                       # no identical cut was copied: it must be regenerated
         r = dict(src)

@@ -380,3 +380,36 @@ if __name__ == "__main__":
         f()
         print("ok", f.__name__)
     print("%d test functions" % len(fs))
+
+
+def test_fill_shared_cuts_reads_the_stop_off_the_highest_cap():
+    """A source row continued once already: caps copied below the old boundary carry the old stop
+    (900), caps regenerated above it carry the final stop (2300). The new horizon cap must be
+    shared from the top cap, not looked up by the old stop (which no row's cut equals)."""
+    from prod.generate import fill_shared_cuts
+    caps_old = [0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+    rows = {}
+    for B in caps_old:
+        if B <= 900:
+            rows[B] = {"B": B, "n_cut": min(900, B), "natural_stop": 900, "pred": "old"}
+        else:
+            rows[B] = {"B": B, "n_cut": min(2300, B), "natural_stop": 2300, "pred": "new"}
+
+    class AP:
+        def __init__(self):
+            self.w = []
+
+        def write(self, r):
+            self.w.append(r)
+
+    ap = AP()
+    out = fill_shared_cuts(ap, caps_old + [8192], dict(rows), lambda B: False)
+    assert [r["B"] for r in out] == [8192]
+    assert out[0]["pred"] == "new" and out[0]["shared_cut_from_B"] == 4096
+    # a plain row (one stop everywhere) still shares by its identical cut
+    plain = {B: {"B": B, "n_cut": min(278, B), "natural_stop": 278, "pred": "p"} for B in caps_old}
+    out = fill_shared_cuts(AP(), caps_old + [8192], plain, lambda B: False)
+    assert [r["B"] for r in out] == [8192] and out[0]["shared_cut_from_B"] == 512
+    # a row that never stopped is not shared: it has to be regenerated
+    none = {B: {"B": B, "n_cut": B, "natural_stop": None, "pred": "n"} for B in caps_old}
+    assert fill_shared_cuts(AP(), caps_old + [8192], none, lambda B: False) == []
