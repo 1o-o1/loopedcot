@@ -1,12 +1,14 @@
 #!/bin/bash
 # Chain-continuation runs (prod.generate --continue-chains): one Slurm job per (model, task, depth), one GPU
 # each, ALL submitted at once so the scheduler fills every free GPU on every node. Run from anywhere:
-#   bash slurm/continue_chains.sh probe   # one 5-minute job per GPU node: can torch initialise CUDA there? then
-#                                         # run it again to read the verdicts; export SBATCH_EXTRA="--exclude=<bad nodes>"
+#   bash slurm/continue_chains.sh run     # everything: probe the nodes, then (re)submit whatever is not done, avoiding bad nodes
+#   bash slurm/continue_chains.sh probe   # one 5-minute job per GPU node: can torch initialise CUDA there? waits for the
+#                                         # verdicts and writes logs/bad_nodes.txt; every later submission excludes those nodes
 #   bash slurm/continue_chains.sh c1      # think-tag continuation: 2 Thinking checkpoints x 10 tasks x depths 1-4 = 80 jobs
 #   bash slurm/continue_chains.sh c2      # horizon 4096 -> 8192 on the ten (model, task, depth) below; a Thinking job
 #                                         # waits for its c1 job (afterok) and continues from the natural2 cells
-#   bash slurm/continue_chains.sh retry   # resubmit every c1 and c2 job that is not RC=0 and not running/pending
+#   bash slurm/continue_chains.sh retry   # resubmit every c1 and c2 job that is not RC=0 and not running/pending; a node
+#                                         # whose job died at CUDA start is added to logs/bad_nodes.txt and excluded
 #   bash slurm/continue_chains.sh c2more  # the four extra k=2 Thinking jobs, only once c2 is done and GPUs are idle
 #   bash slurm/continue_chains.sh status  # finished / failed counts, and the last 30 log lines of every failed job
 #   bash slurm/continue_chains.sh report  # per c2 job: rows continued, share stopped before 8192, accuracy at caps 4096 and 8192
@@ -41,12 +43,23 @@ width_for() {  # the batch width for 8192-token sequences: half the width the 40
 }
 
 ok_log()   { [ -f "logs/$1.out" ] && grep -q "^RC=0" "logs/$1.out"; }
+
+# Nodes to avoid: every node whose probe failed, plus every node where a c1/c2 job died at CUDA start
+# (the two signatures seen on 2026-09-17). Kept in logs/bad_nodes.txt; submit() excludes them.
+collect_bad_nodes() {
+  { [ -f logs/bad_nodes.txt ] && cat logs/bad_nodes.txt
+    for f in logs/probe_*.out; do [ -f "$f" ] || continue; grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { n=${f#logs/probe_}; echo "${n%.out}"; }; done
+    for f in logs/c1_*.out logs/c2_*.out; do [ -f "$f" ] || continue; case "$f" in *.prev.out) continue ;; esac
+      grep -q "CUDA unknown error\|No devices were found" "$f" && grep -m1 "^node=" "$f" | sed "s/^node=\([^ ]*\).*/\1/"; done
+  } | grep -v "^$" | sort -u > logs/bad_nodes.tmp && mv -f logs/bad_nodes.tmp logs/bad_nodes.txt
+}
+exclude_arg() { [ -s logs/bad_nodes.txt ] && echo "--exclude=$(paste -sd, logs/bad_nodes.txt)"; }
 in_queue() { squeue -u "$USER" -h -n "$1" -o %j | grep -qx "$1"; }
 
 submit() {  # submit <name> <time> <dependency or ""> <command...>; prints the job id
   local name="$1" time="$2" dep="$3"; shift 3
   [ -f "logs/${name}.out" ] && mv -f "logs/${name}.out" "logs/${name}.prev.out"
-  sbatch --parsable $EXTRA ${dep:+--dependency=afterok:$dep} --job-name="$name" --gres=gpu:1 \
+  sbatch --parsable $EXTRA $(exclude_arg) ${dep:+--dependency=afterok:$dep} --job-name="$name" --gres=gpu:1 \
     --cpus-per-task="$CPUS" --mem="$MEM" --time="$time" --output="logs/${name}.out" \
     --wrap="echo node=\$(hostname) CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-unset}; nvidia-smi -L; cd '$ROOT' && $* ; rc=\$?; echo RC=\$rc; exit \$rc"
 }
@@ -84,33 +97,43 @@ submit_c2_pair() {  # a Thinking pair waits for its c1 job unless that job is al
   echo "  sent   $name ($jid)${dep:+ after c1 job $dep}"
 }
 
+do_retry() {  # (re)submit every c1 and c2 job that is neither RC=0 nor in the queue, avoiding the bad nodes
+  collect_bad_nodes; echo "excluded nodes: $(paste -sd, logs/bad_nodes.txt 2>/dev/null)"
+  # c2 jobs still waiting on a c1 job that failed can never start (afterok): cancel them, resubmit below
+  for j in $(squeue -u "$USER" -h -o "%i %j %r" | awk '$2 ~ /^c2_/ && $3 ~ /Dependency/ {print $1}'); do scancel "$j"; done
+  for M in $C1_MODELS; do for T in $TASKS; do for K in 1 2 3 4; do submit_c1_pair "$M" "$T" "$K"; done; done; done | grep -v "  done\|  queued"
+  submit_c2_list "$HITLIST" | grep -v "  done\|  queued"
+}
+
 submit_c2_list() { local n=0 M T K; for item in $1; do IFS=: read -r M T K <<< "$item"; submit_c2_pair "$M" "$T" "$K" && n=$((n + 1)); done; echo "c2: $n jobs submitted"; }
 
 case "$MODE" in
-  probe)
-    nodes=$(sinfo -h -N -o "%N %G" | awk '$2 ~ /gpu/ {print $1}' | sort -u)
-    if ls logs/probe_*.out >/dev/null 2>&1; then
-      echo "verdicts (delete logs/probe_*.out to probe again):"
-      for f in logs/probe_*.out; do n=${f#logs/probe_}; n=${n%.out}; if grep -q "^RC=0" "$f"; then echo "  ok   $n: $(grep -m1 'device_count' "$f")"; elif grep -q "^RC=" "$f"; then echo "  BAD  $n: $(grep -m1 -i 'error' "$f" | cut -c1-120)"; else echo "  ...  $n (not finished)"; fi; done
-      bad=$(for f in logs/probe_*.out; do grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { n=${f#logs/probe_}; echo -n "${n%.out},"; }; done); bad=${bad%,}
-      [ -n "$bad" ] && echo "export SBATCH_EXTRA=\"--exclude=$bad\"   # then: bash slurm/continue_chains.sh retry"
-      exit 0
-    fi
+  probe|run)
+    # GPU nodes that are up (down/drained ones are left alone, a probe there would only pend)
+    nodes=$(sinfo -h -N -o "%N %G %T" | awk '$2 ~ /gpu/ && $3 !~ /down|drain|drng|fail|maint|unk/ {print $1}' | sort -u)
+    rm -f logs/probe_*.out
     for n in $nodes; do
       sbatch --parsable $EXTRA --nodelist="$n" --job-name="probe_$n" --gres=gpu:1 --cpus-per-task=2 --mem=8gb --time=00:05:00 --output="logs/probe_$n.out" \
         --wrap="hostname; echo CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-unset}; nvidia-smi -L; nvidia-smi --query-gpu=name,compute_mode,memory.used,driver_version --format=csv; $PROD_PYTHON -c 'import torch; torch.cuda.init(); print(\"device_count\", torch.cuda.device_count(), torch.cuda.get_device_name(0), torch.version.cuda)'; rc=\$?; echo RC=\$rc; exit \$rc" > /dev/null
     done
-    echo "probes sent to: $(echo $nodes | tr '\n' ' '); run this again in a few minutes for the verdicts" ;;
+    total=$(echo $nodes | wc -w); echo "probing $total nodes: $(echo $nodes | tr '\n' ' ')"
+    for i in $(seq 1 40); do   # up to ~13 minutes; a probe that gets no GPU in that time counts as unknown, not bad
+      fin=$(grep -l "^RC=" logs/probe_*.out 2>/dev/null | wc -l); [ "$fin" -ge "$total" ] && break; sleep 20
+    done
+    for f in logs/probe_*.out; do [ -f "$f" ] || continue; n=${f#logs/probe_}; n=${n%.out}
+      if grep -q "^RC=0" "$f"; then echo "  ok      $n: $(grep -m1 device_count "$f")"
+      elif grep -q "^RC=" "$f"; then echo "  BAD     $n: $(grep -m1 -i "error\|No devices" "$f" | cut -c1-110)"
+      else echo "  unknown $n (probe did not run in time; not excluded)"; fi; done
+    for j in $(squeue -u "$USER" -h -o "%i %j" | awk '$2 ~ /^probe_/ {print $1}'); do scancel "$j"; done
+    collect_bad_nodes; echo "excluded nodes: $(paste -sd, logs/bad_nodes.txt 2>/dev/null)"
+    [ "$MODE" = probe ] && exit 0
+    do_retry ;;
   c1)
     for M in $C1_MODELS; do for T in $TASKS; do for K in 1 2 3 4; do submit_c1_pair "$M" "$T" "$K"; done; done; done
     echo "c1 job ids in logs/c1_jobs.txt" ;;
   c2)      submit_c2_list "$HITLIST" ;;
   c2more)  submit_c2_list "$HITLIST_MORE" ;;
-  retry)
-    # c2 jobs still waiting on a c1 job that failed can never start (afterok): cancel them, resubmit below
-    for j in $(squeue -u "$USER" -h -o "%i %j %r" | awk '$2 ~ /^c2_/ && $3 ~ /Dependency/ {print $1}'); do scancel "$j"; done
-    for M in $C1_MODELS; do for T in $TASKS; do for K in 1 2 3 4; do submit_c1_pair "$M" "$T" "$K"; done; done; done | grep -v "  done\|  queued"
-    submit_c2_list "$HITLIST" | grep -v "  done\|  queued" ;;
+  retry)   do_retry ;;
   status)
     for stage in c1 c2; do
       all=$(ls logs/${stage}_*.out 2>/dev/null | grep -vc prev); ok=$(grep -l "^RC=0" logs/${stage}_*.out 2>/dev/null | grep -vc prev)
@@ -165,5 +188,5 @@ for mp in sorted(glob.glob(os.path.join(art, "meta_*_natural2h_k*.json"))):
 EOF
     ;;
   *)
-    echo "usage: bash slurm/continue_chains.sh probe|c1|c2|retry|c2more|status|report"; exit 1 ;;
+    echo "usage: bash slurm/continue_chains.sh run|probe|c1|c2|retry|c2more|status|report"; exit 1 ;;
 esac
