@@ -37,14 +37,15 @@ ONE = E.BUDGET_FRACTIONS.index(1.0)
 _T1 = {}
 
 
-def t1(which, families, c_gate=P.DEFAULT_C_GATE, n_select=50, n_verify=50):
-    key = (which, families, c_gate, n_select, n_verify)
+def t1(which, families, c_gate=P.DEFAULT_C_GATE, n_select=50, n_verify=50, folds=None):
+    """`folds` None is the frozen default, two; 1 is the one-direction gate kept for comparison."""
+    key = (which, families, c_gate, n_select, n_verify, folds)
     if key not in _T1:
         surf = null_surface() if which == "null" else true_surface()
         _T1[key] = E.table1(planted(surf), accounting="expected", avg_budget=True,
                             n_labels_grid=(30,), gate_draws=10, n_boot=50, c_gate=c_gate,
                             gate_mode="split", n_select=n_select, n_verify=n_verify,
-                            families=families)
+                            families=families, gate_folds=folds)
     return _T1[key]
 
 
@@ -219,15 +220,33 @@ class TestTheDeviationFamilies(unittest.TestCase):
 class TestTheFamiliesKeepATrueCapZeroOptimum(unittest.TestCase):
     """The plant where cap 0 really is 15 points better than the default cell."""
 
-    def test_F0_opens_on_the_true_surface(self):
+    def test_F0_opens_on_the_true_surface_in_one_direction(self):
+        """One fold, the old default: F0 clears the bar on the verification half at +12.0 +/- 8.7."""
+        for arm in (P.AVG_GATED, "gated_equation"):
+            row = t1("true", True, folds=1)["rows"][arm]
+            self.assertEqual(row["deviation_family"][ONE], "F0", arm)
+
+    def test_two_folds_take_the_cap_zero_family_that_BOTH_halves_earn(self):
+        """The frozen default. F0's mirror half measures 0.0 on these fifty questions, so F0 is
+        withheld, and F2 -- one depth shallower, still at cap 0, +20.0 on one half and +16.0 on the
+        other -- is what runs. Cap 0 survives the second fold; the deepest depth does not."""
         for arm in (P.AVG_GATED, "gated_equation"):
             row = t1("true", True)["rows"][arm]
-            self.assertEqual(row["deviation_family"][ONE], "F0", arm)
+            self.assertEqual(row["deviation_family"][ONE], "F2", arm)
+        recs = [r for r in t1("true", True)["rows"]["gated_equation"]["family_decisions"]
+                if r["family"] == "F0" and r["X"] == t1("true", True)["budgets"][ONE]]
+        self.assertEqual(len(recs), 1)
+        self.assertGreater(recs[0]["margin_pts"], recs[0]["bar_pts"])       # fold 1 said yes
+        self.assertFalse(recs[0]["folds"][0]["opened"])                     # fold 2 said no
+        self.assertFalse(recs[0]["opened"])
 
     def test_the_family_that_opened_buys_the_cap_zero_cell(self):
         row = t1("true", True)["rows"][P.AVG_GATED]
-        self.assertEqual(list(row["cells_used"][ONE]), ["k%d_T0" % KS[-1]])
+        self.assertEqual(list(row["cells_used"][ONE]), ["k%d_T0" % KS[-2]])
         self.assertFalse(row["gate_reverted"][ONE])
+        # one fold buys the deepest depth's own cap-0 cell instead
+        self.assertEqual(list(t1("true", True, folds=1)["rows"][P.AVG_GATED]["cells_used"][ONE]),
+                         ["k%d_T0" % KS[-1]])
 
     def test_the_true_deviation_is_worth_what_it_was_planted_at(self):
         row = t1("true", True)["rows"][P.AVG_GATED]
@@ -366,8 +385,8 @@ class TestEveryGatedRowIsReadAgainstItsOwnFallback(unittest.TestCase):
     `vs_default` reads every arm against the unbudgeted default row, which a hard per-prompt cap
     cannot buy for the dearer prompts, so it is not the number a gate's verdict can be judged by.
     `vs_fallback` reads each arm against what the gate would have reverted TO: normal operation at
-    the same budget for the per-prompt arms, the default cell run for every prompt for the
-    average-budget ones.
+    the same budget, under a hard per-prompt cap for the per-prompt arms and under the average
+    budget (`evaluate.normal_at_budget`) for the average-budget gated one.
     """
 
     def setUp(self):
@@ -376,8 +395,10 @@ class TestEveryGatedRowIsReadAgainstItsOwnFallback(unittest.TestCase):
     def test_the_per_prompt_arms_name_normal_operation(self):
         self.assertEqual(self.t["rows"]["gated_equation"]["fallback"], "default_at_budget")
 
-    def test_the_average_budget_arms_name_the_default_cell(self):
-        self.assertEqual(self.t["rows"][P.AVG_GATED]["fallback"], "default_cell")
+    def test_the_average_budget_arm_names_normal_operation_at_the_budget(self):
+        self.assertEqual(self.t["rows"][P.AVG_GATED]["fallback"], "normal_at_budget")
+        # the ungated average-budget arms are still read against the default cell
+        self.assertEqual(self.t["rows"]["avg_lookup"]["fallback"], "default_cell")
 
     def test_the_interval_brackets_its_own_mean(self):
         for arm in (P.AVG_GATED, "gated_equation"):

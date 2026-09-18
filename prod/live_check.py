@@ -52,7 +52,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_YAML = os.path.join(REPO_ROOT, "prod", "config.yaml")
 #: the install record: repo, pinned revision and local snapshot per model name
 REVISIONS_FILE = os.path.join(DATA, "model_revisions.json")
-ARMS = ("lookup", "avg_gated_lookup")
+# The arms the live check can run: every one is read out of alloc.cli's picks block, so adding
+# one here needs no other logic. avg_gated_equation_resolved is the arm of record (alloc v6).
+ARMS = ("lookup", "avg_gated_lookup", "equation_resolved", "avg_gated_equation_resolved")
 #: lines of each subprocess's stdout and stderr kept on the run record
 TAIL_LINES = 40
 
@@ -341,7 +343,10 @@ def main(argv=None):
                         "from its results.json and nothing is re-ranked here")
     p.add_argument("--arm", default="lookup", choices=ARMS,
                    help="lookup: the calibration-ranked first affordable cell per prompt; "
-                        "avg_gated_lookup: the average-budget lookup policy with the gate")
+                        "equation_resolved: the same per-prompt rule ranked by the settle-time-resolved "
+                        "commitment identity; avg_gated_lookup: the average-budget lookup policy with the "
+                        "gate (label-only baseline); avg_gated_equation_resolved: the average-budget arm of "
+                        "record, resolved ranking and two-fold verified gate")
     p.add_argument("--budget-fraction", dest="budget_fraction", type=float, required=True,
                    help="X as a fraction of the DEFAULT cost, one of the fractions alloc priced")
     p.add_argument("--accounting", default="expected",

@@ -134,8 +134,9 @@ $PROD_PYTHON -m prod.analyze.figures --cells=$PROD_ART --model=ouro_1_4b_think -
 $PROD_PYTHON -m prod.analyze.cards --cells=$PROD_ART --model=ouro_1_4b_think --tasks=gsm8k,math500,aqua  # per-checkpoint card over several datasets
 $PROD_PYTHON -m prod.live_check --model=ouro_1_4b_base --task=gsm8k --cells=$PROD_ART --alloc-dir=$PROD_ART/alloc_v5_gsm8k_ouro_1_4b_base --budget-fraction=0.5 --no-generate   # the allocator's pick per prompt, read from alloc's results.json
 $PROD_PYTHON -m prod.analyze.table1 --cells=$PROD_ART --models=ouro_1_4b_base,ouro_1_4b_think,ouro_2_6b_base,ouro_2_6b_think --tasks=gsm8k,math500,svamp,aqua,csqa,arc,strategyqa,bbh,mmlu,hellaswag --accounting=both   # Table 1: default vs allocator at 25/50/100% of the default cost
-$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> --model-config prod/config.yaml --accounting all --avg-budget --out $PROD_ART/alloc_v2_<task>_<model>   # the S35 allocator: lookup, equation, gated and average-budget arms under the cap, expected and realised accountings
-$PROD_PYTHON -m prod.live_check --model=<model> --task=<task> --cells=$PROD_ART --alloc-dir=$PROD_ART/alloc_v5_<task>_<model> --budget-fraction=0.5 --arm avg_gated_lookup   # live check of the average-budget gated arm at alloc's own picks (--arm lookup is the per-prompt cap rule)
+$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> --model-config prod/config.yaml --accounting all --avg-budget --promptfree --boot 2000 --out $PROD_ART/alloc_v6_<task>_<model>   # the allocator (v6): arm of record avg_gated_equation_resolved, the label-only baseline avg_gated_lookup, the per-prompt rules, every accounting
+$PROD_PYTHON -m alloc.cli --cells $PROD_ART --task <task> --checkpoint <model> --model-config prod/config.yaml --accounting all --avg-budget --promptfree --boot 2000 --protocol natural2 --out $PROD_ART/alloc_v6n2_<task>_<model>   # the same on the think-tag continuation grid (natural2h for the horizon extension)
+$PROD_PYTHON -m prod.live_check --model=<model> --task=<task> --cells=$PROD_ART --alloc-dir=$PROD_ART/alloc_v6_<task>_<model> --budget-fraction=0.5 --arm avg_gated_equation_resolved   # live check of the arm of record at alloc's own picks; --arm avg_gated_lookup, equation_resolved, lookup read the same way
 ```
 
 `prod.score` prints the accuracy table and writes `score_<model>_<task>_<protocol>.json`; the figures
@@ -150,15 +151,22 @@ expected-accounting table; `picks` holds every arm's per-prompt pick per account
 they were fitted on); `table1_cap.md` (arms
 charged the whole cap they commit to); `table1_expected.md` (arms charged the mean chain length the calibration prompts
 realised at that cell, the decision-time price the average-budget arms are fitted under); `table1_realised.md` (arms
-charged what their rows actually generated, an audit price). `prod.live_check --alloc-dir <alloc output> --arm
-avg_gated_lookup` reads that arm's picks for the budget fraction out of alloc's `results.json` (it refuses to run without
-them, or if the cells' split is not the one alloc calibrated on), regenerates every evaluation prompt at its recorded cell
-and prints n, live accuracy, grid accuracy at the same picks, live minus grid in points, and the mean realised price
-against the budget; `--arm lookup` (default) is the per-prompt cap rule, read the same way.
+charged what their rows actually generated, an audit price). The arm of record is `avg_gated_equation_resolved`: cells
+ranked by the commitment identity resolved by settle time (`equation_resolved`), the average budget held over the
+prompts, and every deviation from the default verified by a two-fold gate on the calibration questions;
+`avg_gated_lookup` is the label-only baseline, the same policy ranked by calibration accuracy alone. `--protocol
+natural2|natural2h` runs the allocator on the continuation grid of the same pair instead of the natural-stop grid
+(default `natural`; only the files carrying that protocol segment are read). `prod.live_check --alloc-dir <alloc
+output> --arm <arm>` reads that arm's picks for the budget fraction out of alloc's `results.json` (it refuses to run
+without them, or if the cells' split is not the one alloc calibrated on), regenerates every evaluation prompt at its
+recorded cell and prints n, live accuracy, grid accuracy at the same picks, live minus grid in points, and the mean
+realised price against the budget; the arms are `avg_gated_equation_resolved`, `avg_gated_lookup`,
+`equation_resolved` and `lookup` (default), all read the same way, and `--preflight` runs one throwaway generation
+first so a broken environment fails before the picks are spent.
 The calibration split grows with the dataset, min(300, 20 percent of N) with a floor of 100, promoted from the
 evaluation split in seeded order (round-robin over subtasks on BBH; `--n-cal` overrides), and the gate fits on 70
 percent of it and verifies every deviation from the default on the rest, with the verified margin, its sd and the cost
-saving printed under Table 1 for each `avg_gated_lookup` deviation. The gate tests the structured deviation families
+saving printed under Table 1 for each gated deviation. The gate tests the structured deviation families
 first, smallest first (F0 the deepest depth at cap 0, F1 the deepest depth at any cap, F2 one depth shallower, then F3
 the free set), and Table 1's oracle-gap column is the best single evaluation cell minus each arm at 1.0x, a diagnostic
 of calibration noise that no arm reads.
@@ -184,6 +192,56 @@ still fails (the job is then re-queued by the next `--run`).
 The forced-continuation block ("Wait" injection to 4096 on GSM8K and MATH500, Ouro only) is OFF by
 default (`forced_block.enabled: false` in `prod/config.yaml`). To run it later: set it to `true` and
 plan a new queue with `--root=<new dir>`.
+
+### Continuing a stored chain instead of regenerating it
+
+Every natural-stop job writes `chains_<model>_<task>_k<k>.jsonl`, one row per problem holding the
+chain up to its own stop, and the cluster has all 262 of them. `prod.generate --continue-chains=<mode>`
+replays those ids as the prefix and carries the greedy decoding on, so a chain that stopped too early
+costs its continuation rather than a whole regeneration. Two modes:
+
+| mode | rows it continues | selection field | where it stops |
+|---|---|---|---|
+| `think_tag` | the chain ended at the closing think tag | `stop_marker == "</think>"` in the OLD cells rows (the chains file records the stop position, not which marker made it) | the tag is put back and decoding runs on to the task's stop strings, the tokenizer eos, or the horizon |
+| `horizon` | the chain reached the old horizon | `natural_stop` in the chains file: missing or >= the old horizon | the new `--horizon` |
+
+The cuts and forced read-outs are recomputed at **every** cap in `--caps` for the continued rows. A cap
+at or below a continued row's old stop is **copied** from the old cells row, not regenerated: the cut is
+`min(stop, B) = B` under both stop rules and the first `B` ids are the same ids, so the read-out is
+identical and stays bit-comparable to the published grid, which a regeneration at a different batch
+composition would not be. Rows the mode did not select are copied at every cap (a cap the old grid never
+had is served by the copied row with the same cut). Output goes to a new grid under `--protocol-tag`
+(`natural2` for think_tag, `natural2h` for horizon, so both can exist for one cell); the source cells
+file and the chains sidecar are only ever read, and `prod.cleanup` never deletes a chains file.
+
+```bash
+source env.sh
+# C1, think_tag: for MODEL in ouro_1_4b_think ouro_2_6b_think; for TASK in the ten; for K in 1 2 3 4
+$PROD_PYTHON -m prod.generate --model=$MODEL --task=$TASK --k=$K --protocol=natural \
+  --continue-chains=think_tag --protocol-tag=natural2 --out=$PROD_ART \
+  --horizon=4096 --caps=0,16,32,64,128,256,512,1024,2048,4096 --no-extra-caps --old-horizon=4096
+# C2, horizon to 8192: the same two checkpoints on the ten tasks, plus mcleish_llama32_r32 on
+# math500 and strategyqa (K in 1 2 4 8 there); 8192 must be IN --caps or the new tail is never scored
+$PROD_PYTHON -m prod.generate --model=$MODEL --task=$TASK --k=$K --protocol=natural \
+  --continue-chains=horizon --protocol-tag=natural2h --out=$PROD_ART \
+  --horizon=8192 --caps=0,16,32,64,128,256,512,1024,2048,4096,8192 --no-extra-caps --old-horizon=4096
+```
+
+Pass no `--batch-width` and the per-(model, k) table in `config.yaml` applies (16, or 8 for Ouro-2.6B
+at k=3,4). A C2 job's KV cache is twice a natural-stop job's, since its horizon is.
+
+Cost, from the cells and meta files of the 88 jobs concerned (rates are each job's own measured
+tokens/s; two jobs finished in a resumed process that generated nothing and take the median of their
+(model, k)):
+
+| | rows | continuation candidates | continuation tokens | GPU-hours | full regeneration |
+|---|---|---|---|---|---|
+| C1 think_tag, 80 jobs (2 Thinking checkpoints x 10 tasks x k1-4) | 107,944 | 89,163 (82.6%) | 14.6 M at 150/row + 126,586 read-out groups | **59** | 408 |
+| C2 horizon to 8192, 88 jobs (the same 80, plus McLeish on math500 and strategyqa) | 119,104 | 22,215 (18.7%): 18,777 Ouro, 3,438 McLeish | 91 M at 4096/row | **145** (289 if the chain prefill is charged at the decode rate) | 510 |
+
+The hours are cluster hours, not GB10 hours: they are priced off the rates these jobs actually ran at.
+The continuation prefill (one forward pass over the stored chain per row) is free in the lower figure
+and charged at the full decode rate in the upper one; the truth is near the lower end.
 
 ## 7. Layout
 

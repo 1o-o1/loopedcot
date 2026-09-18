@@ -3,6 +3,35 @@
 Pick, per question and per compute budget, how many loop passes to run and how many tokens of chain
 to allow before forcing the answer out. CPU, numpy only, no imports from any other directory.
 
+## Frozen defaults (2026-09-18)
+
+Both rulings come off the 60-pair run under `work/analysis_2026-09-18`: `equation_v6` (one fold)
+against `equation_v6_folds2` (two folds), expected accounting, 1.0x of the default cost.
+
+**1. Two folds are the default** (`policy.GATE_FOLDS = 2`). A deviation has to be earned in both
+directions of the calibration split: fit on half A and verify on half B, then fit on B and verify on
+A, and deviate only when both verified margins clear `c_gate * sd`. At 1.0x it removed every FALSE
+deviation -- one that loses to its own fallback on the evaluation questions -- for both gated arms:
+
+| arm | deviations | false at two folds | mean gain @1.0x | cost saving @1.0x |
+|---|---|---|---|---|
+| `avg_gated_lookup` | 31 -> 22 | 0 | 1.22 -> 1.45 | 42% -> 35% |
+| `avg_gated_equation_resolved` | 34 -> 25 | 0 | 0.95 -> 1.13 | 42% -> 35% |
+
+Nine deviations fell in each arm and the mean gain went UP, because what fell did not repay. The
+saving is smaller for the same reason: a withheld deviation runs the dearer fallback.
+`--gate-folds 1` is the one-direction gate, kept for comparison.
+
+**2. The ranking of record is `equation_resolved`**, the settle-time-resolved commitment identity
+(`policy.RANKING_OF_RECORD`). It is statistically indistinguishable from the lookup on 58 of the 60
+pairs, and it is the one the mechanism justifies: the lookup is a table of measured cell means with
+no account of WHEN a question commits, so it can only repeat what the calibration labels happened to
+say. So `avg_gated_equation_resolved` leads the CLI's arm list and Table 1 and `avg_gated_lookup`
+comes second, as the label-only baseline the resolved arm is read against; every other arm is still
+available (`policy.AVG_ARMS`).
+
+Every `results.json` header carries both: `ranking_of_record` and `gate_folds`.
+
 ## The three stages
 
 1. **Measure.** Run the model over a grid of **cells** `(k, T)`: `k` loop passes per token, `T`
@@ -77,7 +106,7 @@ cap, not skipped, and its share is reported.
 The depth and cap sets are whatever the rows hold, so a grid running to cap 4096 and depth 32 loads
 whole. `--ks` and `--caps` narrow that to a subset; a depth or cap the rows lack is an error.
 
-## The two rankings
+## The three rankings
 
 **lookup** ranks cells by accuracy on the calibration questions. Ties go to the lower price at the
 median prompt, then the lower depth and cap, so the order is deterministic; a cell with no
@@ -101,7 +130,44 @@ questions in id order, so labels can be traded against accuracy. `l_k` falls bac
 depth where every cell has arrived and the `(1 - G)` term is zero anyway. The card reports how well
 `A_hat` reconstructs the measured surface next to a **noise floor**: the error a perfect surface
 would still show, since the measured accuracy is itself a mean of `n_labels` coin flips.
-No evaluation label reaches either ranking; both ranking functions reject non-calibration positions.
+No evaluation label reaches any ranking; every ranking function rejects non-calibration positions.
+
+**equation_resolved** is the same identity RESOLVED BY SETTLE TIME. A question's settle cap
+`s_k(n)` is the FIRST cap it has arrived at -- the arrival Boolean is a suffix in the cap, so that
+cap is well defined -- and a question that never stops moving, or whose last read-out does not
+parse, settles `never`, encoded beyond the last cap and never at it. Then
+
+    P_k(s=j)   share of calibration questions whose settle cap is j   -- read-outs only, no labels
+    c_k(j)     accuracy of the questions that settled at cap j        -- labels, read at the last cap
+    l_k(T)     accuracy at cap T of the questions not settled by T    -- labels
+    A_res(k,T) = sum_{j<=T} P_k(s=j) c_k(j) + P_k(s>T) l_k(T)
+
+`c_k(j)` is well defined because a question settled at `j` carries the same read-out, and so the
+same label, at every cap from `j` on. The two terms partition the same questions, so `A_res`
+reproduces the calibration surface exactly once every settle cap is estimated from its own labels.
+
+Why it exists: the pooled surface is `G c_k + (1 - G) l_k` with one `c_k` per depth, so wherever
+`c_k > l_k` it RISES with `T` and can never rank the first cap first. On the class sets the first
+answer is the good one -- first-answer accuracy beats the later settlers' by about 20 points and
+nearly half the questions settle at cap 0 -- and the best evaluation cell is a cap-0 cell on 14 of
+the 60 production grids. The pooled surface finds a cap-0 optimum on 1 of them, the resolved one on
+8. Per-cell evaluation RMSE at 100 labels falls from 4.95 to 4.59 points; at 30 labels it RISES to
+8.28 against 7.30, because one `c` per settle cap is many more numbers than one per depth and 30
+labels cannot fill them.
+
+**Sparse settle caps.** A settle cap holding fewer than `mechanism.MIN_SETTLE_LABELS` (8) labelled
+calibration questions takes its bin's pooled `c` instead of its own; bins are
+`0 / 16-32 / 64-128 / 256-512 / 1024-4096` (`mechanism.SETTLE_BINS`), and a bin that is itself short
+falls back to the depth's pooled `c` -- the number the pooled identity carries. A cap the table does
+not cover pools by octave pair and can never join a table bin. Every fallback is counted
+(`c_source`, `n_caps_own`, `n_caps_binned`, `n_caps_pooled`, and the `_with_mass` counts, which say
+how many fallbacks a cap with calibration mass behind it actually used).
+
+`equation_resolved` is usable everywhere `equation` is: the hard per-prompt cap
+(`equation_resolved`, `gated_equation_resolved`), the average budget (`avg_equation_resolved`,
+`avg_gated_equation_resolved`), and the measured split gate with the deviation families. `n_labels`
+takes the same subset the pooled version takes, the first `n_labels` calibration ids in id order.
+It is the RANKING OF RECORD (see Frozen defaults), with `lookup` as the label-only baseline.
 
 ## The gate
 
@@ -183,6 +249,30 @@ bar is the sampling error of `n_verify` questions and nothing else: thirty binar
 about 5 to 7 points of SD, and `c_gate = 0.5` asks for half of one. That is the live constraint on
 this gate, and it is why the sweep above is read on twenty grids rather than on any single task's
 verdict. A larger verification half costs selection questions, which is the trade `50/50` loses on.
+
+### Two folds
+
+Two folds are the DEFAULT (`policy.GATE_FOLDS`, frozen 2026-09-18; see Frozen defaults above for
+what the second fold bought). The deviation has to be earned in BOTH directions of the split: fit the
+ranking, the multiplier and the reference on the selection half and verify on the verification half,
+then fit on the verification half and verify on the selection half, and take the deviation only when
+both verified margins clear `c_gate * sd`. **Nothing about one fold moves:** the arm that RUNS is
+always the fold-1 policy, so a second fold can only withhold a deviation, never add or change one.
+Every gated row carries `gate_folds`, with each further fold's own margin and SD beside the first's
+(`gate_fold_detail`, and `folds` inside each family decision), so a withheld deviation says which
+half refused it. `--gate-folds 1` is the one-direction gate, kept for comparison.
+
+Why it exists: a thirty-question verification half can read a margin the evaluation questions do not
+repay. StrategyQA's F0 deviation verified +13.3 +/- 5.5 and then lost 2.7 points over 1,990
+evaluation questions. One fold cannot tell that from a real edge; two folds ask the other half of
+the calibration set the same question. `--gate-mode whole` has one set that both fits and measures,
+so it has no second fold: the default there is one fold, and asking for two is refused rather than
+ignored (`policy.resolve_gate_folds`).
+
+The second fold can also move WHICH family opens. On the planted true cap-0 grid in the tests F0
+clears fold 1 at +12.0 +/- 8.7 and measures 0.0 on the mirror half, so it is withheld and F2 -- one
+depth shallower, still at cap 0, +20.0 and +16.0 -- runs instead. The deviation is not lost, it is
+the one both halves paid for.
 
 ## The average budget
 
@@ -299,15 +389,16 @@ row with a bootstrap interval over questions.
 ## Running it
 
     cd work/spikes/s35_allocator
-    python -m unittest discover -s tests -t tests            # 206 tests, CPU, a minute
+    python -m unittest discover -s tests -t tests            # 280 tests, CPU, a minute
 
     python -m alloc.cli --cells DIR --task gsm8k --checkpoint NAME \
                         --model-config PATH | --layers-per-loop N [--fixed-layers M] \
                         [--reference NAME] [--c-gate 0.5] [--n-labels 30] \
                         [--gate-mode split|whole] [--one-se] [--n-select 70] [--n-verify 30] \
-                        [--n-cal 150] [--no-families] \
+                        [--gate-folds 1|2] [--n-cal 150] [--no-families] \
                         [--accounting cap|realised|expected|all] [--avg-budget] \
-                        [--ks 1,2,4,8] [--caps 0,64,512,4096] --out OUTDIR
+                        [--ks 1,2,4,8] [--caps 0,64,512,4096] \
+                        [--cache-dir DIR | --no-cache] --out OUTDIR
 
 `--cells` is any directory of cell jsonl files; two file-name shapes and two row shapes need no
 flag. Names: `cells_<model>_<task>_<protocol>_k<K>[_s<I>of<N>].jsonl`, where a depth may be split
@@ -316,10 +407,19 @@ names marked a dry run or a smoke test are ignored. Rows: keyed by `idx`, or wit
 `{"_header": ...}` line plus `row_idx`, `kind` and `subtask`. A line that is not JSON is counted and
 warned about, never dropped in silence. One case needs a flag: a reference file of raw
 multiple-choice rows with no split or parsed read-out (`--reference-bbh-base`).
-`--avg-budget` adds the `avg_lookup` and `avg_equation` rows to every Table 1 written.
+Each cells file is parsed once and kept as a compressed numpy archive
+(`<name>.jsonl.alloc-cache.npz`) beside it, keyed by its size, mtime and header line, so a
+regenerated grid invalidates its own entry and a second pass over the same grids reads arrays
+instead of JSON. `--cache-dir` puts the archives somewhere else; `--no-cache` reads and writes none.
+The three routes give identical numbers -- the cache only changes the wall time -- and `results.json`
+records which was used under `read`.
+`--avg-budget` adds the five average-budget rows -- `avg_gated_equation_resolved` (the arm of record), `avg_gated_lookup` (the label-only baseline), then `avg_lookup`, `avg_equation`, `avg_equation_resolved` -- to every Table 1 written, in that order, and a second table of their realised mean price against the budget each was fitted to.
 Outputs: `cards.json` (per checkpoint — `G`, `c`, `l`, `A_hat`, the measured surface, the
-reconstruction error and its noise floor, both rankings, the calibration and predicted accuracies,
-every cell's median price and expected length); `results.json` (five arms with both gain means, both
+reconstruction error and its noise floor, every ranking, the calibration and predicted
+accuracies, every cell's median price and expected length; and the resolved identity: the
+settle-time distribution per depth, `P_k(s=j)`, `c_k(j)`, `l_k(T)`, which source each `c` came from,
+`A_res`, and both surfaces' RMSE against the measured one on the calibration AND the evaluation
+questions beside each split's noise floor); `results.json` (seven arms with both gain means, both
 bootstrap intervals, the worst budget and the per-budget record; the two contrasts; the
 non-inferiority verdict at the top three `B*` budgets with a 2-point margin; the default cost;
 Table 1 with the oracle gap of every arm, and one Table 1 per accounting under `--accounting all`;
@@ -332,10 +432,10 @@ accounting, the first of the list, so `all` tabulates three and prices the rest 
 | file | holds |
 |---|---|
 | `alloc/cells.py` | both file-name and row shapes, labels, the read-out parse, the reserve, the grid assertions, model geometry, the calibration expected-length table, the calibration-size rule and the seeded promotion of evaluation ids into it |
-| `alloc/mechanism.py` | arrival, `G`, `c`, `l`, `A_hat`, the reconstruction error and noise floor |
-| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, both rankings, affordability, normal operation, both gates (`MeasuredGate`, the default; `Gate`, the predicted one `whole` keeps), the one-standard-error rule, the paired margin SD, the average-budget multiplier, the 70/30 proportion and the four deviation families |
+| `alloc/mechanism.py` | arrival, `G`, `c`, `l`, `A_hat`, the reconstruction error and noise floor; settle time, its distribution, the sparse-cap bins, `P_k(s=j)`, `c_k(j)`, `l_k(T)` and `A_res` |
+| `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, all three rankings, affordability, normal operation, both gates (`MeasuredGate`, the default, and its folds; `Gate`, the predicted one `whole` keeps), the one-standard-error rule, the paired margin SD, the average-budget multiplier, the 70/30 proportion and the four deviation families |
 | `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the calibration split, the gate sweep, the family tests, the oracle gap, each arm against its own fallback |
-| `tests/` | a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close, a planted cap-0 optimum it must keep and a planted wrong-signed surface where the predicted margin opens the gate and the measured one reverts, a reproduction test against frozen real numbers, and the v5 file: the size rule, the promotion, the proportional split, the four families on a true cap-0 plant and on a losing one, the oracle gap, the fallback interval, the frozen defaults |
+| `tests/` | a planted first-answer-is-best grid the pooled identity must misrank and the resolved one must lead with cap 0, the resolved identity reproducing its own calibration surface exactly, the sparse-cap fallbacks, the four resolved arms in Table 1 and in its picks, the card's four RMSEs, the two-fold gate withholding a deviation one fold keeps, and a reproduction of compute.py's resolved evaluation RMSE on a production grid to 0.05; a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close, a planted cap-0 optimum it must keep and a planted wrong-signed surface where the predicted margin opens the gate and the measured one reverts, a reproduction test against frozen real numbers, and the v5 file: the size rule, the promotion, the proportional split, the four families on a true cap-0 plant and on a losing one, the oracle gap, the fallback interval, the frozen defaults |
 
 Rerunning the real grids reproduces 26 frozen numbers to **0.05 points** (tolerance 0.1): headline
 and pooled gain over normal on six tasks under lookup and five under equation at 30 labels, plus

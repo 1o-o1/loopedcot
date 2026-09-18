@@ -12,6 +12,7 @@ command in place of `prod.generate` so nothing here needs a GPU or a checkpoint:
 
   python -m pytest tests/test_live_check_robustness.py -q
 """
+import io
 import json
 import os
 import sys
@@ -122,3 +123,23 @@ class TestTheSetupIsCheckedBeforeTheGpu(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestArms(unittest.TestCase):
+    def test_every_recorded_arm_is_accepted_and_an_unknown_one_is_refused(self):
+        """The four arms alloc records are all runnable; each gets past argparse and stops only at
+        the (absent) alloc output directory, and a name alloc never records is refused by argparse
+        (exit code 2) before anything else is looked at."""
+        self.assertEqual(lc.ARMS, ("lookup", "avg_gated_lookup", "equation_resolved",
+                                   "avg_gated_equation_resolved"))
+        d = tempfile.mkdtemp()
+        for arm in lc.ARMS:
+            with self.assertRaises(SystemExit) as cm:
+                lc.main(["--model", "m", "--task", "gsm8k", "--alloc-dir", d, "--arm", arm,
+                         "--budget-fraction", "0.5"])
+            self.assertIn("results.json", str(cm.exception), arm)
+        with mock.patch("sys.stderr", new=io.StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                lc.main(["--model", "m", "--task", "gsm8k", "--alloc-dir", d, "--arm", "avg_gated_equation",
+                         "--budget-fraction", "0.5"])
+        self.assertEqual(cm.exception.code, 2)

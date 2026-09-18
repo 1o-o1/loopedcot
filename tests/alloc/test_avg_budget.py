@@ -320,8 +320,9 @@ class TestRealGrids(unittest.TestCase):
     # over or under X is decided by how the prompts either side of the threshold split between the
     # two halves; at 0.25x on MATH500 the two cells in play are 24 and 48 layers per token with a
     # 512-token chain between them, so one prompt crossing moves the mean by about a percent.
-    OVER_TWO_PERCENT = {("math500", "avg_equation", 0.25): 2.30,
-                        ("math500", "avg_gated_lookup", 0.25): 2.30}
+    # `avg_gated_lookup` no longer appears here: at 0.25x its gate now has a reference (normal
+    # operation at that budget) and reverts to it, and that reference is priced UNDER X.
+    OVER_TWO_PERCENT = {("math500", "avg_equation", 0.25): 2.30}
 
     def test_the_mean_price_holds_within_two_percent_or_is_flagged(self):
         for task in self.TASKS:
@@ -407,11 +408,13 @@ class TestRealGrids(unittest.TestCase):
 
 
 class TestTheGatedArm(unittest.TestCase):
-    """`avg_gated_lookup`: the same policy, but it must earn the deviation from the default cell.
+    """`avg_gated_lookup`: the same policy, but it must earn the deviation from normal operation.
 
     The margin is read on the calibration prompts, between two whole policies: the mean score over
-    the cells the multiplier picks for those prompts against the score of the default cell run for
-    every prompt. c_gate scales the SD of that margin over the calibration resamples, so the two
+    the cells the multiplier picks for those prompts against the score of normal operation at that
+    budget -- the default cell run for every prompt wherever the default cell is affordable on
+    average, and the deepest depth the budget does afford, at its largest affordable cap, below
+    that. c_gate scales the SD of that margin over the calibration resamples, so the two
     ends of the constant are what pin the rule down -- at 0 a positive margin is enough, and a
     constant large enough sends every deviation back to the default cell.
     """
@@ -440,13 +443,29 @@ class TestTheGatedArm(unittest.TestCase):
         self.assertGreater(row["gate_sd_pts"][ONE], 0.0)
         self.assertLess(row["gate_margin_pts"][ONE], 10.0 * row["gate_sd_pts"][ONE])
 
-    def test_below_the_default_cell_there_is_nothing_to_revert_to(self):
-        """The fallback has to be affordable on average before the gate can prefer it."""
+    def test_below_the_default_cell_the_gate_measures_against_normal_operation(self):
+        """Below the default cell's own mean price the reference is normal operation AT THAT
+        BUDGET: the deepest depth the budget affords on average, at its largest affordable cap
+        (evaluate.normal_at_budget). The gate used to be skipped entirely there, so the pick stood
+        ungated at every budget where its deviation was largest -- the defect this replaces."""
         row = self._table(10.0)["rows"][P.AVG_GATED]
         for j in range(ONE):
+            self.assertIsNotNone(row["gate_margin_pts"][j], j)
+            self.assertEqual(row["reference_rule"][j], "shallower_depth", j)
+            self.assertTrue(row["gate_reverted"][j], j)          # a 10 sd bar closes everything
+            self.assertEqual(list(row["cells_used"][j]), ["k%d_T512" % row["reference_k"][j]], j)
+            self.assertFalse(row["over_budget"][j], j)
+        # and it is no longer the ungated pick that stands there
+        self.assertNotEqual(row["acc_pts"][0],
+                            self._table(0.0)["rows"]["avg_lookup"]["acc_pts"][0])
+
+    def test_a_zero_gate_still_keeps_the_pick_below_the_default_cell(self):
+        """The reference exists at every budget now, so what decides the row is the margin."""
+        t1 = self._table(0.0)
+        row, plain = t1["rows"][P.AVG_GATED], t1["rows"]["avg_lookup"]
+        for j in range(ONE):
             self.assertFalse(row["gate_reverted"][j], j)
-            self.assertIsNone(row["gate_margin_pts"][j], j)
-        self.assertEqual(row["acc_pts"][0], self._table(0.0)["rows"]["avg_lookup"]["acc_pts"][0])
+            self.assertEqual(row["acc_pts"][j], plain["acc_pts"][j], j)
 
     def test_the_underspend_is_reported_as_a_saving(self):
         t1 = self._table(0.0)

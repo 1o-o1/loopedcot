@@ -231,7 +231,10 @@ class TestATrueDeviationSurvives(unittest.TestCase):
         verification questions measure any one cell loosely."""
         row = table("true", "split")["rows"][P.AVG_GATED]
         self.assertGreater(row["gate_draw_frac_positive"][ONE], 0.5)
-        self.assertIsNone(row["gate_draw_frac_positive"][0])   # no fallback, so nothing to draw
+        # Every budget some depth fits on average now has a reference -- normal operation at that
+        # budget -- so the draws are measured at 0.25x too, where the gate used not to run at all.
+        self.assertIsNotNone(row["gate_draw_frac_positive"][0])
+        self.assertIsNotNone(row["reference_rule"][0])
 
     def test_one_standard_error_still_keeps_a_fifteen_point_margin(self):
         row = table("true", "split", one_se=True)["rows"][P.AVG_GATED]
@@ -352,8 +355,10 @@ class TestTheWholeSetPathIsUnchanged(unittest.TestCase):
 class TestTheRealGrids(unittest.TestCase):
     """S33 cells, 24 layers per loop and no fixed layers, expected accounting, at 1.0x.
 
-    Under the frozen 70/30 the gate reverts every one of these ten grids at 1.0x. MATH500 A0 is
-    where that costs something real: the whole-set gate keeps its depth-3 deviation on a +8.0 point
+    Under the frozen 70/30 the gate reverts eight of these ten grids at 1.0x; MATH500 s33 and CSQA
+    s33 are the two whose deviation the verification half backs, and both are budgets the default
+    cell cannot buy on average, where the gate ruled nothing at all before it had a reference there.
+    MATH500 A0 is where a reversion costs something real: the whole-set gate keeps its depth-3 deviation on a +8.0 point
     margin in its own score units, and the verification ids 70-99 measure the same policy at -10.0
     points and close it. The same policy read on ids 50-79 measured +16.7, which is how far thirty
     questions can move a margin. That a genuine deviation must still survive is held down by the
@@ -385,28 +390,40 @@ class TestTheRealGrids(unittest.TestCase):
         split = self._table("math500", "A0", "split")["rows"][P.AVG_GATED]
         self.assertEqual(list(split["cells_used"][ONE]), ["k4_T512"])
 
-    def test_a_reverted_grid_lands_exactly_on_the_default_cell(self):
+    def test_a_reverted_grid_lands_exactly_on_its_reference(self):
+        """A reversion runs NORMAL OPERATION at that budget: the default cell for every question
+        where the default cell fits the calibration mean price, and the deepest depth with the cap
+        stepped down per question where it does not."""
         for task in self.TASKS:
             for ckpt in ("A0", "s33"):
                 t1 = self._table(task, ckpt, "split")
                 row = t1["rows"][P.AVG_GATED]
-                if row["gate_reverted"][ONE]:
-                    self.assertEqual(len(row["cells_used"][ONE]), 1, (task, ckpt))
-                    self.assertEqual(list(row["cells_used"][ONE])[0],
-                                     "k%d_T%d" % tuple(t1["rows"]["default_cell"]["cell"]),
+                if not row["gate_reverted"][ONE]:
+                    continue
+                self.assertEqual(row["cells_used"][ONE], row["reference_cells"][ONE], (task, ckpt))
+                if row["reference_rule"][ONE] == "default_cell":
+                    self.assertEqual(list(row["cells_used"][ONE]),
+                                     ["k%d_T%d" % tuple(t1["rows"]["default_cell"]["cell"])],
                                      (task, ckpt))
+                else:
+                    self.assertEqual(row["reference_k"][ONE],
+                                     t1["rows"]["default_cell"]["cell"][0], (task, ckpt))
 
-    def test_a_budget_the_default_cell_cannot_buy_has_no_margin_to_report(self):
-        """Below the default cell there is no fallback, so the Lagrangian policy stands ungated.
-
-        GSM8K s33 is that case at 1.0x: the default cell does not fit the budget on average, the
-        row carries no margin, and the arm is the plain `avg_lookup` policy.
+    def test_a_budget_the_default_cell_cannot_buy_is_gated_against_normal_operation(self):
+        """Below the default cell's own mean price the gate used to be skipped and the Lagrangian
+        policy stood UNGATED. GSM8K s33 at 1.0x is that case: the default cell does not fit the
+        budget on average on either half, and the row is now measured against normal operation at
+        that budget -- the deepest depth with the cap stepped down -- and reverts to it.
         """
         t1 = self._table("gsm8k", "s33", "split")
         row = t1["rows"][P.AVG_GATED]
-        self.assertIsNone(row["gate_margin_pts"][ONE])
-        self.assertFalse(row["gate_reverted"][ONE])
         self.assertFalse(t1["rows"]["default_cell"]["affordable_on_average"][ONE])
+        self.assertFalse(row["default_cell_affordable_on_cal"][ONE])
+        self.assertIsNotNone(row["gate_margin_pts"][ONE])          # it used to be None
+        self.assertEqual(row["reference_rule"][ONE], "deepest_depth_capped")
+        self.assertEqual(row["reference_k"][ONE], t1["rows"]["default_cell"]["cell"][0])
+        self.assertTrue(row["gate_reverted"][ONE])
+        self.assertEqual(row["cells_used"][ONE], row["reference_cells"][ONE])
 
     def test_the_split_gate_never_opens_where_the_whole_set_gate_shut(self):
         """The verification margin is the stricter reading, so it can only close deviations."""

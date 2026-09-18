@@ -15,6 +15,10 @@ def _args(argv=None):
     p.add_argument("--cells", required=True, help="directory holding the cells jsonl files")
     p.add_argument("--task", required=True)
     p.add_argument("--checkpoint", required=True)
+    p.add_argument("--protocol", default="natural", choices=("natural", "natural2", "natural2h"),
+                   help="which grid of the pair to read: the natural-stop grid (default), the "
+                        "think-tag continuation (natural2) or the horizon extension (natural2h); "
+                        "the loader takes only the files carrying that protocol segment")
     p.add_argument("--reference", default=None, help="a second checkpoint to contrast against")
     p.add_argument("--reference-cells", default=None,
                    help="directory for the reference's cells (default: --cells)")
@@ -28,12 +32,24 @@ def _args(argv=None):
                         "the multiplier on the first --n-select calibration ids and measures the "
                         "margin on the next --n-verify, which took no part in the fit; `whole` is "
                         "the old rule, one set fitting and measuring, kept for comparison")
+    p.add_argument("--gate-folds", type=int, default=None,
+                   choices=list(P.GATE_FOLD_CHOICES),
+                   help="how many directions of the calibration split a deviation must be earned "
+                        "in. %d, the frozen default, fits on the selection half and verifies on "
+                        "the verification half and then fits on the verification half and verifies "
+                        "on the selection half, and deviates only when BOTH verified margins clear "
+                        "c_gate sd; 1 is the first direction alone. The arm that runs is always "
+                        "the 1-fold policy, so a second fold can only withhold a deviation. Under "
+                        "--gate-mode whole one set both fits and measures, so the default there is "
+                        "1 and asking for 2 is refused" % P.GATE_FOLDS)
     p.add_argument("--one-se", action="store_true",
                    help="the one-standard-error rule: deviate only on a margin above 1.0 sd, "
                         "whatever --c-gate says")
     p.add_argument("--n-select", type=int, default=None,
                    help="calibration ids, in id order, that fit the ranking and the multiplier "
-                        "(default: %.0f%% of the calibration split)" % (100 * P.GATE_SELECT_FRAC))
+                        # argparse expands `help % params` when it prints, so the literal per-cent
+                        # sign this leaves behind has to survive that second pass as well
+                        "(default: %.0f%%%% of the calibration split)" % (100 * P.GATE_SELECT_FRAC))
     p.add_argument("--n-verify", type=int, default=None,
                    help="the ids after those, which measure the gate margin and nothing else "
                         "(default: the rest of the calibration split)")
@@ -57,7 +73,8 @@ def _args(argv=None):
                         "cost (an audit price, not available at decision time), `all` writes one "
                         "Table 1 per accounting")
     p.add_argument("--avg-budget", action="store_true",
-                   help="add the average-budget arms `avg_lookup` and `avg_equation` to Table 1: "
+                   help="add the average-budget arms (%s) to Table 1: "
+                        % ", ".join("`%s`" % n for n in P.AVG_ARMS) +
                         "a multiplier fitted on the calibration prompts holds their MEAN price at "
                         "or below the budget, in place of a cap on every prompt")
     p.add_argument("--seed", type=int, default=7)
@@ -73,6 +90,15 @@ def _args(argv=None):
                    help="comma-separated depths to keep; must be a subset of what the rows hold")
     p.add_argument("--caps", default=None,
                    help="comma-separated token caps to keep; must be a subset of the rows'")
+    p.add_argument("--cache-dir", default=None,
+                   help="where the parsed-file caches live (default: beside each cells file; pass "
+                        "a directory to keep a shared or read-only --cells tree clean). The cache "
+                        "is keyed by each file's size, mtime and header, so a regenerated grid "
+                        "invalidates its own entry and nothing has to be told to rebuild it")
+    p.add_argument("--no-cache", dest="cache", action="store_false",
+                   help="parse every cells file: read no cache and write none. The parse is the "
+                        "ground truth, so the cache must always be able to be taken out")
+    p.set_defaults(cache=True)
     return p.parse_args(argv)
 
 
@@ -113,17 +139,29 @@ def accountings_of(a):
     return [a.accounting], a.accounting
 
 
+def _rmse_pts(A, B):
+    """Return the RMSE between two (depth, cap) accuracy surfaces, in percentage points."""
+    return float(100 * np.sqrt(np.nanmean((np.asarray(A, float) - np.asarray(B, float)) ** 2)))
+
+
 def card(cs, n_labels=None):
-    cal = cs.select("cal")
+    cal, ev = cs.select("cal"), cs.select("eval")
     cost = P.cost_of(cs)
-    Pm, Rm = P.median_point(cs, cs.select("eval"))
+    Pm, Rm = P.median_point(cs, ev)
     elen = C.expected_lengths(cs)
     A_hat, m = E.surface(cs, cal, n_labels=n_labels)
+    A_res, mr = E.resolved_surface(cs, cal, n_labels=n_labels)
     eq, pred = P.rank_equation(cs, A_hat, cost, Pm, Rm)
+    rs, pred_res = P.rank_equation(cs, A_res, cost, Pm, Rm)
     lk, acc = P.rank_lookup(cs, cal, cost, Pm, Rm)
+    # The two surfaces against what the questions actually measured, on both splits. The calibration
+    # column is the fit's own residual and the evaluation column is the only one that says whether
+    # the surface generalises; neither enters a policy.
+    cal_mean = np.nanmean(cs.acc[:, :, cal], axis=2)
+    ev_mean = np.nanmean(cs.acc[:, :, ev], axis=2)
     key = lambda c: "k%d_T%d" % c
     return {"checkpoint": cs.name, "task": cs.task, "n_cal": int(len(cal)),
-            "n_eval": int(len(cs.select("eval"))),
+            "n_eval": int(len(ev)),
             "ks": cs.ks, "caps": cs.caps,
             "answer_budget": cs.answer_budget_used(),
             "reserve_constant_per_task": bool(cs.reserve_is_constant()),
@@ -132,10 +170,35 @@ def card(cs, n_labels=None):
             "A_hat": m["A_hat"], "raw_surface": m["acc_measured"],
             "reconstruction_rmse_pts": m["rmse_pts"], "noise_floor_pts": m["noise_floor_pts"],
             "uncommitted_share": m["uncommitted_share"],
+            # the identity resolved by settle time: P_k(s=j), c_k(j) per settle cap, l_k(T) per cap
+            "settle_time": {
+                "n_labels": mr["n_labels"], "n_readouts": mr["n_g"],
+                "min_labels_per_cap": mr["min_labels"], "bins": mr["bins"],
+                "share_settle_first_cap": mr["share_settle_first"],
+                "share_never": mr["share_never"],
+                "distribution": mr["settle_distribution"],
+                "P": mr["P"], "c_by_settle_cap": mr["c"], "l_by_cap": mr["l"],
+                "c_source": mr["c_source"], "n_labels_at_cap": mr["n_labels_at_cap"],
+                "n_unsettled_at_cap": mr["n_unsettled_at_cap"],
+                "pooled_c": mr["pooled_c"], "pooled_l": mr["pooled_l"],
+                "n_caps_own": mr["n_caps_own"], "n_caps_binned": mr["n_caps_binned"],
+                "n_caps_pooled": mr["n_caps_pooled"],
+                "n_caps_binned_with_mass": mr["n_caps_binned_with_mass"],
+                "n_caps_pooled_with_mass": mr["n_caps_pooled_with_mass"]},
+            "A_res": mr["A_res"],
+            "rmse_pts": {"pooled_cal": _rmse_pts(A_hat, cal_mean),
+                         "resolved_cal": _rmse_pts(A_res, cal_mean),
+                         "pooled_eval": _rmse_pts(A_hat, ev_mean),
+                         "resolved_eval": _rmse_pts(A_res, ev_mean),
+                         "noise_floor_cal": m["noise_floor_pts"],
+                         "noise_floor_eval": float(100 * np.sqrt(np.nanmean(
+                             ev_mean * (1 - ev_mean) / max(1, len(ev)))))},
             "ranking_lookup": [key(c) for c in lk],
             "ranking_equation": [key(c) for c in eq],
+            "ranking_equation_resolved": [key(c) for c in rs],
             "cal_accuracy": {key(c): round(acc[c], 4) for c in acc},
             "predicted_accuracy": {key(c): round(pred[c], 4) for c in pred},
+            "predicted_accuracy_resolved": {key(c): round(pred_res[c], 4) for c in pred_res},
             "median_cost_layer_passes": {key(c): int(cost(c[0], c[1], Pm, Rm)) for c in acc},
             "expected_length_tokens": {key(c): round(float(elen[cs.ks.index(c[0]),
                                                            cs.caps.index(c[1])]), 3)
@@ -149,7 +212,7 @@ def main(argv=None):
     os.makedirs(a.out, exist_ok=True)
     bbh_base = a.task in C.BBH_TASKS and a.checkpoint in ("base", "A0_base")
     cs = C.load(a.cells, a.task, a.checkpoint, bbh_base=bbh_base, ks=ks, caps=caps,
-                L=L, L_fixed=L_fixed)
+                L=L, L_fixed=L_fixed, cache=a.cache, cache_dir=a.cache_dir, protocol=a.protocol)
     # v5: the calibration split is sized from the grid, not fixed at 100. Evaluation ids are
     # promoted into it in the dataset's seeded order until it holds n_cal, so the evaluation split
     # shrinks by exactly as many questions; --n-cal overrides the rule.
@@ -158,15 +221,24 @@ def main(argv=None):
     split_record["reason"] = why
     cards = {cs.name: card(cs, a.n_labels)}
     accs, primary = accountings_of(a)
+    gate_folds = P.resolve_gate_folds(a.gate_mode, a.gate_folds)
     gate_kw = dict(gate_mode=a.gate_mode, one_se=bool(a.one_se),
                    n_select=a.n_select, n_verify=a.n_verify,
-                   families=not bool(a.no_families))
-    res = {"task": a.task, "checkpoint": a.checkpoint, "reference": a.reference,
+                   families=not bool(a.no_families), gate_folds=gate_folds)
+    res = {"task": a.task, "checkpoint": a.checkpoint, "protocol": a.protocol, "reference": a.reference,
            "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
            "gate_mode": a.gate_mode, "one_se": bool(a.one_se),
+           # The two frozen rulings of 2026-09-18, in the header so every artifact carries them:
+           # the ranking of record and how many directions of the split a deviation was earned in.
+           "ranking_of_record": P.RANKING_OF_RECORD,
+           "gate_folds": int(gate_folds),
            "n_select": a.n_select, "n_verify": a.n_verify,
            "n_cal_rule": {"requested": a.n_cal, "resolved": n_cal,
                           "n_questions": int(len(cs.idx)), "split": split_record},
+           # How the cells were read. `cached_files` of `files` says how much of this run was the
+           # parsed-file cache rather than JSON; with --no-cache it is absent and every file was
+           # parsed. The numbers only ever change the run's WALL TIME, never a result.
+           "read": dict(cs.read_stats, cache=bool(a.cache), cache_dir=a.cache_dir),
            "families": not bool(a.no_families),
            "deviation_families": list(P.DEVIATION_FAMILIES),
            "accounting": a.accounting, "accounting_priced": primary,
@@ -175,7 +247,9 @@ def main(argv=None):
             ("equation", dict(ranking="equation", c_gate=0.0)),
             ("equation_n30", dict(ranking="equation", n_labels=30, c_gate=0.0)),
             ("equation_n100", dict(ranking="equation", n_labels=100, c_gate=0.0)),
-            ("gated_equation", dict(ranking="equation", c_gate=a.c_gate))]
+            ("equation_resolved", dict(ranking="equation_resolved", c_gate=0.0)),
+            ("gated_equation", dict(ranking="equation", c_gate=a.c_gate)),
+            ("gated_equation_resolved", dict(ranking="equation_resolved", c_gate=a.c_gate))]
     for name, spec in arms:
         res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
                                                n_cal_draws=a.cal_draws, seed=a.seed,
@@ -214,6 +288,7 @@ def main(argv=None):
     if a.reference:
         rdir = a.reference_cells or a.cells
         ref = C.load(rdir, a.task, a.reference, ks=ks, caps=caps, L=L, L_fixed=L_fixed,
+                     cache=a.cache, cache_dir=a.cache_dir, protocol=a.protocol,
                      bbh_base=a.reference_bbh_base or (a.task in C.BBH_TASKS
                                                        and a.reference == "base"))
         # The reference is re-split to the SAME calibration size, so the two checkpoints still

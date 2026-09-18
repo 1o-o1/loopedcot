@@ -29,20 +29,57 @@ def surface(cells, cal_pos, n_labels=None, label_pos=None):
     return mech.a_hat_matrix(m), m
 
 
+def resolved_surface(cells, cal_pos, n_labels=None, label_pos=None):
+    """Return the settle-time RESOLVED accuracy surface and its diagnostics; same contract as
+    `surface` above.
+
+    `A_res(k,T) = sum_{j<=T} P_k(s=j) c_k(j) + P_k(s>T) l_k(T)`: the share of questions that settle
+    at each cap times the accuracy of the questions that settle there, plus the accuracy at T of
+    those not settled by T. `P` is read off every calibration read-out and needs no label; `c` and
+    `l` come from the first `n_labels` calibration labels, as the pooled surface's do
+    (mechanism.resolved_mechanism).
+    """
+    cal_pos = np.asarray(cal_pos, dtype=int)
+    if not len(cal_pos) or any(cells.split[n] != "cal" for n in cal_pos):
+        raise ValueError("surface fitting requires calibration prompts only")
+    if n_labels is not None and int(n_labels) <= 0:
+        raise ValueError("n_labels must be positive")
+    if label_pos is None:
+        label_pos = cal_pos if n_labels is None else cal_pos[:int(n_labels)]
+    if not len(label_pos) or any(cells.split[n] != "cal" for n in label_pos):
+        raise ValueError("surface fitting requires calibration labels only")
+    m = mech.resolved_mechanism(cells, cal_pos, label_pos=np.asarray(label_pos, dtype=int))
+    return mech.a_res_matrix(m), m
+
+
+def surface_of(cells, cal_pos, ranking, n_labels=None, label_pos=None):
+    """Return the fitted surface one of the equation rankings reads, and its diagnostics.
+
+    `equation` is the pooled identity, `equation_resolved` the same identity resolved by settle
+    time. One entry point, so nothing downstream has to know which of the two an arm asked for.
+    """
+    if ranking == "equation":
+        return surface(cells, cal_pos, n_labels=n_labels, label_pos=label_pos)
+    if ranking == "equation_resolved":
+        return resolved_surface(cells, cal_pos, n_labels=n_labels, label_pos=label_pos)
+    raise ValueError("%r is not an equation ranking; expected one of %s"
+                     % (ranking, ", ".join(pol.EQUATION_RANKINGS)))
+
+
 def make_order(cells, cal_pos, cost, Pm, Rm, ranking="lookup", n_labels=None, boot_sel=None, label_sel=None):
     """Return a lookup/equation cell order and optional fitted surface from calibration positions and optional resampled positions."""
     if ranking == "lookup":
         order, _ = pol.rank_lookup(cells, cal_pos, cost, Pm, Rm, boot_sel=boot_sel)
         return order, None
-    if ranking == "equation":
+    if ranking in pol.EQUATION_RANKINGS:
         ids = np.asarray(cal_pos)[boot_sel] if boot_sel is not None else np.asarray(cal_pos)
         lab = ids if n_labels is None else np.asarray(cal_pos)[:int(n_labels)]
         if label_sel is not None:
             lab = np.asarray(cal_pos)[label_sel]
-        A_hat, m = surface(cells, ids, label_pos=lab)
+        A_hat, m = surface_of(cells, ids, ranking, label_pos=lab)
         order, _ = pol.rank_equation(cells, A_hat, cost, Pm, Rm)
         return order, (A_hat, m)
-    if ranking in pol.AVG_RANKINGS:
+    if ranking in pol.AVG_ARMS:
         raise ValueError("%r is an average-budget policy and not a cell order: it has no one "
                          "sequence of cells to walk, because the cell a prompt takes depends on "
                          "that prompt's own price. Use cell_scores() with "
@@ -52,7 +89,7 @@ def make_order(cells, cal_pos, cost, Pm, Rm, ranking="lookup", n_labels=None, bo
 
 def cell_scores(cells, cal_pos, ranking, cost, Pm, Rm, n_labels=None):
     """Return the (depth, cap) value the average-budget policy maximises: calibration accuracy for
-    `lookup`, predicted accuracy for `equation`, both fractions.
+    `lookup`, predicted accuracy for `equation` and `equation_resolved`, all fractions.
 
     An `avg_` prefix is accepted, so an arm name passes straight through. A cell the ranking cannot
     score stays NaN, and the policy never picks one.
@@ -61,8 +98,8 @@ def cell_scores(cells, cal_pos, ranking, cost, Pm, Rm, n_labels=None):
     if base == "lookup":
         _order, acc = pol.rank_lookup(cells, cal_pos, cost, Pm, Rm)
         return np.array([[acc[(k, T)] for T in cells.caps] for k in cells.ks], float)
-    if base == "equation":
-        return surface(cells, cal_pos, n_labels=n_labels)[0]
+    if base in pol.EQUATION_RANKINGS:
+        return surface_of(cells, cal_pos, base, n_labels=n_labels)[0]
     raise ValueError("unknown ranking %r" % ranking)
 
 
@@ -82,14 +119,18 @@ def calibration_resamples(cal_pos, n_labels, n_draws, seed):
 
 
 def gate_for(cells, cal_pos, n_labels=None, c_gate=pol.DEFAULT_C_GATE, n_draws=40, seed=7,
-             resamples=None):
-    """Return gate and fitted surface; margin SD uses supplied prompt resamples in accuracy units."""
-    A_hat, m = surface(cells, cal_pos, n_labels=n_labels)
+             resamples=None, ranking="equation"):
+    """Return gate and fitted surface; margin SD uses supplied prompt resamples in accuracy units.
+
+    `ranking` names which fitted surface the PREDICTED margin is read off, so a resolved arm's
+    whole-mode gate reads the resolved surface and not the pooled one.
+    """
+    A_hat, m = surface_of(cells, cal_pos, ranking, n_labels=n_labels)
     cal = np.asarray(cal_pos, dtype=int)
     plan = calibration_resamples(cal, n_labels, n_draws, seed) if resamples is None else resamples
     if not plan:
         raise ValueError("the gate requires calibration resamples")
-    draws = [surface(cells, cal[gs], label_pos=cal[ls])[0] for gs, ls in plan]
+    draws = [surface_of(cells, cal[gs], ranking, label_pos=cal[ls])[0] for gs, ls in plan]
     sd = pol.margin_sd(np.stack(draws))
     return pol.Gate(A_hat, sd, c_gate), m
 
@@ -151,7 +192,7 @@ def split_calibration(cells, cal_pos, n_select=None, n_verify=None):
 
 def gate_and_fit(cells, cal_pos, n_labels, c_gate, n_draws, seed,
                  gate_mode=pol.DEFAULT_GATE_MODE, resamples=None,
-                 n_select=None, n_verify=None):
+                 n_select=None, n_verify=None, ranking="equation", folds=None):
     """Return (gate, the positions the ranking may be fitted on, the split sizes).
 
     `split`  the order is fitted on the selection half and the gate MEASURES the margin of the cell
@@ -161,21 +202,54 @@ def gate_and_fit(cells, cal_pos, n_labels, c_gate, n_draws, seed,
              equation's prediction of them.
     `whole`  the old rule, kept for comparison: one set fits and measures, and the margin it reads
              is the predicted one, off the fitted surface.
+
+    `folds` is how many directions of the split a deviation has to be earned in; None takes the
+    frozen default, two (policy.resolve_gate_folds). At 2 the returned gate also carries the mirror
+    fold -- the selection half's own
+    labels -- and a deviation opens only where BOTH halves clear the bar. The positions the ranking
+    is fitted on do not move: the arm that runs is still the fold-1 policy. `whole` has one set and
+    therefore one fold, and asking for two there is refused rather than silently ignored.
     """
     if gate_mode not in pol.GATE_MODES:
         raise ValueError("unknown gate mode %r; expected one of %s"
                          % (gate_mode, ", ".join(pol.GATE_MODES)))
+    folds = pol.resolve_gate_folds(gate_mode, folds)
+    if int(folds) not in pol.GATE_FOLD_CHOICES:
+        raise ValueError("unknown gate fold count %r; expected one of %s"
+                         % (folds, ", ".join(str(f) for f in pol.GATE_FOLD_CHOICES)))
     cal = np.asarray(cal_pos, dtype=int)
     if gate_mode == "whole":
+        if int(folds) != 1:
+            raise ValueError("the `whole` gate has one set that both fits and measures, so it has "
+                             "no second fold to verify on; use --gate-mode split for %d folds"
+                             % int(folds))
         gate, _m = gate_for(cells, cal, n_labels=n_labels, c_gate=c_gate, n_draws=n_draws,
-                            seed=seed, resamples=resamples)
+                            seed=seed, resamples=resamples, ranking=ranking)
         return gate, cal, {"n_selection": int(len(cal)), "n_verification": 0,
-                           "n_calibration": int(len(cal)), "requested": None, "truncated": False}
+                           "n_calibration": int(len(cal)), "requested": None, "truncated": False,
+                           "n_folds": 1}
     sel, ver, sizes = split_calibration(cells, cal, n_select, n_verify)
-    return measured_gate(cells, ver, c_gate=c_gate, seed=seed), sel, sizes
+    mirror = [(cells.acc[:, :, sel], sel)] if int(folds) == 2 else []
+    sizes = dict(sizes, n_folds=int(folds))
+    return measured_gate(cells, ver, c_gate=c_gate, seed=seed, folds=mirror), sel, sizes
 
 
-def measured_gate(cells, ver_pos, c_gate=pol.DEFAULT_C_GATE, seed=7, gate_boot=pol.GATE_BOOT):
+def fold_fits(gate):
+    """Return [(fit positions, verification positions)] for a gate's EXTRA folds, fold 1 excluded.
+
+    Two folds are the two directions of one split, so the extra fold is fitted on exactly the
+    questions fold 1 verifies on and verifies on exactly the questions fold 1 is fitted on. A caller
+    that needs a fold's own ranking refits it on the first element and measures on the second.
+    """
+    own = getattr(gate, "pos", None)
+    if own is None:
+        return []
+    return [(np.asarray(own, dtype=int), np.asarray(g.pos, dtype=int))
+            for g in getattr(gate, "folds", []) if g.pos is not None]
+
+
+def measured_gate(cells, ver_pos, c_gate=pol.DEFAULT_C_GATE, seed=7, gate_boot=pol.GATE_BOOT,
+                  folds=()):
     """Return the gate that reads the VERIFICATION questions' own labels.
 
     The margin between two cells is the paired accuracy difference over those questions and its SD
@@ -186,7 +260,7 @@ def measured_gate(cells, ver_pos, c_gate=pol.DEFAULT_C_GATE, seed=7, gate_boot=p
     """
     ver = np.asarray(ver_pos, dtype=int)
     return pol.MeasuredGate(cells.acc[:, :, ver], c_gate=c_gate, n_boot=gate_boot, seed=seed,
-                            pos=ver)
+                            pos=ver, folds=folds)
 
 
 def _budget_mean(values):
@@ -262,7 +336,7 @@ def family_margin(cells, ver_pos, cost, X, order_f, seed=7, gate_boot=pol.GATE_B
 
 
 def gated_vectors(cells, ev_pos, cost, Xs, order, gate, families=DEFAULT_FAMILIES, seed=7,
-                  gate_boot=pol.GATE_BOOT, picks=None):
+                  gate_boot=pol.GATE_BOOT, picks=None, folds=()):
     """Return (per-budget (policy, normal) vectors, reverted fractions, family per budget, records).
 
     `picks`, when a list, receives per budget the (pick depth, pick cap, normal depth, normal
@@ -281,12 +355,21 @@ def gated_vectors(cells, ev_pos, cost, Xs, order, gate, families=DEFAULT_FAMILIE
     one v4 kept.
 
     `families=False` skips F0 to F2 and leaves the v4 path alone.
+
+    `folds` holds the EXTRA folds of the split (policy.GATE_FOLDS), each a (cell order fitted on that
+    fold's own half, verification positions) pair from `fold_fits`. A family then has to clear the
+    bar on every fold's own questions with every fold's own fit, and the free set on every fold's
+    labels, before the deviation is taken; the policy that RUNS is always fold 1's. An extra fold can
+    only withhold a deviation.
     """
     if gate is None or not isinstance(gate, pol.MeasuredGate) or gate.pos is None:
         P, rev = pol.policy_vectors(cells, ev_pos, cost, Xs, order, gate=gate, picks=picks)
         return P, rev, [None] * len(Xs), []
     ver = gate.pos
     fams = pol.DEVIATION_FAMILIES[:-1] if families else ()
+    # fold 1 is the order this function was handed, measured on the gate's own questions
+    fold_specs = [(order, np.asarray(ver, dtype=int))] + [(o, np.asarray(v, dtype=int))
+                                                          for o, v in folds]
     out, reverted, opened, records = [], [], [], []
     for X in Xs:
         chosen = None
@@ -294,14 +377,27 @@ def gated_vectors(cells, ev_pos, cost, Xs, order, gate, families=DEFAULT_FAMILIE
             order_f = family_order(cells, order, fam)
             if not order_f:
                 continue
-            margin, sd = family_margin(cells, ver, cost, X, order_f, seed=seed,
-                                       gate_boot=gate_boot)
-            passed = pol.gate_passes(margin, sd, gate.c_gate)
+            per_fold, passed = [], True
+            for o_i, v_i in fold_specs:
+                of = family_order(cells, o_i, fam)
+                if not of:
+                    passed = False
+                    break
+                m_i, s_i = family_margin(cells, v_i, cost, X, of, seed=seed, gate_boot=gate_boot)
+                ok_i = pol.gate_passes(m_i, s_i, gate.c_gate)
+                passed = passed and ok_i
+                per_fold.append({"margin_pts": (100 * m_i if m_i == m_i else None),
+                                 "sd_pts": (100 * s_i if s_i == s_i else None),
+                                 "bar_pts": (100 * gate.c_gate * s_i if s_i == s_i else None),
+                                 "opened": bool(ok_i), "n_verification": int(len(v_i))})
+            first = per_fold[0] if per_fold else {"margin_pts": None, "sd_pts": None,
+                                                 "bar_pts": None}
             records.append({"X": float(X), "family": fam, "n_cells": len(order_f),
-                            "margin_pts": (100 * margin if margin == margin else None),
-                            "sd_pts": (100 * sd if sd == sd else None),
-                            "bar_pts": (100 * gate.c_gate * sd if sd == sd else None),
-                            "opened": bool(passed), "n_verification": int(len(ver))})
+                            "margin_pts": first["margin_pts"], "sd_pts": first["sd_pts"],
+                            "bar_pts": first["bar_pts"],
+                            "opened": bool(passed), "n_verification": int(len(ver)),
+                            "n_folds": len(fold_specs),
+                            "folds": (per_fold[1:] or None)})
             if passed:
                 chosen = (fam, order_f)
                 break
@@ -329,11 +425,21 @@ def gated_vectors(cells, ev_pos, cost, Xs, order, gate, families=DEFAULT_FAMILIE
 
 
 # ---------------------------------------------------------------- gain over normal
+def _gate_ranking(ranking):
+    """Return the fitted surface a whole-mode gate reads for an arm: its own where it has one.
+
+    `lookup` has no fitted surface, so its whole-mode gate keeps reading the pooled identity's,
+    which is what it has always read.
+    """
+    return ranking if ranking in pol.EQUATION_RANKINGS else "equation"
+
+
 def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptfree=False,
                      n_budgets=pol.N_BUDGETS, n_boot=2000, n_cal_draws=100, seed=7,
                      min_normal_feasible=0.9, gate_draws=40, accounting="cap",
                      gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
-                     n_select=None, n_verify=None, families=DEFAULT_FAMILIES):
+                     n_select=None, n_verify=None, families=DEFAULT_FAMILIES,
+                     gate_folds=None):
     """Return gains in percentage points over the budgets at which normal operation is
     affordable for at least `min_normal_feasible` of the prompts.
 
@@ -346,6 +452,7 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
     comparison stays internal to one accounting (see policy.Cost).
     """
     rng = np.random.default_rng(seed)
+    gate_folds = pol.resolve_gate_folds(gate_mode, gate_folds)
     cost = pol.cost_of(cells, promptfree, accounting=accounting)
     ev, cal = cells.select("eval"), cells.select("cal")
     if len(ev) == 0 or len(cal) == 0:
@@ -362,14 +469,20 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
         # selection half, the gate its own.
         gate, fit_pos, gate_sizes = gate_and_fit(cells, cal, n_labels, c, gate_draws, seed,
                                                  gate_mode="split", n_select=n_select,
-                                                 n_verify=n_verify)
+                                                 n_verify=n_verify,
+                                                 ranking=_gate_ranking(ranking), folds=gate_folds)
     resamples = calibration_resamples(fit_pos, n_labels, n_cal_draws, seed)
     if c_gate and c_gate > 0 and gate is None:
         gate, fit_pos, gate_sizes = gate_and_fit(cells, cal, n_labels, c, gate_draws, seed,
-                                                 gate_mode=gate_mode, resamples=resamples)
+                                                 gate_mode=gate_mode, resamples=resamples,
+                                                 ranking=_gate_ranking(ranking), folds=gate_folds)
     order, extra = make_order(cells, fit_pos, cost, Pm, Rm, ranking, n_labels)
+    # every extra fold's own order, fitted on that fold's own half (policy.GATE_FOLDS)
+    fold_specs = [(make_order(cells, fp, cost, Pm, Rm, ranking, n_labels)[0], vp)
+                  for fp, vp in fold_fits(gate)]
     P, reverted, fam_opened, fam_records = gated_vectors(cells, ev, cost, Xs, order, gate,
-                                                         families=families, seed=seed)
+                                                         families=families, seed=seed,
+                                                         folds=fold_specs)
     # Snapshot before the bootstrap below asks the gate about further pairs: these are the pairs the
     # reported policy was ruled on, each with the margin and SD its verification questions measured.
     gate_decisions = gate.decisions() if isinstance(gate, pol.MeasuredGate) else None
@@ -397,6 +510,7 @@ def gain_over_normal(cells, ranking="lookup", n_labels=None, c_gate=0.0, promptf
            "budgets": [float(x) for x in Xs], "per_budget": per_budget,
            "Bstar": bstar, "Blow": blow, "range_meta": rmeta,
            "gate_mode": gate_mode, "one_se": bool(one_se), "gate_c": float(c),
+           "gate_folds": int(gate_folds),
            "gate_sizes": gate_sizes, "gate_decisions": gate_decisions,
            "families": bool(families), "family_decisions": fam_records,
            "deviation_family_per_budget": list(fam_opened),
@@ -507,9 +621,11 @@ def contrast(cells_a, cells_b, which="Bstar", ranking="lookup", n_labels=None, c
     if c_gate and c_gate > 0:
         c = pol.gate_constant(c_gate, one_se)
         ga, fa, _sa = gate_and_fit(cells_a, cal_a, n_labels, c, gate_draws, seed, gate_mode,
-                                   n_select=n_select, n_verify=n_verify)
+                                   n_select=n_select, n_verify=n_verify,
+                                   ranking=_gate_ranking(ranking))
         gb, fb, _sb = gate_and_fit(cells_b, cal_b, n_labels, c, gate_draws, seed, gate_mode,
-                                   n_select=n_select, n_verify=n_verify)
+                                   n_select=n_select, n_verify=n_verify,
+                                   ranking=_gate_ranking(ranking))
     oa, _ = make_order(cells_a, fa, ca, Pm, Rm, ranking, n_labels)
     ob, _ = make_order(cells_b, fb, cb, Pm, Rm, ranking, n_labels)
     Pa, _ra = pol.policy_vectors(cells_a, ev_a, ca, Xr, oa, gate=ga)
@@ -557,9 +673,11 @@ def noninferiority(cells_a, cells_b, ranking="lookup", n_labels=None, c_gate=0.0
     if c_gate and c_gate > 0:
         c = pol.gate_constant(c_gate, one_se)
         ga, fa, _sa = gate_and_fit(cells_a, cal_a, n_labels, c, gate_draws, seed, gate_mode,
-                                   n_select=n_select, n_verify=n_verify)
+                                   n_select=n_select, n_verify=n_verify,
+                                   ranking=_gate_ranking(ranking))
         gb, fb, _sb = gate_and_fit(cells_b, cal_b, n_labels, c, gate_draws, seed, gate_mode,
-                                   n_select=n_select, n_verify=n_verify)
+                                   n_select=n_select, n_verify=n_verify,
+                                   ranking=_gate_ranking(ranking))
     oa, _ = make_order(cells_a, fa, ca, Pm, Rm, ranking, n_labels)
     ob, _ = make_order(cells_b, fb, cb, Pm, Rm, ranking, n_labels)
     Pa, _ = pol.policy_vectors(cells_a, ev_a, ca, Xr, oa, gate=ga)
@@ -640,6 +758,7 @@ def _gate_fields(gate_mode, c, sizes):
             "gate_n_selection": int(sizes.get("n_selection", 0)),
             "gate_n_verification": int(sizes.get("n_verification", 0)),
             "gate_n_calibration": int(sizes.get("n_calibration", 0)),
+            "gate_folds": int(sizes.get("n_folds", 1)),
             "gate_split_truncated": bool(sizes.get("truncated", False))}
 
 
@@ -663,7 +782,8 @@ def _paired_vs_default(arm, ref, rng, n_boot):
 def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAULT_C_GATE,
            n_labels_grid=(30, 100), seed=7, gate_draws=40, accounting="cap", n_boot=400,
            avg_budget=False, gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
-           n_select=None, n_verify=None, families=DEFAULT_FAMILIES):
+           n_select=None, n_verify=None, families=DEFAULT_FAMILIES,
+           gate_folds=None):
     """Return each arm's accuracy in percentage points at budgets set to `fractions` of the default
     cost (the mean realised layer-token cost of the deepest depth run to its natural stop).
 
@@ -697,6 +817,7 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
     calibration noise -- and never a policy result; no arm may consume it.
     """
     rng = np.random.default_rng(seed)
+    gate_folds = pol.resolve_gate_folds(gate_mode, gate_folds)
     cost = pol.cost_of(cells, promptfree, accounting=accounting)
     ev, cal = cells.select("eval"), cells.select("cal")
     Pm, Rm = pol.median_point(cells, ev)
@@ -708,16 +829,29 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
 
     arms = [("lookup", dict(ranking="lookup")),
             ("equation", dict(ranking="equation")),
-            ("gated_equation", dict(ranking="equation", gate=True))]
+            ("equation_resolved", dict(ranking="equation_resolved")),
+            ("gated_equation", dict(ranking="equation", gate=True)),
+            ("gated_equation_resolved", dict(ranking="equation_resolved", gate=True))]
     for nl in n_labels_grid:
-        arms.insert(-1, ("equation_n%d" % nl, dict(ranking="equation", n_labels=nl)))
+        arms.insert(2, ("equation_n%d" % nl, dict(ranking="equation", n_labels=nl)))
 
     c = pol.gate_constant(c_gate, one_se)
+    # One gate per RANKING, because a whole-mode gate reads that ranking's own fitted surface. Under
+    # the default split the gate reads labels and no surface, so every ranking shares one object and
+    # its measured margins stay cached.
+    _gates = {}
+
+    def gate_of(ranking):
+        key = None if gate_mode == "split" else _gate_ranking(ranking)
+        if key not in _gates:
+            _gates[key] = gate_and_fit(cells, cal, None, c, gate_draws, seed,
+                                       gate_mode=gate_mode, n_select=n_select, n_verify=n_verify,
+                                       ranking=_gate_ranking(ranking), folds=gate_folds)
+        return _gates[key]
+
     gate, gate_fit, gate_sizes = None, cal, None
     if c_gate and c_gate > 0:
-        gate, gate_fit, gate_sizes = gate_and_fit(cells, cal, None, c, gate_draws, seed,
-                                                  gate_mode=gate_mode, n_select=n_select,
-                                                  n_verify=n_verify)
+        gate, gate_fit, gate_sizes = gate_of("equation")
 
     default_acc_pts = 100 * float(np.nanmean(dacc))
     default_feasible = [bool(pol.affordable(dc["mean"], X)) for X in Xs]
@@ -751,14 +885,19 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
     normal_done, normal_vecs = False, None
     for name, spec in arms:
         gated = bool(spec.get("gate")) and gate is not None
+        g, arm_sizes = None, gate_sizes
+        if gated:
+            g, arm_fit, arm_sizes = gate_of(spec["ranking"])
         # A gated arm is fitted on the SELECTION half only, so the cells its order chose are
         # scored by the gate on labels that had no part in choosing them.
-        fit_pos = gate_fit if gated else cal
+        fit_pos = arm_fit if gated else cal
         order, _ = make_order(cells, fit_pos, cost, Pm, Rm, spec["ranking"], spec.get("n_labels"))
-        g = gate if gated else None
+        fold_specs = [(make_order(cells, fp, cost, Pm, Rm, spec["ranking"],
+                                  spec.get("n_labels"))[0], vp)
+                      for fp, vp in fold_fits(g)] if gated else []
         arm_picks = []
         P, rev, fams, frecs = gated_vectors(cells, ev, cost, Xs, order, g, families=families,
-                                            seed=seed, picks=arm_picks)
+                                            seed=seed, picks=arm_picks, folds=fold_specs)
         picks_out[name] = [
             {"fraction": float(fractions[j]), "budget": float(Xs[j]),
              "gate": (_gate_decision(fams[j], frecs, Xs[j]) if gated else None),
@@ -780,10 +919,10 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
                                       for j in range(len(Xs))],
                       "fallback": "default_at_budget"}
         if gated:
-            rows[name].update(_gate_fields(gate_mode, c, gate_sizes))
+            rows[name].update(_gate_fields(gate_mode, c, arm_sizes))
             rows[name]["family_decisions"] = frecs
-            if isinstance(gate, pol.MeasuredGate):
-                rows[name]["gate_decisions"] = gate.decisions()
+            if isinstance(g, pol.MeasuredGate):
+                rows[name]["gate_decisions"] = g.decisions()
         if not normal_done:
             picks_out["default_at_budget"] = [
                 {"fraction": float(fractions[j]), "budget": float(Xs[j]), "gate": None,
@@ -801,13 +940,13 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             normal_done = True
 
     avg_on = bool(avg_budget) and accounting != "realised"
-    for name in (pol.AVG_RANKINGS if avg_on else ()):
+    for name in (pol.AVG_ARMS if avg_on else ()):
         score = cell_scores(cells, cal, name, cost, Pm, Rm)
-        if name == pol.AVG_GATED:
+        if name in pol.AVG_GATED_ARMS:
             V = avg_gated_vectors(cells, ev, cal, cost, Xs, score, (dk, dT), c_gate=c_gate,
                                   n_draws=gate_draws, seed=seed, gate_mode=gate_mode,
                                   one_se=one_se, n_select=n_select, n_verify=n_verify,
-                                  families=families)
+                                  families=families, ranking=name, folds=gate_folds)
         else:
             V = pol.avg_budget_vectors(cells, ev, cal, cost, Xs, score)
         rows[name] = {
@@ -831,6 +970,9 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             "deviation_family": [v.get("deviation_family") for v in V],
             "gate_margin_pts": [v.get("gate_margin_pts") for v in V],
             "gate_sd_pts": [v.get("gate_sd_pts") for v in V],
+            # the further folds' own verified margins, where more than one fold was demanded
+            "gate_folds_per_budget": [v.get("gate_folds") for v in V],
+            "gate_fold_detail": [v.get("gate_fold_detail") for v in V],
             "gate_draw_frac_positive": [v.get("gate_draw_frac_positive") for v in V],
             # gain over normal is not defined for an average budget: normal operation is a
             # per-prompt cap policy and the two are not priced the same way. The paired
@@ -845,16 +987,56 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             "vs_fallback": [_paired_vs_default(V[j]["acc"], cells.acc[dki, dbi, ev], rng, n_boot)
                             for j in range(len(Xs))],
             "fallback": "default_cell"}
-        if name == pol.AVG_GATED:
+        if name in pol.AVG_GATED_ARMS:
             rows[name].update(_gate_fields(gate_mode, c,
                                            V[0].get("gate_sizes") if V else gate_sizes))
+            # The GATED average-budget arm reverts to normal operation at the budget, which is the
+            # default cell only where that cell is affordable on average (evaluate.normal_at_budget),
+            # so its fallback column is that reference and the rule that produced it per budget.
+            ref_acc = [(v.get("reference_acc") if v.get("reference_acc") is not None
+                        else cells.acc[dki, dbi, ev]) for v in V]
+            rows[name].update({
+                "note": rows[name]["note"] + "; the gate's reference is NORMAL OPERATION at the "
+                        "same budget -- the deepest depth at the largest cap per prompt the budget "
+                        "affords on average, the default cell itself wherever that is affordable",
+                "reference_rule": [v.get("reference_rule") for v in V],
+                "reference_k": [v.get("reference_k") for v in V],
+                "reference_cells": [v.get("reference_cells") for v in V],
+                "reference_mean_price_layer_passes": [v.get("reference_mean_price") for v in V],
+                "reference_affordable_on_average": [v.get("reference_affordable_on_average")
+                                                    for v in V],
+                # which half's mean price the affordability test read, and what the other says
+                "default_cell_mean_price_cal": [v.get("default_cell_mean_price_cal") for v in V],
+                "default_cell_mean_price_eval": [v.get("default_cell_mean_price_eval") for v in V],
+                "default_cell_affordable_on_cal": [v.get("default_cell_affordable_on_cal")
+                                                   for v in V],
+                "default_cell_affordable_on_eval": [v.get("default_cell_affordable_on_eval")
+                                                    for v in V],
+                "vs_fallback": [_paired_vs_default(V[j]["acc"], ref_acc[j], rng, n_boot)
+                                for j in range(len(Xs))],
+                "fallback": "normal_at_budget"})
         picks_out[name] = [
             {"fraction": float(fractions[j]), "budget": float(Xs[j]),
              "gate": ({"family": v.get("deviation_family"),
                        "margin_pts": v.get("gate_margin_pts"), "sd_pts": v.get("gate_sd_pts"),
                        "opened": v.get("deviation_family") is not None,
-                       "reverted": bool(v.get("gate_reverted", False))}
-                      if name == pol.AVG_GATED else None),
+                       "reverted": bool(v.get("gate_reverted", False)),
+                       # what the gate ruled against, and what a reversion runs
+                       "reference": {"rule": v.get("reference_rule"), "k": v.get("reference_k"),
+                                     "lambda": v.get("reference_lambda"),
+                                     "cells": v.get("reference_cells"),
+                                     "mean_price": v.get("reference_mean_price"),
+                                     "affordable_on_average":
+                                         v.get("reference_affordable_on_average"),
+                                     "default_cell_mean_price_cal":
+                                         v.get("default_cell_mean_price_cal"),
+                                     "default_cell_mean_price_eval":
+                                         v.get("default_cell_mean_price_eval"),
+                                     "default_cell_affordable_on_cal":
+                                         v.get("default_cell_affordable_on_cal"),
+                                     "default_cell_affordable_on_eval":
+                                         v.get("default_cell_affordable_on_eval")}}
+                      if name in pol.AVG_GATED_ARMS else None),
              "mean_price": float(v["mean_price"]),
              "picks": _pick_records(cells, ev, cost, v["k_idx"], v["cap_idx"], v["price"])}
             for j, v in enumerate(V)]
@@ -865,6 +1047,7 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
         r["oracle_gap_pts"] = None if v != v else float(orc["acc_pts"] - v)
     return {"task": cells.task, "grid": cells.name, "promptfree": bool(promptfree),
             "accounting": accounting, "fractions": list(fractions), "avg_budget": avg_on,
+            "gate_folds": int(gate_folds),
             "budgets": [float(x) for x in Xs],
             "default_cost": dc, "n_eval": int(len(ev)), "c_gate": float(c_gate),
             "gate_mode": gate_mode, "one_se": bool(one_se), "gate_c": float(c),
@@ -933,22 +1116,114 @@ def oracle_cell(cells, ev_pos=None):
 
 
 # ---------------------------------------------------------------- the average budget, gated
-def cell_scores_boot(cells, cal_pos, cost, Pm, Rm, boot_sel):
-    """Return the lookup score surface on one bootstrap resample of the given calibration prompts."""
+def cell_scores_boot(cells, cal_pos, cost, Pm, Rm, boot_sel, ranking="lookup"):
+    """Return one ranking's score surface on a bootstrap resample of the given calibration prompts.
+
+    `lookup` re-reads the resampled cell means; an equation ranking refits its whole surface on the
+    resampled questions, which is what makes the draw diagnostic say how much of a verdict is the
+    fitting half's own luck rather than only how noisy its cell means are.
+    """
+    base = pol.AVG_BASE.get(ranking, ranking)
+    if base in pol.EQUATION_RANKINGS:
+        ids = np.asarray(cal_pos, dtype=int)[np.asarray(boot_sel, dtype=int)]
+        return surface_of(cells, ids, base)[0]
     _order, acc = pol.rank_lookup(cells, cal_pos, cost, Pm, Rm, boot_sel=boot_sel)
     return np.array([[acc[(k, T)] for T in cells.caps] for k in cells.ks], float)
 
 
-def _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X):
-    """Overwrite one record with the fallback: the default cell run for every evaluation prompt."""
-    price = np.array([cost(default_kt[0], default_kt[1], cells.ptok[n], cells.reserve[n], n)
-                      for n in ev], float)
+def cells_used(cells, a, b):
+    """Return {cell key: prompts} for per-prompt (depth index, cap index) arrays."""
+    counts = {}
+    for i, j in zip(np.asarray(a, int), np.asarray(b, int)):
+        key = "k%d_T%d" % (cells.ks[int(i)], cells.caps[int(j)])
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def normal_at_budget(cells, fit_prices, X, default_kt):
+    """Return the reference the average-budget gate measures against at budget X: NORMAL OPERATION
+    AT THAT BUDGET. Never None -- a gated arm must never be able to return an ungated pick.
+
+    Normal operation at a budget is the deepest depth run as far as the budget allows: per prompt
+    the largest cap at the deepest depth such that the MEAN price over the fitting prompts is at
+    most X, which is `policy.avg_picks` on a score ranking the caps by the tokens they buy, the cap
+    standing for natural stop first. If even the cheapest cap at the deepest depth is unaffordable
+    on average, the rule steps down one depth and repeats.
+
+    Where the DEFAULT CELL -- the deepest depth at natural stop -- is itself affordable on average
+    this returns exactly that cell for every prompt, which is the reference the gate has always
+    used, so a row that gated before gates against the same thing. Where it is not, the reference is
+    the same operating point with the cap, then the depth, stepped down, instead of no reference at
+    all: below the default cell's own mean price the gate used to be skipped entirely and the
+    average-budget pick stood ungated at the budgets where its deviation is largest.
+
+    `fit_prices` is the (depth, cap, prompt) price tensor of the prompts the arm's multiplier is
+    fitted on -- the selection half under the split gate -- so the reference is fitted where the arm
+    is and then read off any prompt set with `reference_record`.
+
+    The affordability test reads the FITTING prompts' mean price, and the evaluation prompts can be
+    cheaper (arc/ouro_2_6b_base at 1.0x: the default cell is over the budget on the calibration mean
+    and under it on the evaluation mean). That only decides WHICH reference the rule names; the gate
+    runs against it either way, and both mean prices are recorded on the row so the gap is visible.
+
+    Returns {"score", "lambda", "k", "rule", "affordable_on_average"}: the surface and multiplier
+    `policy.avg_picks` reads the reference off, the depth index it settled on, and which of the four
+    rules applied (`default_cell`, `deepest_depth_capped`, `shallower_depth`, and
+    `cheapest_over_budget` where no cell of the grid fits X on average at all).
+    """
+    nk, nb = len(cells.ks), len(cells.caps)
+    dki, dbi = list(cells.ks).index(default_kt[0]), list(cells.caps).index(default_kt[1])
+    # The caps are ranked by the tokens they buy, not by their index, so a grid that marks "no cap
+    # at all" with a negative cap still has natural stop at the top of the ranking.
+    limits = C.cap_limits(cells)
+    rank = np.empty(nb, float)
+    rank[np.argsort(limits, kind="stable")] = np.arange(nb, dtype=float)
+    prices = np.asarray(fit_prices, float)
+    for d in range(nk - 1, -1, -1):
+        if not pol.affordable(float(np.nanmin(prices[d], axis=0).mean()), X):
+            continue                 # not even the cheapest cap at this depth fits X on average
+        S = np.full((nk, nb), np.nan)
+        S[d, :] = rank
+        lam, _spend, _met = pol.lambda_for_budget(S, prices, X)
+        default_ok = d == dki and pol.affordable(float(prices[dki, dbi, :].mean()), X)
+        rule = ("default_cell" if default_ok
+                else "deepest_depth_capped" if d == dki else "shallower_depth")
+        return {"score": S, "lambda": float(lam), "k": int(d), "rule": rule,
+                "affordable_on_average": True}
+    # No cell of the grid fits X on average, at any depth. The reference is then the cheapest cell
+    # of the shallowest depth -- where the Lagrangian's own floor sits -- so the gate still has a
+    # measured reference and the gated arm cannot quietly become an ungated one. The row's
+    # `over_budget` flag is what says the budget could not be met.
+    S = np.full((nk, nb), np.nan)
+    S[0, :] = rank
+    lam, _spend, _met = pol.lambda_for_budget(S, prices, X)
+    return {"score": S, "lambda": float(lam), "k": 0, "rule": "cheapest_over_budget",
+            "affordable_on_average": False}
+
+
+def reference_record(cells, ref, pos, prices):
+    """Return (depth indices, cap indices, record fields) of one reference over the prompts `pos`."""
+    a, b = pol.avg_picks(ref["score"], prices, ref["lambda"])
+    price = np.asarray(prices, float)[a, b, np.arange(len(pos))]
+    return a, b, {"reference_rule": ref["rule"], "reference_k": int(cells.ks[ref["k"]]),
+                  "reference_lambda": float(ref["lambda"]),
+                  "reference_affordable_on_average": bool(ref.get("affordable_on_average", True)),
+                  "reference_cells": cells_used(cells, a, b),
+                  "reference_mean_price": float(price.mean())}
+
+
+def _revert_to_reference(rec, cells, ev, cost, ra, rb, X):
+    """Overwrite one record with the fallback: normal operation at this budget run for every
+    evaluation prompt, at the cells `normal_at_budget` reads off for them."""
+    ra, rb = np.asarray(ra, int), np.asarray(rb, int)
+    price = np.array([cost(cells.ks[ra[i]], cells.caps[rb[i]], cells.ptok[n], cells.reserve[n], n)
+                      for i, n in enumerate(ev)], float)
     mean_price = float(price.mean())
-    rec.update({"acc": cells.acc[ki, bi, ev], "price": price, "mean_price": mean_price,
-                "k_idx": np.full(len(ev), ki, int), "cap_idx": np.full(len(ev), bi, int),
+    rec.update({"acc": np.asarray(cells.acc[ra, rb, ev], float), "price": price,
+                "mean_price": mean_price, "k_idx": ra, "cap_idx": rb,
                 "mean_price_over_X_pct": 100.0 * (mean_price / float(X) - 1.0),
                 "over_budget": bool(mean_price > float(X) * (1.0 + pol.AVG_TOL)),
-                "cells_used": {"k%d_T%d" % default_kt: int(len(ev))},
+                "cells_used": cells_used(cells, ra, rb),
                 "gate_reverted": True})
 
 
@@ -956,14 +1231,31 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
                       c_gate=pol.DEFAULT_C_GATE, n_draws=40, seed=7, n_labels=None,
                       gate_mode=pol.DEFAULT_GATE_MODE, one_se=False,
                       n_select=None, n_verify=None, families=DEFAULT_FAMILIES,
-                      gate_boot=pol.GATE_BOOT):
-    """Return the records of `avg_gated_lookup`: the average-budget lookup policy, kept only where
-    it is measured to beat running the DEFAULT CELL for every prompt by more than its own noise.
+                      gate_boot=pol.GATE_BOOT, ranking=pol.AVG_GATED, folds=None):
+    """Return the records of a gated average-budget arm: the average-budget policy of `ranking`,
+    kept only where it is measured to beat NORMAL OPERATION AT THE SAME BUDGET by more than its own
+    noise.
+
+    `ranking` names which score surface the arm maximises -- `avg_gated_lookup` the calibration cell
+    means, `avg_gated_equation_resolved` the settle-time resolved surface -- and is refitted on the
+    selection half under `split`, as the ungated arms are.
+
+    `folds` is how many directions of the split the deviation has to be earned in; None takes the
+    frozen default, two (policy.resolve_gate_folds). At 2 the whole test runs twice: the score, the
+    multiplier and the reference are fitted on the selection half and the margin measured on the
+    verification half, then fitted on the verification half and measured on the selection half, and
+    the deviation is taken only when BOTH clear the bar. The policy that RUNS is always fold 1's, so
+    a second fold can only withhold a deviation.
+
+    The reference is `normal_at_budget`: the deepest depth at the largest cap per prompt the budget
+    affords on average, which is the default cell itself wherever that cell is affordable on average
+    and a stepped-down cap or depth where it is not. Before this the reference was the default cell
+    alone, so below its own mean price the gate did not run and the pick stood ungated.
 
     Under `split` (the default) the calibration questions are cut in id order into a SELECTION half
     and a VERIFICATION half. The ranking and the multiplier are fitted on the selection half alone.
     The margin is then the paired accuracy difference, over the VERIFICATION questions, between the
-    cells that policy picks for them and the default cell, and its SD is a paired bootstrap over
+    cells that policy picks for them and the reference's cells, and its SD is a paired bootstrap over
     those same questions. Neither number can be inflated by the choice of cell, because the labels
     that chose the cell are in the other half.
 
@@ -973,33 +1265,65 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
     cells read on the data that maximised it, so it runs optimistic by roughly the noise spread
     times how many cells were in the running -- the winner curse this repair removes.
 
-    `one_se` replaces c_gate with a whole standard error. The fallback exists only where the
-    default cell fits the budget ON AVERAGE over the calibration prompts; below that there is
+    `one_se` replaces c_gate with a whole standard error. The fallback exists at every budget some
+    depth fits on average; only below that -- where not even the cheapest cell fits -- is there
     nothing to revert to and the Lagrangian policy stands.
 
     `families` (v5) tries the structured deviation families F0 to F2 first, smallest first, each
     one a Lagrangian policy restricted to that family's cells and each tested the same way against
-    the default cell on the verification questions. The first to clear the bar is run and the row
+    the reference on the verification questions. The first to clear the bar is run and the row
     records it. F3, the free set, is the test below and v4's behaviour exactly, so a family can
     only add a deviation the structured test earned, never take one away.
     """
     if gate_mode not in pol.GATE_MODES:
         raise ValueError("unknown gate mode %r; expected one of %s"
                          % (gate_mode, ", ".join(pol.GATE_MODES)))
+    folds = pol.resolve_gate_folds(gate_mode, folds)
+    if int(folds) not in pol.GATE_FOLD_CHOICES:
+        raise ValueError("unknown gate fold count %r; expected one of %s"
+                         % (folds, ", ".join(str(f) for f in pol.GATE_FOLD_CHOICES)))
+    if gate_mode == "whole" and int(folds) != 1:
+        raise ValueError("the `whole` gate has one set that both fits and measures, so it has no "
+                         "second fold to verify on; use gate_mode='split' for %d folds"
+                         % int(folds))
     ev, cal = np.asarray(ev_pos, dtype=int), np.asarray(cal_pos, dtype=int)
     Pm, Rm = pol.median_point(cells, ev)
-    ki = list(cells.ks).index(default_kt[0])
-    bi = list(cells.caps).index(default_kt[1])
     c = pol.gate_constant(c_gate, one_se)
     cal_prices = pol.price_tensor(cells, cal, cost)
+    ev_prices = pol.price_tensor(cells, ev, cost)
+    dki, dbi = list(cells.ks).index(default_kt[0]), list(cells.caps).index(default_kt[1])
     on = bool(c_gate) and float(c_gate) > 0
+    # The fields every row carries about the reference the gate ruled against at that budget.
+    ref_blank = {"reference_rule": None, "reference_k": None, "reference_lambda": None,
+                 "reference_affordable_on_average": None, "reference_cells": None,
+                 "reference_mean_price": None, "reference_acc": None,
+                 "default_cell_mean_price_cal": None, "default_cell_mean_price_eval": None,
+                 "default_cell_affordable_on_cal": None, "default_cell_affordable_on_eval": None}
+
+    def default_prices(fit_prices, X):
+        """The default cell's mean price on the prompts the reference is FITTED on and on the
+        evaluation prompts, with affordability under each. The two differ -- arc/ouro_2_6b_base has
+        the cheaper evaluation half -- and which one the rule reads is a fact about the row."""
+        f, e = float(fit_prices[dki, dbi, :].mean()), float(ev_prices[dki, dbi, :].mean())
+        return {"default_cell_mean_price_cal": f, "default_cell_mean_price_eval": e,
+                "default_cell_affordable_on_cal": bool(pol.affordable(f, X)),
+                "default_cell_affordable_on_eval": bool(pol.affordable(e, X))}
 
     if gate_mode == "split":
         sel, ver, sizes = split_calibration(cells, cal, n_select, n_verify)
-        S = cell_scores(cells, sel, pol.AVG_GATED, cost, Pm, Rm, n_labels=n_labels)
+        sizes = dict(sizes, n_folds=int(folds))
+        S = cell_scores(cells, sel, ranking, cost, Pm, Rm, n_labels=n_labels)
         sel_prices = pol.price_tensor(cells, sel, cost)
         ver_prices = pol.price_tensor(cells, ver, cost)
-        ref = np.asarray(cells.acc[ki, bi, ver], float)
+        # The folds of the split. Fold 1 fits on the selection half and verifies on the verification
+        # half; at two folds the mirror fits on the verification half and verifies on the selection
+        # half. Each fold carries its OWN score, multiplier and reference, so its verified margin is
+        # measured on questions that took no part in producing the policy it is measuring.
+        halves = [(sel, ver, sel_prices, ver_prices)]
+        if int(folds) == 2:
+            halves.append((ver, sel, ver_prices, sel_prices))
+        fold_S = [S] + [cell_scores(cells, h[0], ranking, cost, Pm, Rm, n_labels=n_labels)
+                        for h in halves[1:]]
         # The multiplier is fitted on the selection half, so that is the half the arm is fitted
         # to; the evaluation mean price stays a measurement, as it is for the ungated arms.
         out = pol.avg_budget_vectors(cells, ev, sel, cost, Xs, S)
@@ -1008,28 +1332,74 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
             rec = out[j]
             rec.update({"gate_mode": "split", "gate_c": c, "gate_margin_pts": None,
                         "gate_sd_pts": None, "gate_reverted": False, "deviation_family": None,
-                        "family_decisions": [],
+                        "family_decisions": [], "gate_folds": int(folds), "gate_fold_detail": None,
                         "gate_draw_frac_positive": None, "gate_sizes": sizes})
-            if not on or not pol.affordable(float(cal_prices[ki, bi, :].mean()), X):
+            rec.update(ref_blank)
+            if not on:
                 continue
+            rec.update(default_prices(sel_prices, X))
+            # The reference is fitted on the SELECTION half, where the arm's multiplier is fitted,
+            # and exists at every budget, so no gated row can stand as an ungated pick.
+            info = normal_at_budget(cells, sel_prices, X, default_kt)
+            ra, rb, _rf = reference_record(cells, info, ver, ver_prices)
+            ea, eb, ef = reference_record(cells, info, ev, ev_prices)
+            rec.update(ef)
+            rec["reference_acc"] = np.asarray(cells.acc[ea, eb, ev], float)
+            ref = np.asarray(cells.acc[ra, rb, ver], float)
+            # each fold's own reference, read on that fold's own verification questions
+            fold_ref = [ref]
+            for (hs, hv, hsp, hvp) in halves[1:]:
+                i_h = normal_at_budget(cells, hsp, X, default_kt)
+                ha, hb, _hf = reference_record(cells, i_h, hv, hvp)
+                fold_ref.append(np.asarray(cells.acc[ha, hb, hv], float))
+
+            def fold_margin(i, Score):
+                """Return (margin, sd, affordable) of one fold's own policy over its own reference."""
+                hs, hv, hsp, hvp = halves[i]
+                lam_i, _sp, met_i = pol.lambda_for_budget(Score, hsp, X)
+                if not met_i:
+                    return float("nan"), float("nan"), False
+                ai, bi = pol.avg_picks(Score, hvp, lam_i)
+                arm_i = np.asarray(cells.acc[ai, bi, hv], float)
+                return (_nanmean(arm_i - fold_ref[i]),
+                        pol.paired_margin_sd(arm_i, fold_ref[i], n_boot=gate_boot, seed=seed),
+                        True)
+
             hit = None
             for fam in (pol.DEVIATION_FAMILIES[:-1] if families else ()):
                 Sf = family_score(cells, S, fam)
                 if Sf is None:
                     continue
-                lam_f, _sp, _met = pol.lambda_for_budget(Sf, sel_prices, X)
-                af, bf = pol.avg_picks(Sf, ver_prices, lam_f)
-                arm_f = np.asarray(cells.acc[af, bf, ver], float)
-                m_f = _nanmean(arm_f - ref)
-                sd_f = pol.paired_margin_sd(arm_f, ref, n_boot=gate_boot, seed=seed)
-                passed = pol.gate_passes(m_f, sd_f, c)
+                per_fold, passed, affordable_all = [], True, True
+                for i in range(len(halves)):
+                    Sfi = family_score(cells, fold_S[i], fam)
+                    if Sfi is None:
+                        passed, affordable_all = False, False
+                        break
+                    m_i, sd_i, met_i = fold_margin(i, Sfi)
+                    ok_i = met_i and pol.gate_passes(m_i, sd_i, c)
+                    passed = passed and ok_i
+                    affordable_all = affordable_all and met_i
+                    per_fold.append({"margin_pts": (100 * m_i if m_i == m_i else None),
+                                     "sd_pts": (100 * sd_i if sd_i == sd_i else None),
+                                     "bar_pts": (100 * c * sd_i if sd_i == sd_i else None),
+                                     "opened": bool(ok_i), "affordable_on_average": bool(met_i),
+                                     "n_verification": int(len(halves[i][1]))})
+                first = per_fold[0] if per_fold else {"margin_pts": None, "sd_pts": None,
+                                                      "bar_pts": None,
+                                                      "affordable_on_average": False}
+                # The family has no cell this budget can buy on average in some fold, so it is not an
+                # option here: running it would put the row over the budget it is reported at.
                 rec["family_decisions"].append(
                     {"family": fam, "n_cells": int(np.isfinite(Sf).sum()),
-                     "margin_pts": (100 * m_f if m_f == m_f else None),
-                     "sd_pts": (100 * sd_f if sd_f == sd_f else None),
-                     "bar_pts": (100 * c * sd_f if sd_f == sd_f else None),
-                     "opened": bool(passed), "n_verification": int(len(ver))})
+                     "margin_pts": first["margin_pts"], "sd_pts": first["sd_pts"],
+                     "bar_pts": first["bar_pts"], "opened": bool(passed),
+                     "affordable_on_average": bool(affordable_all),
+                     "n_verification": int(len(ver)), "n_folds": len(halves),
+                     "folds": (per_fold[1:] or None)})
                 if passed:
+                    m_f, sd_f = fold_margin(0, Sf)[:2]
+                    rec["gate_fold_detail"] = per_fold[1:] or None
                     hit = (fam, Sf, m_f, sd_f)
                     break
             if hit is not None:
@@ -1039,63 +1409,86 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
                 # and remeasures the same verification margin.
                 fpos = []
                 for dsel, _lab in plan:
-                    Sd = family_score(cells, cell_scores_boot(cells, sel, cost, Pm, Rm, dsel), fam)
+                    Sd = family_score(cells, cell_scores_boot(cells, sel, cost, Pm, Rm, dsel,
+                                                              ranking=ranking), fam)
                     if Sd is None:
                         continue
                     lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
                     ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
                     fpos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
-                keep = {k: rec[k] for k in ("gate_mode", "gate_c", "gate_sizes",
-                                            "family_decisions")}
+                keep = {k: rec[k] for k in (("gate_mode", "gate_c", "gate_sizes", "gate_folds",
+                                             "gate_fold_detail", "family_decisions")
+                                            + tuple(ref_blank))}
                 rec.update(pol.avg_budget_vectors(cells, ev, sel, cost, [X], Sf)[0])
                 rec.update(keep)
                 rec.update({"gate_margin_pts": 100 * m_f, "gate_sd_pts": 100 * sd_f,
                             "gate_reverted": False, "deviation_family": fam,
                             "gate_draw_frac_positive": (float(np.mean(fpos)) if fpos else None)})
                 continue
+            # F3, the free set: each fold's own whole policy against its own reference.
             a, b = pol.avg_picks(S, ver_prices, rec["lambda"])
             arm = np.asarray(cells.acc[a, b, ver], float)
             margin = _nanmean(arm - ref)
             sd = pol.paired_margin_sd(arm, ref, n_boot=gate_boot, seed=seed)
+            free_ok = pol.gate_passes(margin, sd, c)
+            free_folds = []
+            for i in range(1, len(halves)):
+                m_i, sd_i, met_i = fold_margin(i, fold_S[i])
+                ok_i = met_i and pol.gate_passes(m_i, sd_i, c)
+                free_ok = free_ok and ok_i
+                free_folds.append({"margin_pts": (100 * m_i if m_i == m_i else None),
+                                   "sd_pts": (100 * sd_i if sd_i == sd_i else None),
+                                   "bar_pts": (100 * c * sd_i if sd_i == sd_i else None),
+                                   "opened": bool(ok_i), "affordable_on_average": bool(met_i),
+                                   "n_verification": int(len(halves[i][1]))})
+            rec["gate_fold_detail"] = free_folds or None
             # The selection half is bootstrapped in its turn: each draw refits the score and the
             # multiplier on a resample of it and remeasures the same verification margin, so the
             # share positive says how much of the verdict is the selection half own luck.
             pos = []
             for dsel, _lab in plan:
-                Sd = cell_scores_boot(cells, sel, cost, Pm, Rm, dsel)
+                Sd = cell_scores_boot(cells, sel, cost, Pm, Rm, dsel, ranking=ranking)
                 lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
                 ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
                 pos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
             rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
             rec["gate_draw_frac_positive"] = float(np.mean(pos)) if pos else None
-            if pol.gate_passes(margin, sd, c):
+            if free_ok:
                 rec["deviation_family"] = "F3"
                 continue
-            _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X)
+            _revert_to_reference(rec, cells, ev, cost, ea, eb, X)
         return out
 
     S = np.asarray(score, float)
     sizes = {"n_selection": int(len(cal)), "n_verification": 0, "n_calibration": int(len(cal)),
-             "requested": None, "truncated": False}
+             "requested": None, "truncated": False, "n_folds": 1}
     out = pol.avg_budget_vectors(cells, ev, cal, cost, Xs, S)
     plan = calibration_resamples(cal, n_labels, n_draws, seed) if on else []
-    draw_scores = [cell_scores_boot(cells, cal, cost, Pm, Rm, sel) for sel, _lab in plan]
+    draw_scores = [cell_scores_boot(cells, cal, cost, Pm, Rm, sel, ranking=ranking)
+                   for sel, _lab in plan]
     for j, X in enumerate(Xs):
         rec = out[j]
         rec.update({"gate_mode": "whole", "gate_c": c, "gate_margin_pts": None,
                     "gate_sd_pts": None, "gate_reverted": False, "deviation_family": None,
-                    "family_decisions": [],
+                    "family_decisions": [], "gate_folds": 1, "gate_fold_detail": None,
                     "gate_draw_frac_positive": None, "gate_sizes": sizes})
-        if not on or not pol.affordable(float(cal_prices[ki, bi, :].mean()), X):
+        rec.update(ref_blank)
+        if not on:
             continue
+        rec.update(default_prices(cal_prices, X))
+        info = normal_at_budget(cells, cal_prices, X, default_kt)
+        ra, rb, _rf = reference_record(cells, info, cal, cal_prices)
+        ea, eb, ef = reference_record(cells, info, ev, ev_prices)
+        rec.update(ef)
+        rec["reference_acc"] = np.asarray(cells.acc[ea, eb, ev], float)
         a, b = pol.avg_picks(S, cal_prices, rec["lambda"])
-        margin = float(np.nanmean(S[a, b]) - S[ki, bi])
+        margin = float(np.nanmean(S[a, b]) - np.nanmean(S[ra, rb]))
         draws = []
         for (sel, _lab), Sd in zip(plan, draw_scores):
             pd = cal_prices[:, :, sel]
             lam_d, _spend, _met = pol.lambda_for_budget(Sd, pd, X)
             ad, bd = pol.avg_picks(Sd, pd, lam_d)
-            draws.append(float(np.nanmean(Sd[ad, bd]) - Sd[ki, bi]))
+            draws.append(float(np.nanmean(Sd[ad, bd]) - np.nanmean(Sd[ra, rb])))
         sd = float(np.std(draws)) if draws else 0.0
         rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
         rec["gate_draw_frac_positive"] = (float(np.mean([d > 0 for d in draws]))
@@ -1103,7 +1496,7 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
         if pol.gate_passes(margin, sd, c):
             rec["deviation_family"] = "F3"
             continue
-        _revert_to_default(rec, cells, ev, cost, default_kt, ki, bi, X)
+        _revert_to_reference(rec, cells, ev, cost, ea, eb, X)
     return out
 
 
@@ -1146,6 +1539,18 @@ def gate_selection(cells_by_task, c_grid=(0.0, 0.5, 1.0, 1.5, 2.0), worst_floor_
                                             "worst_pts": per[(t, c)][1]} for (t, c) in per}}
 
 
+def _reference_name(rule, k):
+    """Return what a gated average-budget row at one budget measured against, in words."""
+    if rule in (None, "default_cell"):
+        return "the default cell"
+    if rule == "cheapest_over_budget":
+        return ("the cheapest cell of the shallowest depth (no cell of the grid fits this budget "
+                "on average)")
+    where = "one depth down" if rule == "shallower_depth" else "the deepest depth"
+    return ("normal operation at this budget (%s, depth %s, at the largest cap it affords)"
+            % (where, k))
+
+
 def _gate_lines(t1, name, r):
     """Return the gate note for each budget where the arm had a fallback to deviate from.
 
@@ -1167,14 +1572,23 @@ def _gate_lines(t1, name, r):
         if m is None or sd is None:
             continue                       # no fallback at this budget: nothing to gate against
         fam = (r.get("deviation_family") or [None] * len(t1["fractions"]))[j]
-        verdict = ("reverted to the default cell for every question"
+        what = _reference_name((r.get("reference_rule") or [None] * len(t1["fractions"]))[j],
+                              (r.get("reference_k") or [None] * len(t1["fractions"]))[j])
+        verdict = ("reverted to %s for every question" % what
                    if r["gate_reverted"][j] else
-                   "deviated from the default cell on family %s" % fam if fam
-                   else "deviated from the default cell")
+                   "deviated from %s on family %s" % (what, fam) if fam
+                   else "deviated from %s" % what)
+        extra = (r.get("gate_fold_detail") or [None] * len(t1["fractions"]))[j] or []
+        mirror = "".join(
+            " Mirror fold %+.1f points, sd %.1f on %d questions (%s)."
+            % (d["margin_pts"], d["sd_pts"], d["n_verification"],
+               "clears" if d["opened"] else "fails")
+            for d in extra if d.get("margin_pts") is not None and d.get("sd_pts") is not None)
         lines.append("- `%s` at %.2fx: %s. %s margin %+.1f points, sd %.1f, bar %.2f sd (%s); "
-                     "cost saving %.1f%% of the budget, %.1f%% of the default cost."
+                     "cost saving %.1f%% of the budget, %.1f%% of the default cost.%s"
                      % (name, f, verdict, "Verification" if mode == "split" else "Calibration",
-                        m, sd, c, where, r["cost_saving_pct"][j], r["pct_of_default_cost"][j]))
+                        m, sd, c, where, r["cost_saving_pct"][j], r["pct_of_default_cost"][j],
+                        mirror))
     return lines
 
 
@@ -1183,8 +1597,8 @@ def table1_markdown(t1):
         return "# Table 1\n\n(no uncapped realisation in these cells; nothing to report)\n"
     order = ["default", "default_cell", "default_at_budget", "lookup", "equation"]
     order += [k for k in t1["rows"] if k.startswith("equation_n")]
-    order += ["gated_equation"]
-    order += [k for k in pol.AVG_RANKINGS if k in t1["rows"]]
+    order += ["equation_resolved", "gated_equation", "gated_equation_resolved"]
+    order += [k for k in pol.AVG_ARMS if k in t1["rows"]]
     head = " | ".join("%.2f x default" % f for f in t1["fractions"])
     acc = t1.get("accounting", "cap")
     out = ["# Table 1 -- %s (%s), %s accounting" % (t1["task"], t1["grid"], acc), "",
@@ -1216,7 +1630,7 @@ def table1_markdown(t1):
                       "n/a" if gap is None else "%+.1f" % gap))
     orc = t1.get("oracle")
     if orc and orc.get("cell"):
-        fams = sorted({f for n in pol.AVG_RANKINGS + ("gated_equation",)
+        fams = sorted({f for n in pol.AVG_ARMS + ("gated_equation", "gated_equation_resolved")
                        for f in (t1["rows"].get(n, {}).get("deviation_family") or []) if f})
         out += ["", "The ORACLE GAP is the best single evaluation cell (depth %d at cap %d, %.1f "
                 "points over %d questions) minus each arm at %.2fx. It reads the EVALUATION "
@@ -1240,9 +1654,10 @@ def table1_markdown(t1):
                 "above it is over those questions only, which are the cheaper -- and so the "
                 "easier -- ones. Affordable ON AVERAGE over the questions: %s."
                 % (dcell["cell"][0], dcell["cell"][1], acc, avg)]
-    avg = [n for n in pol.AVG_RANKINGS if n in t1["rows"]]
+    avg = [n for n in pol.AVG_ARMS if n in t1["rows"]]
     if avg:
-        out += ["", "`avg_lookup` and `avg_equation` hold the MEAN price over questions at or "
+        out += ["", "The average-budget arms (%s) hold the MEAN price over questions at or "
+                % ", ".join("`%s`" % n for n in avg) +
                 "below the budget instead of capping every question, so the default cell for "
                 "every question is one feasible policy and these rows are comparable with the "
                 "`default` row itself. Realised mean price over the evaluation questions, against "
@@ -1254,6 +1669,38 @@ def table1_markdown(t1):
                 "%.0f vs %.0f (%+.1f%%)" % (r["mean_price_layer_passes"][j], t1["budgets"][j],
                                             r["mean_price_over_X_pct"][j])
                 for j in range(len(t1["fractions"])))))
+    for gname in [n for n in pol.AVG_GATED_ARMS if n in t1["rows"]]:
+        g = t1["rows"][gname]
+        if not any(g.get("reference_rule") or []):
+            continue
+        out += ["", "`%s`'s gate measures its margin against NORMAL OPERATION AT THE BUDGET and "
+                "returns to it when the margin fails: the deepest depth at the largest cap per "
+                "question the budget affords ON AVERAGE. That is the default cell itself wherever "
+                "the default cell is affordable on average, a stepped-down cap where it is not, and "
+                "one depth shallower where not even the cheapest cap at the deepest depth fits. "
+                "The affordability test reads the CALIBRATION mean price, so the two price columns "
+                "below say when the evaluation half is the cheaper one and the default cell would "
+                "have fitted there; the gate runs against the reference either way, and never "
+                "leaves the row an ungated pick. What the gate ruled against, per budget:"
+                % gname, "",
+                "| budget | rule | depth | reference cells over the evaluation questions | mean "
+                "price | default cell cal vs eval |", "|---|---|---|---|---|---|"]
+        nf = len(t1["fractions"])
+        for j, f in enumerate(t1["fractions"]):
+            used = (g.get("reference_cells") or [None] * nf)[j] or {}
+            mp = (g.get("reference_mean_price_layer_passes") or [None] * nf)[j]
+            dcal = (g.get("default_cell_mean_price_cal") or [None] * nf)[j]
+            dev = (g.get("default_cell_mean_price_eval") or [None] * nf)[j]
+            aff = [(g.get("default_cell_affordable_on_cal") or [None] * nf)[j],
+                   (g.get("default_cell_affordable_on_eval") or [None] * nf)[j]]
+            out.append("| %.2fx | %s | %s | %s | %s | %s |"
+                       % (f, (g.get("reference_rule") or [None] * nf)[j] or "n/a",
+                          (g.get("reference_k") or [None] * nf)[j] or "n/a",
+                          ", ".join("%s: %d" % kv for kv in sorted(used.items())) or "n/a",
+                          "n/a" if mp is None else "%.0f" % mp,
+                          "n/a" if dcal is None else
+                          "%.0f (%s) vs %.0f (%s)" % (dcal, "fits" if aff[0] else "over",
+                                                      dev, "fits" if aff[1] else "over")))
     for n in avg:
         r = t1["rows"][n]
         for j, f in enumerate(t1["fractions"]):

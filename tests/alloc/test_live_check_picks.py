@@ -18,7 +18,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, PKG)
 from alloc import cells as C, cli, evaluate as E, policy as P        # noqa: E402
-from prod.live_check import check_split, load_picks                   # noqa: E402
+try:
+    from prod.live_check import check_split, load_picks               # noqa: E402
+except ImportError:
+    # `alloc` and this suite are also run from the spike tree, where the prod package is not beside
+    # them. Everything here is about prod.live_check, so without it there is nothing to run.
+    check_split = load_picks = None
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 S33 = os.environ.get("ALLOC_S33") or os.path.join(ROOT, "s33_anytime", "artifacts")
@@ -66,7 +71,8 @@ def _alloc_own_picks():
     return own
 
 
-@unittest.skipUnless(os.path.isdir(S33), "S33 grids not present")
+@unittest.skipUnless(os.path.isdir(S33) and load_picks is not None,
+                     "S33 grids or the prod package not present")
 class TestLiveCheckReadsAllocPicks(unittest.TestCase):
     def test_reader_picks_equal_alloc_evaluate_for_both_arms_and_all_fractions(self):
         d = _run_cli()

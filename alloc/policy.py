@@ -8,6 +8,19 @@ DEFAULT_C_GATE = 0.5
 N_BUDGETS = 16
 BUDGET_TOL = 1e-9
 
+# The cell orders a per-prompt policy can walk.
+#   `lookup`             calibration accuracy, measured cell by cell.
+#   `equation`           the POOLED commitment identity: one c_k and one l_k per depth.
+#   `equation_resolved`  the identity RESOLVED BY SETTLE TIME: c_k(j) per settle cap, l_k(T) per
+#                        cap (mechanism.resolved_mechanism). The pooled surface rises with T
+#                        wherever c_k > l_k, so it can never rank the first cap first; the resolved
+#                        one can, which is what the class sets need.
+# Every one of them is ranked the same way by `rank_lookup`/`rank_equation`: by score, then by the
+# median prompt's price, then by depth and cap, so a tie is broken toward the cheaper cell.
+RANKINGS = ("lookup", "equation", "equation_resolved")
+# The two that are fitted surfaces rather than measured cell means.
+EQUATION_RANKINGS = ("equation", "equation_resolved")
+
 # How the gate measures its margin.
 #   `split`  the calibration questions are halved once, by seed: the SELECTION half fits the
 #            ranking and the multiplier, the VERIFICATION half measures the margin of what was
@@ -18,6 +31,43 @@ BUDGET_TOL = 1e-9
 #            cover it. Kept under a flag so the two can be compared.
 GATE_MODES = ("split", "whole")
 DEFAULT_GATE_MODE = "split"
+
+# How many FOLDS of the split the gate must be cleared on.
+#   1  one direction: fit on the selection half, verify on the verification half. The comparison
+#      setting now, and the only count the `whole` gate can have.
+#   2  the FROZEN default (2026-09-18). Both directions: fit on the selection half and verify on the
+#      verification half, then fit on the verification half and verify on the selection half, and
+#      deviate only when BOTH verified margins clear c_gate * sd. A one-fold verification of 30
+#      questions can read a large margin that the evaluation half does not repay -- StrategyQA's F0
+#      deviation verified +13.3 +/- 5.5 and then lost 2.7 points over 1,990 evaluation questions --
+#      and a deviation that is real has to show in both halves. Nothing about one fold moves: the
+#      arm that RUNS is always the fold-1 policy, and the extra fold can only withhold a deviation.
+#
+# Frozen on the 60-pair run of work/analysis_2026-09-18: equation_v6 (one fold) against
+# equation_v6_folds2 (two), expected accounting, 1.0x of the default cost. The second fold removed
+# every FALSE deviation -- one whose paired evaluation interval sits wholly below its own
+# fallback -- for both gated arms, and the deviations it kept are worth more per point of compute:
+#
+#   arm                          deviations   false at two folds   gain@1.0x      saving@1.0x
+#   avg_gated_lookup             31 -> 22     0                    1.22 -> 1.45   42% -> 35%
+#   avg_gated_equation_resolved  34 -> 25     0                    0.95 -> 1.13   42% -> 35%
+GATE_FOLDS = 2
+GATE_FOLD_CHOICES = (1, 2)
+
+
+def resolve_gate_folds(gate_mode=DEFAULT_GATE_MODE, folds=None):
+    """Return the fold count for a run: an explicit request unchanged, else the mode's own default.
+
+    `None` means the default, which is GATE_FOLDS under a split and 1 under `whole`: that mode has
+    one set that both fits and measures, so it has no second direction to verify in. An explicit 2
+    under `whole` comes back unchanged and is refused where it would be used, because asking for a
+    verification the mode cannot do is a mistake and not something to satisfy silently.
+    """
+    if folds is not None:
+        return int(folds)
+    return 1 if gate_mode == "whole" else GATE_FOLDS
+
+
 # The one-standard-error rule: demand a whole SD of margin instead of c_gate of one.
 ONE_SE_C_GATE = 1.0
 # The split is by COUNT, not by fraction, and it is taken in id order: the first N_SELECT
@@ -327,12 +377,20 @@ class MeasuredGate(object):
     fallback stands.
     """
 
-    def __init__(self, acc, c_gate=DEFAULT_C_GATE, n_boot=GATE_BOOT, seed=7, pos=None):
+    def __init__(self, acc, c_gate=DEFAULT_C_GATE, n_boot=GATE_BOOT, seed=7, pos=None, folds=()):
         self.acc = np.asarray(acc, float)
         # The verification POSITIONS behind `acc`, when the caller has them. The structured
         # deviation families need to run a whole policy over those same questions, which needs
         # their prompt lengths and prices, not only their labels.
         self.pos = None if pos is None else np.asarray(pos, dtype=int)
+        # Extra FOLDS a deviation must also clear (GATE_FOLDS). Each is another MeasuredGate over a
+        # disjoint set of questions -- under two folds, the selection half's own labels -- and
+        # `choose` opens only where every one of them clears the bar. The cell pair being ruled on
+        # comes from the fold-1 order, so the extra fold tightens the bar; it never loosens it.
+        self.folds = [(f if isinstance(f, MeasuredGate)
+                       else MeasuredGate(f[0], c_gate=c_gate, n_boot=n_boot, seed=seed,
+                                         pos=(f[1] if len(f) > 1 else None)))
+                      for f in folds]
         self.n_calls = 0
         self.n_opened = 0
         if self.acc.ndim != 3:
@@ -377,20 +435,45 @@ class MeasuredGate(object):
             return normal, False
         self.n_calls += 1
         margin, sd = self.measure(pick, normal)
-        if gate_passes(margin, sd, self.c_gate):
+        ok = gate_passes(margin, sd, self.c_gate)
+        for g in self.folds:
+            ok = ok and gate_passes(*g.measure(pick, normal), c_gate=self.c_gate)
+        if ok:
             self.n_opened += 1
             return pick, False
         return normal, True
 
+    @property
+    def n_folds(self):
+        """Return how many disjoint question sets a deviation has to clear."""
+        return 1 + len(self.folds)
+
     def decisions(self):
-        """Return one record per cell pair the gate ruled on, margins and SDs in percentage points."""
-        return [{"pick": list(p), "normal": list(n),
-                 "margin_pts": (100 * m if m == m else None),
-                 "sd_pts": (100 * s if s == s else None),
-                 "bar_pts": (100 * self.c_gate * s if s == s else None),
-                 "opened": bool(gate_passes(m, s, self.c_gate)),
-                 "n_verification": self.n_verification}
-                for (p, n), (m, s) in sorted(self.seen.items())]
+        """Return one record per cell pair the gate ruled on, margins and SDs in percentage points.
+
+        Under more than one fold the record carries each further fold's own margin and SD beside the
+        first's, and `opened` is the conjunction: every fold had to clear its own bar.
+        """
+        out = []
+        for (p, n), (m, s) in sorted(self.seen.items()):
+            ok = gate_passes(m, s, self.c_gate)
+            folds = []
+            for g in self.folds:
+                fm, fs = g.measure(p, n)
+                ok = ok and gate_passes(fm, fs, self.c_gate)
+                folds.append({"margin_pts": (100 * fm if fm == fm else None),
+                              "sd_pts": (100 * fs if fs == fs else None),
+                              "bar_pts": (100 * self.c_gate * fs if fs == fs else None),
+                              "opened": bool(gate_passes(fm, fs, self.c_gate)),
+                              "n_verification": g.n_verification})
+            out.append({"pick": list(p), "normal": list(n),
+                        "margin_pts": (100 * m if m == m else None),
+                        "sd_pts": (100 * s if s == s else None),
+                        "bar_pts": (100 * self.c_gate * s if s == s else None),
+                        "opened": bool(ok), "n_verification": self.n_verification,
+                        "n_folds": self.n_folds,
+                        "folds": (folds or None)})
+        return out
 
 
 # ---------------------------------------------------------------- per-prompt policy
@@ -444,10 +527,31 @@ def policy_vectors(cells, ev_pos, cost, Xs, order, gate=None, picks=None):
 # uncapped default row is like for like, and the allocator is free to take a cheaper cell where it
 # scores the same and spend the saving where depth is worth buying.
 AVG_RANKINGS = ("avg_lookup", "avg_equation", "avg_gated_lookup")
+# The resolved-identity average-budget arms, kept in their own tuple so the frozen v5 set above
+# still names exactly the three arms it named. `AVG_ARMS` is what a table reports.
+AVG_RANKINGS_RESOLVED = ("avg_equation_resolved", "avg_gated_equation_resolved")
+# Ruling of record (2026-09-18): the RANKING OF RECORD is the settle-time-resolved commitment
+# identity. Over the 60 pairs of work/analysis_2026-09-18/equation_v6 it is statistically
+# indistinguishable from the lookup on 58 of them, and it is the one the mechanism justifies: the
+# lookup is a table of measured cell means with no account of WHEN a question commits, so it can only
+# repeat what the calibration labels happened to say. The lookup stays as the LABEL-ONLY BASELINE
+# the resolved arm is read against, so those two lead every report, in that order, and every other
+# arm is still available.
+RANKING_OF_RECORD = "equation_resolved"
+AVG_ARM_OF_RECORD = "avg_gated_equation_resolved"
+AVG_ARM_BASELINE = "avg_gated_lookup"
+# The reporting ORDER of the average-budget arms; neither set above moves.
+AVG_ARMS = (AVG_ARM_OF_RECORD, AVG_ARM_BASELINE) + tuple(
+    n for n in AVG_RANKINGS + AVG_RANKINGS_RESOLVED
+    if n not in (AVG_ARM_OF_RECORD, AVG_ARM_BASELINE))
 # Which ranking supplies the per-cell score of each average-budget arm. `avg_gated_lookup` scores
 # like `avg_lookup` and then has to clear a gate against running the default cell for every prompt.
-AVG_BASE = {"avg_lookup": "lookup", "avg_equation": "equation", "avg_gated_lookup": "lookup"}
+AVG_BASE = {"avg_lookup": "lookup", "avg_equation": "equation", "avg_gated_lookup": "lookup",
+            "avg_equation_resolved": "equation_resolved",
+            "avg_gated_equation_resolved": "equation_resolved"}
 AVG_GATED = "avg_gated_lookup"
+# Every average-budget arm whose deviation has to clear the gate before it is run.
+AVG_GATED_ARMS = ("avg_gated_lookup", "avg_gated_equation_resolved")
 AVG_TOL = 0.02          # the realised mean price may run this far over X before it is flagged
 AVG_ITERS = 80          # bisection steps: the spend is a step function of the multiplier
 

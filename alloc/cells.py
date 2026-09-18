@@ -1,5 +1,6 @@
 """Load checkpoint/task JSONL rows into arrays indexed by loop depth, token cap, and prompt; prices use task answer budgets."""
 import glob as _glob
+import hashlib
 import json
 import os
 import re
@@ -153,6 +154,163 @@ def read_rows(path, stats=None):
             stats["rows"] += 1
             out.append(r)
     return out
+
+
+# ---------------------------------------------------------------- the parsed-file cache
+# Every cells file is parsed once and kept as a compressed numpy archive beside it (or under
+# `cache_dir`), so a second CLI pass over the same grids reads arrays instead of JSON. The archive
+# is keyed by the file's SIZE, its MTIME and the sha256 of its `_header` line: a regenerated or
+# extended shard changes at least one of the three, so a stale cache is never read and nothing has
+# to be told to rebuild it. Nothing is pickled -- the columns are typed arrays, and a column that is
+# not numeric or boolean travels as one JSON blob -- so an archive is safe to read from a shared
+# directory and portable between machines.
+#: bumped whenever the layout below changes, so an older archive is ignored rather than misread
+CACHE_VERSION = 1
+CACHE_EXT = ".alloc-cache.npz"
+_MISSING = object()
+
+
+def cache_key(path):
+    """Return the identity of a cells file: version, size, mtime and the sha256 of its header line.
+
+    None of the three needs the file's rows read, so validating a cache costs one stat and one line.
+    """
+    st = os.stat(path)
+    with open(path, "rb") as f:
+        first = f.readline()
+    head = first if b'"_header"' in first[:200] else b"(no header line)"
+    return "v%d|%d|%d|%s" % (CACHE_VERSION, st.st_size, st.st_mtime_ns,
+                             hashlib.sha256(head).hexdigest())
+
+
+def cache_path(path, cache_dir=None):
+    """Where the parsed form of `path` is cached: beside the file, or under `cache_dir`."""
+    return os.path.join(cache_dir or os.path.dirname(os.path.abspath(path)),
+                        os.path.basename(path) + CACHE_EXT)
+
+
+def _encode_rows(rows, unparsed=0):
+    """Return the archive entries of a columnar, pickle-free form of `rows`.
+
+    One column per key ever seen, each with its own present and null masks, so a key a row does not
+    carry comes back MISSING and a key it carries as null comes back None -- a distinction the
+    loader's `_f` fallbacks rely on. A column of bools or ints keeps its Python type through the
+    round trip; anything else (a float, a string, a list, mixed types) travels as one JSON blob for
+    the whole column, which is one `json.loads` per column instead of one per row.
+    """
+    names = list({k: None for r in rows for k in r})
+    out = {"names": np.array(json.dumps(names)), "n": np.array(len(rows), np.int64),
+           "unparsed": np.array(int(unparsed), np.int64)}
+    for i, name in enumerate(names):
+        vals = [r.get(name, _MISSING) for r in rows]
+        real = [v for v in vals if v is not _MISSING and v is not None]
+        is_bool = all(isinstance(v, bool) for v in real)
+        is_int = (not is_bool) and all(isinstance(v, int) and not isinstance(v, bool)
+                                       for v in real)
+        if is_bool and real:
+            kind = "b"
+            data = np.array([v is True for v in vals], bool)
+        elif is_int and real:
+            kind = "i"
+            data = np.array([int(v) if isinstance(v, int) and not isinstance(v, bool) else 0
+                             for v in vals], np.int64)
+        else:
+            kind = "j"
+            data = np.array(json.dumps([None if (v is _MISSING or v is None) else v
+                                        for v in vals]))
+        out["c%d_kind" % i] = np.array(kind)
+        out["c%d_present" % i] = np.array([v is not _MISSING for v in vals], bool)
+        out["c%d_null" % i] = np.array([v is None for v in vals], bool)
+        out["c%d_data" % i] = data
+    return out
+
+
+def _decode_rows(z):
+    """Return the rows of an archive written by `_encode_rows`."""
+    names = json.loads(str(z["names"]))
+    n = int(z["n"])
+    rows = [{} for _ in range(n)]
+    for i, name in enumerate(names):
+        kind = str(z["c%d_kind" % i])
+        present = z["c%d_present" % i].tolist()
+        null = z["c%d_null" % i].tolist()
+        data = z["c%d_data" % i]
+        vals = json.loads(str(data)) if kind == "j" else data.tolist()
+        if all(present) and not any(null):
+            for r, v in zip(rows, vals):                    # the common column: one insert per row
+                r[name] = v
+        else:
+            for r, p, nul, v in zip(rows, present, null, vals):
+                if p:
+                    r[name] = None if nul else v
+    return rows
+
+
+def write_cache(path, rows, cache_dir=None, unparsed=0):
+    """Cache the parsed rows of one cells file; return the archive's path, or None if it could not
+    be written (a read-only artifacts directory is not an error, only a slower load)."""
+    dest = cache_path(path, cache_dir)
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(dest)) or ".", exist_ok=True)
+        entries = _encode_rows(rows, unparsed=unparsed)
+        entries["key"] = np.array(cache_key(path))
+        tmp = dest + ".tmp%d" % os.getpid()
+        with open(tmp, "wb") as fh:
+            np.savez_compressed(fh, **entries)
+        os.replace(tmp, dest)
+        return dest
+    except OSError:
+        return None
+
+
+def read_cache(path, cache_dir=None, stats=None):
+    """Return the cached rows of one cells file, or None when there is no archive for its current
+    size, mtime and header. A damaged archive is treated as no archive."""
+    dest = cache_path(path, cache_dir)
+    if not os.path.exists(dest):
+        return None
+    try:
+        with np.load(dest, allow_pickle=False) as z:
+            if str(z["key"]) != cache_key(path):
+                return None
+            rows = _decode_rows(z)
+            if stats is not None:
+                n_bad = int(z["unparsed"]) if "unparsed" in z.files else 0
+                stats["rows"] = stats.get("rows", 0) + len(rows)
+                stats["header"] = stats.get("header", 0) + 1
+                stats["unparsed"] = stats.get("unparsed", 0) + n_bad
+                stats.setdefault("unparsed_paths", [])
+                if n_bad and path not in stats["unparsed_paths"]:
+                    stats["unparsed_paths"].append(path)
+                stats["cached_files"] = stats.get("cached_files", 0) + 1
+            return rows
+    except (OSError, ValueError, KeyError, EOFError):
+        return None
+
+
+def cached_rows(path, stats=None, cache_dir=None, cache=True):
+    """Return one cells file's rows, from its cache when that is current, parsing it otherwise.
+
+    `cache=False` neither reads nor writes an archive, which is what `--no-cache` is for: the parse
+    is the ground truth and the cache must always be able to be taken out of the picture.
+    """
+    if not cache:
+        return read_rows(path, stats=stats)
+    got = read_cache(path, cache_dir, stats=stats)
+    if got is not None:
+        return got
+    own = {}
+    rows = read_rows(path, stats=own)
+    write_cache(path, rows, cache_dir, unparsed=own.get("unparsed", 0))
+    if stats is not None:
+        for key in ("unparsed", "header", "rows"):
+            stats[key] = stats.get(key, 0) + own.get(key, 0)
+        stats.setdefault("unparsed_paths", [])
+        for p in own.get("unparsed_paths", []):
+            if p not in stats["unparsed_paths"]:
+                stats["unparsed_paths"].append(p)
+        stats.setdefault("cached_files", 0)
+    return rows
 
 
 def dedup(rows):
@@ -479,21 +637,26 @@ def cell_paths(cells_dir, task, checkpoint, protocol="natural"):
 
 
 def load(cells_dir, task, checkpoint, name=None, ks=None, caps=None, bbh_base=False,
-         protocol="natural", **kw):
+         protocol="natural", cache=True, cache_dir=None, **kw):
     """Return Cells built from every cell file of one task and checkpoint in `cells_dir`.
 
     The depth set and the cap set come from the rows themselves; `ks` and `caps` are optional
     SUBSETS of what the rows hold, never a way to introduce a depth or a cap the rows lack.
     `bbh_base` re-parses the answer letter and re-derives the calibration split for a reference file
     of raw multiple-choice rows. Unparseable lines are counted and reported as a warning, and the
-    totals are left on the result as `read_stats`.
+    totals are left on the result as `read_stats`, with `cached_files` saying how many of the files
+    were read from their cache.
+
+    `cache` (on) reads and writes the per-file archives described above; `cache_dir` puts them
+    somewhere other than beside the cells files. `cache=False` parses every time, which is the
+    ground truth the cache is tested against.
     """
     paths = cell_paths(cells_dir, task, checkpoint, protocol)
     if not paths:
         raise FileNotFoundError("no cell files for %s/%s in %s" % (task, checkpoint, cells_dir))
     rows, stats = [], {}
     for p in paths:
-        rows.extend(read_rows(p, stats=stats))
+        rows.extend(cached_rows(p, stats=stats, cache_dir=cache_dir, cache=cache))
     header = read_header(paths[0])
     if stats.get("unparsed"):
         warnings.warn("%s/%s: %d unparseable line(s) skipped in %s"
