@@ -9,6 +9,13 @@ artifacts/*
 !artifacts/alloc_*/
 !artifacts/alloc_*_all_tables_*.md
 !artifacts/live_*.json
+# the S36 training run root travels except its weights and logs: chains, targets, gates, cells, manifests, train records
+!artifacts/s36/
+artifacts/s36/adapters/
+artifacts/s36/logs/
+artifacts/s36/train_logs/
+artifacts/s36/**/*.pt
+artifacts/s36/**/*.safetensors
 logs/
 __pycache__/
 *.pyc
