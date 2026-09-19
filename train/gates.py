@@ -44,8 +44,16 @@ def load_arrays(cfg, P, variant):
 
 
 # ================================================================= V4 (GPU)
+# The V4 bar: the largest |batched - single| logit difference as a fraction of the largest logit,
+# measured in float32. Kernel reduction-order noise is about 1e-5 of the scale there; a packing
+# leak (one row reading another row's tokens through the mask) is of order 1.
+V4_REL_TOL = 1e-3
+
+
 def run_v4(cfg, P, variant, CK, wait=False):
-    """Check on GPU that a batched forward at one depth equals the same blocks forwarded singly, and that another depth differs; waits for an idle GPU only when asked; returns a process exit code."""
+    """Check on GPU that a batched forward at one depth equals the same blocks forwarded singly (in
+    float32, within V4_REL_TOL of the logit scale), and that another depth differs; waits for an idle
+    GPU only when asked; returns a process exit code."""
     import torch
     from s3_patch import patch_universal_cache
     # the preflight is a two-minute job: it waits only under the shared-box policy, never on a
@@ -57,7 +65,12 @@ def run_v4(cfg, P, variant, CK, wait=False):
     tok, model = load_base()
     patch_universal_cache(model)
     model.eval()
-    res, worst = {}, 0.0
+    # bf16 GEMMs pick a kernel by batch shape on most GPUs, so a batch and a single row are only
+    # bit-identical where the kernels happen to coincide (they did on the GB10 this recipe was
+    # frozen on; on the cluster's GPUs they differ by units of logit). The comparison therefore runs
+    # in float32, where what is left is reduction-order noise, and a leak still shows as order 1.
+    model.float()
+    res, worst, worst_abs = {}, 0.0, 0.0
     with torch.no_grad():
         for mb in sched[:3]:
             d, L, idx = int(mb["depth"]), int(mb["seq_len"]), mb["blocks"]
@@ -67,14 +80,21 @@ def run_v4(cfg, P, variant, CK, wait=False):
                 b = torch.cat([model(input_ids=x[i:i + 1]).logits.float()
                                for i in range(x.shape[0])], 0)
             m = float((a - b).abs().max())
+            scale = max(float(a.abs().max()), 1e-6)
             res["depth_%d_L%d_batch_vs_rows" % (d, L)] = m
-            worst = max(worst, m)
+            res["depth_%d_L%d_batch_vs_rows_rel" % (d, L)] = m / scale
+            res["depth_%d_L%d_logit_scale" % (d, L)] = scale
+            worst = max(worst, m / scale)
+            worst_abs = max(worst_abs, m)
             with G.execution_depth(model, 1 if d != 1 else 4):
                 c = model(input_ids=x).logits.float()
             res["depth_%d_L%d_vs_other_depth" % (d, L)] = float((a - c).abs().max())
             del a, b, c, x
             torch.cuda.empty_cache()
-    res["max_abs_diff"] = worst
+    res["max_abs_diff"] = worst_abs
+    res["max_rel_diff"] = worst
+    res["rel_tol"] = V4_REL_TOL
+    res["compared_in"] = "float32"
     res["waited_for_gpu"] = bool(wait)
     res["gpu_wait"] = waited
     res["depth_switch_is_effective"] = bool(
@@ -82,7 +102,7 @@ def run_v4(cfg, P, variant, CK, wait=False):
     G.jdump(res, os.path.join(P["gates"], "v4_preflight.json"))
     upd(CK, V4=worst, V4_detail=res)
     print(json.dumps(res, indent=2), flush=True)
-    assert worst == 0.0, worst
+    assert worst <= V4_REL_TOL, "batched vs single-row logits differ by %.3g of the logit scale (bar %g)" % (worst, V4_REL_TOL)
     assert res["depth_switch_is_effective"], res
     print("V4 OK", flush=True)
     return 0

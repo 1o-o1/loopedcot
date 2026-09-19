@@ -252,8 +252,10 @@ plus grid), so the order is the schedule.
   a swapped or edited block fails too. Then the same visits are repacked the old way and the gate
   must **fail**, or passing proves nothing. None of V1, V2 or V4 looks at the context a supervised
   token sees.
-- **V4 preflight** - a packed micro-batch at its own depth is bit-identical to the same blocks
-  forwarded one at a time, and a different depth gives a different answer.
+- **V4 preflight** - a packed micro-batch at its own depth equals the same blocks forwarded one at
+  a time, compared in float32 within 1e-3 of the logit scale (bf16 kernels differ by batch shape
+  on most GPUs, so bit-identity is a property of the card, not of the packing; a mask leak is
+  order 1), and a different depth gives a different answer.
 - **V10 draw weights** - the realised `T` and depth histograms, per source, sit within 0.05 of the
   weights `theory_weights.json` intended. The manifest carries both sides, so this is a check of the
   objective on disk against the objective on paper; the only way they can part is a dropped draw,
@@ -348,7 +350,7 @@ the **3.3** contention factor the same smoke measured on training (149.2 vs 45.2
 | smoke stage, measured (100-200 pool questions per source) | measured |
 |---|---|
 | targets + all CPU gates | 4 s + 3 s |
-| V4 preflight (GPU) | 38 s, max abs diff 0.0 |
+| V4 preflight (GPU) | 38 s, max abs diff 0.0 in bf16 on the GB10; the gate now compares in float32 against a 1e-3 relative bar |
 | grid, 6 problems, k=4, budgets {0, 32, none} | 64 s, peak 19.9 GB, 54 cells, no field missing |
 | train, 512-packing reference run, 1,136 steps, 18.61M tokens | 19,180 s, 970.4 tok/s, peak 48.3 GB |
 | the packing factor of one visit per block | supervised density 0.0821 dense -> **0.0551** padded: **1.49x**, not the 2x estimated |
