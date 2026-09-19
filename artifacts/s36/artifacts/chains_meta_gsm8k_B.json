@@ -1,0 +1,29 @@
+{
+  "task": "gsm8k",
+  "eval_task": "gsm8k",
+  "prompt": "short",
+  "chain_tag": "B",
+  "prefix_source": "/home/mzaoad/loopedcot/train/prompts/prompts_short_gsm8k.txt",
+  "k": 4,
+  "n_questions": 3000,
+  "n_kept": 2353,
+  "kept_frac": 0.7843333333333333,
+  "horizon": 1024,
+  "n_hit_horizon": 0,
+  "horizon_hit_share": 0.0,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 29.003399915002124,
+  "len_median": 27,
+  "len_p10": 18,
+  "len_p90": 42,
+  "len_min_max": [
+    10,
+    218
+  ],
+  "share_le_64": 0.9923501912452188,
+  "share_le_128": 0.9991500212494687,
+  "prefix_tokens": 337,
+  "prompt_tokens_mean": 385.1963333333333,
+  "seconds": 1264.3,
+  "peak_gb": 9.195
+}

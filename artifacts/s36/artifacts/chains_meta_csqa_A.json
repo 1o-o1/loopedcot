@@ -1,0 +1,29 @@
+{
+  "task": "csqa",
+  "eval_task": "csqa",
+  "prompt": "standard",
+  "chain_tag": "A",
+  "prefix_source": "evaluation harness",
+  "k": 4,
+  "n_questions": 1500,
+  "n_kept": 1474,
+  "kept_frac": 0.9826666666666667,
+  "horizon": 1024,
+  "n_hit_horizon": 0,
+  "horizon_hit_share": 0.0,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 34.19606512890095,
+  "len_median": 34,
+  "len_p10": 30,
+  "len_p90": 39,
+  "len_min_max": [
+    20,
+    58
+  ],
+  "share_le_64": 1.0,
+  "share_le_128": 1.0,
+  "prefix_tokens": 550,
+  "prompt_tokens_mean": 594.5493333333334,
+  "seconds": 143.5,
+  "peak_gb": 11.78
+}

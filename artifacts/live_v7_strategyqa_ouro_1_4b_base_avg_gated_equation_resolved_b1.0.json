@@ -1,0 +1,474 @@
+{
+  "model": "ouro_1_4b_base",
+  "task": "strategyqa",
+  "arm": "avg_gated_equation_resolved",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7_strategyqa_ouro_1_4b_base",
+  "budget_fraction": 1.0,
+  "budget": 24412.75175879397,
+  "default_cost": {
+    "k": 4,
+    "n": 1990,
+    "mean": 24412.75175879397,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": 11.11111111111111,
+    "sd_pts": 4.658919362859764,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "default_cell",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T4096": 1990
+      },
+      "mean_price": 23316.480000000003,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 23316.480000000003,
+      "default_cell_mean_price_eval": 23316.480000000003,
+      "default_cell_affordable_on_cal": true,
+      "default_cell_affordable_on_eval": true
+    }
+  },
+  "alloc_mean_price_layer_passes": 23316.480000000003,
+  "n_eval_used": 1990,
+  "n_infeasible": 0,
+  "n_cal": 300,
+  "n_promoted": 200,
+  "chosen_histogram": {
+    "k4_B4096": 1990
+  },
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.6648241206030151,
+  "preflight": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 4096,
+      "n": 1990,
+      "rc": 0,
+      "seconds": 4539.6,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_strategyqa_avg_gated_equation_resolved_b1.0/live_k4_B4096",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_base --task=strategyqa --k=4 --caps=4096 --no-extra-caps --horizon=4096 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_strategyqa_avg_gated_equation_resolved_b1.0/live_k4_B4096 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_strategyqa_avg_gated_equation_resolved_b1.0/live_k4_B4096/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_1_4b_base_strategyqa_natural_k4_sub1990] N=1990 caps=[4096] horizon=4096 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 235.3 hit 0.955, 476274 tokens in 4143s (115.0 tok/s) [4291s]\n    readout single 256/1990 jobs b=16 rows 256 [4316s] peak 57.30 GB\n    readout single 512/1990 jobs b=16 rows 512 [4339s] peak 57.30 GB\n    readout single 768/1990 jobs b=16 rows 768 [4363s] peak 57.30 GB\n    readout single 1024/1990 jobs b=16 rows 1024 [4387s] peak 57.30 GB\n    readout single 1280/1990 jobs b=16 rows 1280 [4412s] peak 57.30 GB\n    readout single 1536/1990 jobs b=16 rows 1536 [4436s] peak 57.30 GB\n    readout single 1792/1990 jobs b=16 rows 1792 [4461s] peak 57.30 GB\n    readout single 1990/1990 jobs b=6 rows 1990 [4536s] peak 59.60 GB\nDONE ouro_1_4b_base_strategyqa_natural_k4_sub1990 1990/1990 cells in 4536s peak 59.6 GB | acc_v2 {'4096': 0.671}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 1990,
+  "live_acc": 0.6708542713567839,
+  "grid_acc_same_rows": 0.6648241206030151,
+  "delta_pp": 0.603,
+  "live_mean_price_layer_passes": 58450.54070351759,
+  "grid_mean_price_same_rows": 59025.28643216081,
+  "price_over_budget_pct": 139.43,
+  "n_flips": 28,
+  "flips": [
+    {
+      "row_idx": 76,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 116,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 131,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 154,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 155,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 170,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 191,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 228,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 270,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 547,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 677,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 724,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 766,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 903,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1316,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1373,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1533,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1641,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1753,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2062,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2082,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2136,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2143,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2144,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2182,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 2186,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2256,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2261,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}

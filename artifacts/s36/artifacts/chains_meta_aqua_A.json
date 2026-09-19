@@ -1,0 +1,29 @@
+{
+  "task": "aqua",
+  "eval_task": "aqua",
+  "prompt": "standard",
+  "chain_tag": "A",
+  "prefix_source": "evaluation harness",
+  "k": 4,
+  "n_questions": 1500,
+  "n_kept": 1452,
+  "kept_frac": 0.968,
+  "horizon": 1024,
+  "n_hit_horizon": 5,
+  "horizon_hit_share": 0.0033333333333333335,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 79.93388429752066,
+  "len_median": 73,
+  "len_p10": 36,
+  "len_p90": 133,
+  "len_min_max": [
+    6,
+    395
+  ],
+  "share_le_64": 0.4201101928374656,
+  "share_le_128": 0.8836088154269972,
+  "prefix_tokens": 529,
+  "prompt_tokens_mean": 608.8126666666667,
+  "seconds": 1637.1,
+  "peak_gb": 13.745
+}

@@ -1,0 +1,29 @@
+{
+  "task": "aqua",
+  "eval_task": "aqua",
+  "prompt": "short",
+  "chain_tag": "B",
+  "prefix_source": "/home/mzaoad/loopedcot/train/prompts/prompts_short_aqua.txt",
+  "k": 4,
+  "n_questions": 1500,
+  "n_kept": 1237,
+  "kept_frac": 0.8246666666666667,
+  "horizon": 1024,
+  "n_hit_horizon": 22,
+  "horizon_hit_share": 0.014666666666666666,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 44.79708973322555,
+  "len_median": 39,
+  "len_p10": 20,
+  "len_p90": 71,
+  "len_min_max": [
+    10,
+    844
+  ],
+  "share_le_64": 0.8552950687146321,
+  "share_le_128": 0.9894907033144705,
+  "prefix_tokens": 434,
+  "prompt_tokens_mean": 513.8126666666667,
+  "seconds": 1345.3,
+  "peak_gb": 21.771
+}

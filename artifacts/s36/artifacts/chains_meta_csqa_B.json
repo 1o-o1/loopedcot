@@ -1,0 +1,29 @@
+{
+  "task": "csqa",
+  "eval_task": "csqa",
+  "prompt": "short",
+  "chain_tag": "B",
+  "prefix_source": "/home/mzaoad/loopedcot/train/prompts/prompts_short_csqa.txt",
+  "k": 4,
+  "n_questions": 1500,
+  "n_kept": 1328,
+  "kept_frac": 0.8853333333333333,
+  "horizon": 1024,
+  "n_hit_horizon": 0,
+  "horizon_hit_share": 0.0,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 15.313253012048193,
+  "len_median": 15,
+  "len_p10": 13,
+  "len_p90": 18,
+  "len_min_max": [
+    11,
+    27
+  ],
+  "share_le_64": 1.0,
+  "share_le_128": 1.0,
+  "prefix_tokens": 415,
+  "prompt_tokens_mean": 459.5493333333333,
+  "seconds": 16.5,
+  "peak_gb": 2.672
+}

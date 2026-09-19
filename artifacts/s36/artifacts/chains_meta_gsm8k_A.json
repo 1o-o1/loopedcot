@@ -1,0 +1,29 @@
+{
+  "task": "gsm8k",
+  "eval_task": "gsm8k",
+  "prompt": "standard",
+  "chain_tag": "A",
+  "prefix_source": "evaluation harness",
+  "k": 4,
+  "n_questions": 3000,
+  "n_kept": 2959,
+  "kept_frac": 0.9863333333333333,
+  "horizon": 1024,
+  "n_hit_horizon": 1,
+  "horizon_hit_share": 0.0003333333333333333,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 93.02703616086515,
+  "len_median": 87,
+  "len_p10": 58,
+  "len_p90": 137,
+  "len_min_max": [
+    22,
+    342
+  ],
+  "share_le_64": 0.1906049340993579,
+  "share_le_128": 0.8627914836093274,
+  "prefix_tokens": 573,
+  "prompt_tokens_mean": 621.1963333333333,
+  "seconds": 2905.0,
+  "peak_gb": 13.809
+}

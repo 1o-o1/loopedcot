@@ -1,0 +1,29 @@
+{
+  "task": "math",
+  "eval_task": "math500",
+  "prompt": "short",
+  "chain_tag": "B",
+  "prefix_source": "/home/mzaoad/loopedcot/train/prompts/prompts_short_math.txt",
+  "k": 4,
+  "n_questions": 1360,
+  "n_kept": 822,
+  "kept_frac": 0.6044117647058823,
+  "horizon": 2048,
+  "n_hit_horizon": 23,
+  "horizon_hit_share": 0.016911764705882352,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 85.43552311435523,
+  "len_median": 59,
+  "len_p10": 32,
+  "len_p90": 168,
+  "len_min_max": [
+    6,
+    493
+  ],
+  "share_le_64": 0.5474452554744526,
+  "share_le_128": 0.843065693430657,
+  "prefix_tokens": 491,
+  "prompt_tokens_mean": 520.3742647058823,
+  "seconds": 1956.1,
+  "peak_gb": 34.297
+}

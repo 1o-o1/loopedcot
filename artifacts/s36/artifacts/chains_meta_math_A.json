@@ -1,0 +1,29 @@
+{
+  "task": "math",
+  "eval_task": "math500",
+  "prompt": "standard",
+  "chain_tag": "A",
+  "prefix_source": "evaluation harness",
+  "k": 4,
+  "n_questions": 1360,
+  "n_kept": 1295,
+  "kept_frac": 0.9522058823529411,
+  "horizon": 2048,
+  "n_hit_horizon": 9,
+  "horizon_hit_share": 0.006617647058823529,
+  "n_correct_but_unfinished": 0,
+  "len_mean": 245.91814671814672,
+  "len_median": 227,
+  "len_p10": 88,
+  "len_p90": 420,
+  "len_min_max": [
+    12,
+    1724
+  ],
+  "share_le_64": 0.04555984555984556,
+  "share_le_128": 0.2084942084942085,
+  "prefix_tokens": 904,
+  "prompt_tokens_mean": 933.3742647058823,
+  "seconds": 3482.6,
+  "peak_gb": 27.103
+}

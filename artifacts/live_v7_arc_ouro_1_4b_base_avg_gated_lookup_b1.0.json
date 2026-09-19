@@ -1,0 +1,258 @@
+{
+  "model": "ouro_1_4b_base",
+  "task": "arc",
+  "arm": "avg_gated_lookup",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7_arc_ouro_1_4b_base",
+  "budget_fraction": 1.0,
+  "budget": 4970.200426439233,
+  "default_cost": {
+    "k": 4,
+    "n": 938,
+    "mean": 4970.200426439233,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": 0.0,
+    "sd_pts": 0.0,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "default_cell",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T4096": 938
+      },
+      "mean_price": 4908.307692307693,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 4908.307692307692,
+      "default_cell_mean_price_eval": 4908.307692307693,
+      "default_cell_affordable_on_cal": true,
+      "default_cell_affordable_on_eval": true
+    }
+  },
+  "alloc_mean_price_layer_passes": 4908.307692307693,
+  "n_eval_used": 938,
+  "n_infeasible": 0,
+  "n_cal": 234,
+  "n_promoted": 134,
+  "chosen_histogram": {
+    "k4_B4096": 938
+  },
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.8635394456289979,
+  "preflight": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 4096,
+      "n": 938,
+      "rc": 0,
+      "seconds": 508.7,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_arc_avg_gated_lookup_b1.0/live_k4_B4096",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_base --task=arc --k=4 --caps=4096 --no-extra-caps --horizon=4096 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_arc_avg_gated_lookup_b1.0/live_k4_B4096 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_base_arc_avg_gated_lookup_b1.0/live_k4_B4096/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_1_4b_base_arc_natural_k4_sub938] N=938 caps=[4096] horizon=4096 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 38.8 hit 1.000, 40108 tokens in 368s (108.9 tok/s) [410s]\n    readout single 256/938 jobs b=16 rows 256 [435s] peak 9.54 GB\n    readout single 512/938 jobs b=16 rows 512 [461s] peak 9.54 GB\n    readout single 768/938 jobs b=16 rows 768 [487s] peak 9.54 GB\n    readout single 938/938 jobs b=10 rows 938 [505s] peak 9.54 GB\nDONE ouro_1_4b_base_arc_natural_k4_sub938 938/938 cells in 505s peak 9.537 GB | acc_v2 {'4096': 0.866}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 938,
+  "live_acc": 0.8656716417910447,
+  "grid_acc_same_rows": 0.8635394456289979,
+  "delta_pp": 0.213,
+  "live_mean_price_layer_passes": 38813.168443496805,
+  "grid_mean_price_same_rows": 38814.498933901916,
+  "price_over_budget_pct": 680.92,
+  "n_flips": 4,
+  "flips": [
+    {
+      "row_idx": 11,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 108,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 795,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1132,
+      "cell": [
+        4,
+        4096
+      ],
+      "grid": true,
+      "live": false
+    }
+  ],
+  "missing_rows": []
+}

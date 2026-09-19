@@ -1,0 +1,453 @@
+{
+  "model": "mcleish_llama32_r32",
+  "task": "gsm8k",
+  "arm": "avg_gated_equation_resolved",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7_gsm8k_mcleish_llama32_r32",
+  "budget_fraction": 0.5,
+  "budget": 16585.416666666668,
+  "default_cost": {
+    "k": 32,
+    "n": 1056,
+    "mean": 33170.833333333336,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": "F2",
+    "margin_pts": 24.050632911392405,
+    "sd_pts": 5.163486447440506,
+    "opened": true,
+    "reverted": false,
+    "reference": {
+      "rule": "deepest_depth_capped",
+      "k": 32,
+      "lambda": 0.0,
+      "cells": {
+        "k32_T64": 1056
+      },
+      "mean_price": 15008.365019011406,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 29260.83650190115,
+      "default_cell_mean_price_eval": 29260.83650190115,
+      "default_cell_affordable_on_cal": false,
+      "default_cell_affordable_on_eval": false
+    }
+  },
+  "alloc_mean_price_layer_passes": 12712.517110266159,
+  "n_eval_used": 1056,
+  "n_infeasible": 0,
+  "n_cal": 263,
+  "n_promoted": 163,
+  "chosen_histogram": {
+    "k16_B2048": 1056
+  },
+  "layers_per_loop": 6,
+  "layers_fixed": 8,
+  "grid_acc_at_picks": 0.48863636363636365,
+  "preflight": {
+    "model": "mcleish_llama32_r32",
+    "task": "gsm8k",
+    "adapter": null,
+    "python": "/home/mzaoad/loopedcot/.venv/bin/python",
+    "cwd": "/home/mzaoad/loopedcot",
+    "out_dir": "/tmp/live_preflight_v35007kw",
+    "hf_hub_offline": "1",
+    "hf_home": "/home/mzaoad/loopedcot/hf",
+    "model_path": {
+      "name": "mcleish_llama32_r32",
+      "base": "mcleish_llama32_r32",
+      "repo": "smcleish/Recurrent-Llama-3.2-train-recurrence-32",
+      "revision": "a5f6f126e9d9302445346844f1d7d29d111a06eb",
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--smcleish--Recurrent-Llama-3.2-train-recurrence-32/snapshots/a5f6f126e9d9302445346844f1d7d29d111a06eb",
+      "local_dir_exists": true,
+      "revisions_file": "/home/mzaoad/loopedcot/prod/tasks/data/model_revisions.json"
+    },
+    "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=mcleish_llama32_r32 --task=gsm8k --k=1 --caps=0 --no-extra-caps --horizon=1 --out=/tmp/live_preflight_v35007kw --n=1",
+    "rc": 0,
+    "seconds": 34.6,
+    "n_rows": 1,
+    "stdout_tail": "[mcleish_llama32_r32_gsm8k_natural_k1] N=1 caps=[0] horizon=1 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 1.0 hit 0.000, 1 tokens in 0s (4.0 tok/s) [32s]\n    readout single 1/1 jobs b=1 rows 1 [32s] peak 2.74 GB\nDONE mcleish_llama32_r32_gsm8k_natural_k1 1/1 cells in 32s peak 2.745 GB | acc_v2 {'0': 0.0}",
+    "stderr_tail": "`torch_dtype` is deprecated! Use `dtype` instead!\n\nLoading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]\nLoading checkpoint shards:  50%|\u2588\u2588\u2588\u2588\u2588     | 1/2 [00:17<00:17, 17.84s/it]\nLoading checkpoint shards: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 2/2 [00:25<00:00, 12.06s/it]\nLoading checkpoint shards: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 2/2 [00:25<00:00, 12.93s/it]"
+  },
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 16,
+      "B": 2048,
+      "n": 1056,
+      "rc": 0,
+      "seconds": 1629.4,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_mcleish_llama32_r32_gsm8k_avg_gated_equation_resolved_b0.5/live_k16_B2048",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=mcleish_llama32_r32 --task=gsm8k --k=16 --caps=2048 --no-extra-caps --horizon=2048 --out=/home/mzaoad/loopedcot/artifacts/live_check_mcleish_llama32_r32_gsm8k_avg_gated_equation_resolved_b0.5/live_k16_B2048 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_mcleish_llama32_r32_gsm8k_avg_gated_equation_resolved_b0.5/live_k16_B2048/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[mcleish_llama32_r32_gsm8k_natural_k16_sub1056] N=1056 caps=[2048] horizon=2048 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 107.5 hit 0.989, 117781 tokens in 1366s (86.2 tok/s) [1395s]\n    readout single 256/1056 jobs b=16 rows 256 [1444s] peak 18.59 GB\n    readout single 512/1056 jobs b=16 rows 512 [1493s] peak 18.59 GB\n    readout single 768/1056 jobs b=16 rows 768 [1544s] peak 18.59 GB\n    readout single 1024/1056 jobs b=16 rows 1024 [1599s] peak 18.59 GB\n    readout single 1056/1056 jobs b=16 rows 1056 [1627s] peak 43.95 GB\nDONE mcleish_llama32_r32_gsm8k_natural_k16_sub1056 1056/1056 cells in 1627s peak 43.95 GB | acc_v2 {'2048': 0.484}",
+      "stderr_tail": "`torch_dtype` is deprecated! Use `dtype` instead!\n\nLoading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]\nLoading checkpoint shards:  50%|\u2588\u2588\u2588\u2588\u2588     | 1/2 [00:02<00:02,  2.16s/it]\nLoading checkpoint shards: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 2/2 [00:02<00:00,  1.20s/it]\nLoading checkpoint shards: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 2/2 [00:02<00:00,  1.34s/it]"
+    }
+  ],
+  "n_live_rows": 1056,
+  "live_acc": 0.48390151515151514,
+  "grid_acc_same_rows": 0.48863636363636365,
+  "delta_pp": -0.473,
+  "live_mean_price_layer_passes": 69086.92424242424,
+  "grid_mean_price_same_rows": 70191.72727272728,
+  "price_over_budget_pct": 316.55,
+  "n_flips": 23,
+  "flips": [
+    {
+      "row_idx": 36,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 98,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 270,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 338,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 386,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 399,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 408,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 459,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 467,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 507,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 509,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 600,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 685,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 786,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 809,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 844,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 927,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1002,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1072,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1169,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1211,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1212,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1284,
+      "cell": [
+        16,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}
