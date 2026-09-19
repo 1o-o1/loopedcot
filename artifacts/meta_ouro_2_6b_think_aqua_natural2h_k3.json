@@ -235,7 +235,7 @@
     "hf_hub_offline": "1",
     "mem_fraction": 0.85,
     "batch_cap": 32,
-    "time": "2026-09-18T01:59:20",
+    "time": "2026-09-19T01:57:30",
     "torch": "2.6.0+cu124",
     "transformers": "4.56.2",
     "cuda": "12.4",
@@ -453,7 +453,7 @@
   ],
   "passes_per_token": 144,
   "kv_bytes_per_token": 1179648,
-  "load_seconds": 5.7,
+  "load_seconds": 11.6,
   "batch_width_pinned": 4,
   "strip_at_eos": true,
   "eos_cut": true,
@@ -472,9 +472,9 @@
     "n_selected": 35,
     "think_id": 4,
     "think_text": "</think>",
-    "cells_shared_cut": 0,
+    "cells_shared_cut": 219,
     "rows_continued": 35,
-    "cells_copied": 2540,
+    "cells_copied": 219,
     "cells_above_the_old_stop": 0,
     "rows_copied_whole": 219
   },
@@ -516,14 +516,14 @@
       ],
       "natural_stop_hit_frac": 0.027559055118110236,
       "trace_tokens": 268145,
-      "generated_tokens": 124785,
-      "generate_seconds": 6049.49,
-      "tokens_per_s": 20.627351401269802
+      "generated_tokens": 0,
+      "generate_seconds": 0.0,
+      "tokens_per_s": null
     }
   },
   "chains_written": 0,
   "chains_path": "/home/mzaoad/loopedcot/artifacts/chains_ouro_2_6b_think_aqua_k3.jsonl",
-  "cells_written": 2575,
+  "cells_written": 2794,
   "cells_expected": 2794,
   "by_budget": {
     "0": {
@@ -667,32 +667,26 @@
       "n_cal": 100
     },
     "8192": {
-      "n": 35,
-      "parse_rate_forced": 1.0,
-      "parse_rate_own": 0.0,
-      "acc_forced": 0.3142857142857143,
-      "acc_own": 0.0,
-      "acc_v2": 0.3142857142857143,
-      "mean_layer_passes": 1198787.657142857,
-      "mean_n_cut": 7661.085714285714,
-      "acc_v2_eval": 0.30434782608695654,
-      "n_eval": 23,
-      "acc_v2_cal": 0.3333333333333333,
-      "n_cal": 12
+      "n": 254,
+      "parse_rate_forced": 0.937007874015748,
+      "parse_rate_own": 0.07874015748031496,
+      "acc_forced": 0.8031496062992126,
+      "acc_own": 0.07874015748031496,
+      "acc_v2": 0.8031496062992126,
+      "mean_layer_passes": 408937.88976377953,
+      "mean_n_cut": 2183.6732283464567,
+      "acc_v2_eval": 0.8116883116883117,
+      "n_eval": 154,
+      "acc_v2_cal": 0.79,
+      "n_cal": 100
     }
   },
   "batch_width_histogram": {
-    "generation": {
-      "4": 8,
-      "3": 1
-    },
-    "readout": {
-      "4": 8,
-      "3": 1
-    }
+    "generation": {},
+    "readout": {}
   },
   "parse_rate_min": 0.937007874015748,
-  "seconds": 6178.9,
-  "peak_gb": 46.279,
-  "complete": false
+  "seconds": 12.4,
+  "peak_gb": 4.969,
+  "complete": true
 }

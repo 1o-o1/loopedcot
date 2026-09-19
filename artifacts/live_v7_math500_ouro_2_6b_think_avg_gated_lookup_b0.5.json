@@ -1,0 +1,358 @@
+{
+  "model": "ouro_2_6b_think",
+  "task": "math500",
+  "arm": "avg_gated_lookup",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7n2_math500_ouro_2_6b_think",
+  "budget_fraction": 0.5,
+  "budget": 211780.08,
+  "default_cost": {
+    "k": 4,
+    "n": 400,
+    "mean": 423560.16,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": 10.0,
+    "sd_pts": 7.090205294003208,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "deepest_depth_capped",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T1024": 400
+      },
+      "mean_price": 192449.28,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 400047.35999999987,
+      "default_cell_mean_price_eval": 400047.36,
+      "default_cell_affordable_on_cal": false,
+      "default_cell_affordable_on_eval": false
+    }
+  },
+  "alloc_mean_price_layer_passes": 192449.28,
+  "n_eval_used": 400,
+  "n_infeasible": 0,
+  "n_cal": 100,
+  "n_promoted": 0,
+  "chosen_histogram": {
+    "k4_B1024": 400
+  },
+  "layers_per_loop": 48,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.7625,
+  "preflight": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 1024,
+      "n": 400,
+      "rc": 0,
+      "seconds": 11451.3,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_math500_avg_gated_lookup_b0.5/live_k4_B1024",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_2_6b_think --task=math500 --k=4 --caps=1024 --no-extra-caps --horizon=1024 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_math500_avg_gated_lookup_b0.5/live_k4_B1024 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_math500_avg_gated_lookup_b0.5/live_k4_B1024/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_2_6b_think_math500_natural_k4_sub400] N=400 caps=[1024] horizon=1024 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 904.1 hit 0.365, 361770 tokens in 10598s (34.1 tok/s) [11021s]\n    readout single 128/400 jobs b=8 rows 128 [11110s] peak 33.39 GB\n    readout single 256/400 jobs b=8 rows 256 [11257s] peak 33.39 GB\n    readout single 384/400 jobs b=8 rows 384 [11424s] peak 33.39 GB\n    readout single 400/400 jobs b=8 rows 400 [11446s] peak 40.42 GB\nDONE ouro_2_6b_think_math500_natural_k4_sub400 400/400 cells in 11446s peak 40.418 GB | acc_v2 {'1024': 0.77}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 400,
+  "live_acc": 0.77,
+  "grid_acc_same_rows": 0.7625,
+  "delta_pp": 0.75,
+  "price_accounting": "promptfree",
+  "live_mean_price_layer_passes": 177601.44,
+  "grid_mean_price_same_rows": 177136.32,
+  "price_over_budget_pct": -16.14,
+  "n_flips": 15,
+  "flips": [
+    {
+      "row_idx": 30,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 32,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 82,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 123,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 130,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 194,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 236,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 293,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 305,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 317,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 326,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 349,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 394,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 408,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 436,
+      "cell": [
+        4,
+        1024
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}

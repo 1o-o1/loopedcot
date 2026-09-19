@@ -1,0 +1,18 @@
+{
+  "n_chains_questions": 16637,
+  "not_in_pool": 0,
+  "pool_jsonl": "train/data/pool.jsonl",
+  "pool_sha256": "7d5569c32611a90afc57a3655052b0338dd12d30346f4c0938ebb544758d81d3",
+  "exemplar_sha256": {
+    "gsm8k": "931391a38fe2cfccb48a624ece3d9949e8034d5d3e75aacc2a361b06b67b8001",
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7",
+    "csqa": "47fff635592d5b3bb1665fc540f49045f73d26b0d4646f81e9cd0085262e6159",
+    "aqua": "62ea68b3f45231e70b1c8f2facbc8ad086d0a2e52097ef05abc38e431c65a1d2"
+  },
+  "math_exemplar_source": null,
+  "s33_v9_exact_overlaps_left_in_pool": 82,
+  "s33_v9_near_duplicates_dropped": 126,
+  "s33_v9_drop_near": true,
+  "s33_v9_pool_after": 12991,
+  "argument": "every chain's question comes from the screened pool, which was checked against GSM8K test, MATH500, SVAMP test, AQuA test, CSQA validation, the two BBH files and the five calibration sets, with every exact overlap and every near-duplicate dropped. This recipe introduces no new question."
+}

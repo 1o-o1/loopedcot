@@ -1,0 +1,295 @@
+{
+  "real": {
+    "n_spans": 21456,
+    "n_supervised_tokens": 1200319,
+    "n_failing_spans": 0,
+    "failures_by_reason": {},
+    "ok": true,
+    "detail": []
+  },
+  "legacy_control": {
+    "n_spans": 148,
+    "n_supervised_tokens": 2857,
+    "n_failing_spans": 148,
+    "failures_by_reason": {
+      "block_span_count": 63,
+      "visit_span_count": 63,
+      "visit_split": 2937,
+      "prompt_split_or_absent": 2873,
+      "prompt_not_before_token": 2857,
+      "cross_visit_context": 63
+    },
+    "ok": false,
+    "detail": [
+      {
+        "block": 0,
+        "L": 512,
+        "visit": 0,
+        "v_start": 0,
+        "start": 0,
+        "prompt_len": 601,
+        "first_supervised": 512,
+        "reasons": [
+          "visit_split"
+        ]
+      },
+      {
+        "block": 1,
+        "L": 512,
+        "visit": 0,
+        "v_start": 512,
+        "start": 0,
+        "prompt_len": 601,
+        "first_supervised": 89,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 1,
+        "L": 512,
+        "visit": 1,
+        "v_start": 0,
+        "start": 126,
+        "prompt_len": 947,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 2,
+        "L": 512,
+        "visit": 1,
+        "v_start": 386,
+        "start": 0,
+        "prompt_len": 947,
+        "first_supervised": 512,
+        "reasons": [
+          "prompt_split_or_absent",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 3,
+        "L": 512,
+        "visit": 1,
+        "v_start": 898,
+        "start": 0,
+        "prompt_len": 947,
+        "first_supervised": 49,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 3,
+        "L": 512,
+        "visit": 2,
+        "v_start": 0,
+        "start": 125,
+        "prompt_len": 602,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 4,
+        "L": 512,
+        "visit": 2,
+        "v_start": 387,
+        "start": 0,
+        "prompt_len": 602,
+        "first_supervised": 215,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 4,
+        "L": 512,
+        "visit": 3,
+        "v_start": 0,
+        "start": 229,
+        "prompt_len": 628,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 5,
+        "L": 512,
+        "visit": 3,
+        "v_start": 283,
+        "start": 0,
+        "prompt_len": 628,
+        "first_supervised": 345,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 5,
+        "L": 512,
+        "visit": 4,
+        "v_start": 0,
+        "start": 398,
+        "prompt_len": 635,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 6,
+        "L": 512,
+        "visit": 4,
+        "v_start": 114,
+        "start": 0,
+        "prompt_len": 635,
+        "first_supervised": 512,
+        "reasons": [
+          "prompt_split_or_absent",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 7,
+        "L": 512,
+        "visit": 4,
+        "v_start": 626,
+        "start": 0,
+        "prompt_len": 635,
+        "first_supervised": 9,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 7,
+        "L": 512,
+        "visit": 5,
+        "v_start": 0,
+        "start": 81,
+        "prompt_len": 608,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 8,
+        "L": 512,
+        "visit": 5,
+        "v_start": 431,
+        "start": 0,
+        "prompt_len": 608,
+        "first_supervised": 177,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 8,
+        "L": 512,
+        "visit": 6,
+        "v_start": 0,
+        "start": 212,
+        "prompt_len": 606,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 9,
+        "L": 512,
+        "visit": 6,
+        "v_start": 300,
+        "start": 0,
+        "prompt_len": 606,
+        "first_supervised": 306,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 9,
+        "L": 512,
+        "visit": 7,
+        "v_start": 0,
+        "start": 338,
+        "prompt_len": 936,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 10,
+        "L": 512,
+        "visit": 7,
+        "v_start": 174,
+        "start": 0,
+        "prompt_len": 936,
+        "first_supervised": 512,
+        "reasons": [
+          "prompt_split_or_absent",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 11,
+        "L": 512,
+        "visit": 7,
+        "v_start": 686,
+        "start": 0,
+        "prompt_len": 936,
+        "first_supervised": 250,
+        "reasons": [
+          "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 11,
+        "L": 512,
+        "visit": 8,
+        "v_start": 0,
+        "start": 304,
+        "prompt_len": 638,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      }
+    ],
+    "ran": true
+  },
+  "split_detected": true
+}

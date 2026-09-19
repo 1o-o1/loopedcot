@@ -1,0 +1,174 @@
+{
+  "name": "s36_uniform_longest",
+  "variant": "uniform_longest",
+  "variant_config": {
+    "rule": "longest_fitting",
+    "budget_line": true,
+    "fallback": true,
+    "draw": "uniform"
+  },
+  "seed": 20260914,
+  "blocks_by_len": {
+    "1024": 19701,
+    "1536": 1748,
+    "2048": 7
+  },
+  "one_visit_per_block": true,
+  "packing": "one visit per block, right-padded, pad mask 0, causal forward, no attention mask",
+  "tokens_in_blocks": 15727176,
+  "padding_share": 0.31242,
+  "supervised_token_budget": 1200000,
+  "supervised_tokens_drawn": 1200319,
+  "supervised_tokens_scheduled": 1190898,
+  "blocks_dropped_as_remainder": 48,
+  "supervised_tokens_planned": 1190898,
+  "supervised_density": 0.052477348051998926,
+  "visits_by_T": {
+    "128": 2340,
+    "256": 2367,
+    "32": 2333,
+    "512": 2379,
+    "1024": 2334,
+    "0": 2377,
+    "none": 2311,
+    "2048": 341,
+    "16": 2384,
+    "64": 2290
+  },
+  "visits_by_kind": {
+    "CHAIN": 14911,
+    "FALLBACK": 3709,
+    "DIRECT": 2377,
+    "CHAIN_PLUS": 459
+  },
+  "fallback_share_overall": 0.17286539895600297,
+  "supervised_share_by_source": {
+    "csqa": 0.13695609250540897,
+    "math": 0.3334005376903973,
+    "aqua": 0.25301607322720043,
+    "gsm8k": 0.2766272965769933
+  },
+  "supervised_share_by_format": {
+    "letter_paren": 0.3899721657326094,
+    "math_boxed": 0.3334005376903973,
+    "numeric_hash": 0.2766272965769933
+  },
+  "micro_by_block_len": {
+    "1024": 4,
+    "1536": 2,
+    "2048": 2
+  },
+  "accum_by_block_len": {
+    "1024": 8,
+    "1536": 16,
+    "2048": 16
+  },
+  "effective_batch_blocks": 32,
+  "padding_share_by_block_len": {
+    "1024": 0.32286,
+    "1536": 0.23438,
+    "2048": 0.22398
+  },
+  "chains_horizon_by_source": {
+    "gsm8k": 1024,
+    "math": 2048,
+    "csqa": 1024,
+    "aqua": 1024
+  },
+  "n_micro_batches": 5784,
+  "n_opt_steps": 669,
+  "warmup_steps": 20,
+  "lr": 0.0002,
+  "weight_decay": 0.0,
+  "betas": [
+    0.9,
+    0.95
+  ],
+  "grad_clip": 1.0,
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.0,
+    "targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "n_trainable_params": 15138816,
+  "loss": "ce_sum_over_window_supervised",
+  "loss_detail": "CE SUM from lm_head(hidden_states_list[d-1]) on the masked target tokens, divided by the accumulation window's own supervised-token total; padding is mask 0 and never enters the sum",
+  "lr_schedule": "cosine",
+  "blocks_sha256": "880a6d466baa87454270a52bcdb0c0b29ff6f40594818db14ba885d731bf7110",
+  "data_dir": "/home/mzaoad/loopedcot/artifacts/s36/data/uniform_longest",
+  "gradient_checkpointing": false,
+  "depth_probabilities": {
+    "1": 0.1,
+    "2": 0.3,
+    "3": 0.2,
+    "4": 0.4
+  },
+  "budget_grid_by_source": {
+    "gsm8k": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "math": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "2048",
+      "none"
+    ],
+    "csqa": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "aqua": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ]
+  },
+  "block_lens": [
+    1024,
+    1536,
+    2048,
+    2560,
+    3072
+  ],
+  "control_line": "\nBudget: %d tokens. | \nBudget: no limit.  (never supervised)",
+  "gpu_wait": {
+    "waited_s": 0
+  },
+  "errors": {}
+}

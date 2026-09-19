@@ -1,0 +1,697 @@
+{
+  "model": "ouro_1_4b_think",
+  "task": "bbh",
+  "arm": "avg_gated_equation_resolved",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7n2_bbh_ouro_1_4b_think",
+  "budget_fraction": 0.5,
+  "budget": 61696.823584464204,
+  "default_cost": {
+    "k": 4,
+    "n": 2137,
+    "mean": 123393.64716892841,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": 0.0,
+    "sd_pts": 4.133140825863517,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "deepest_depth_capped",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T512": 2137
+      },
+      "mean_price": 49771.320542817026,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 113665.05142857143,
+      "default_cell_mean_price_eval": 113511.80054281703,
+      "default_cell_affordable_on_cal": false,
+      "default_cell_affordable_on_eval": false
+    }
+  },
+  "alloc_mean_price_layer_passes": 49771.320542817026,
+  "n_eval_used": 2137,
+  "n_infeasible": 0,
+  "n_cal": 300,
+  "n_promoted": 200,
+  "chosen_histogram": {
+    "k4_B512": 2137
+  },
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.7927000467945718,
+  "preflight": {
+    "model": "ouro_1_4b_think",
+    "task": "bbh",
+    "adapter": null,
+    "python": "/home/mzaoad/loopedcot/.venv/bin/python",
+    "cwd": "/home/mzaoad/loopedcot",
+    "out_dir": "/tmp/live_preflight_owwab2xh",
+    "hf_hub_offline": "1",
+    "hf_home": "/home/mzaoad/loopedcot/hf",
+    "model_path": {
+      "name": "ouro_1_4b_think",
+      "base": "ouro_1_4b_think",
+      "repo": "ByteDance/Ouro-1.4B-Thinking",
+      "revision": "3aaa2224253a92ca45cf2e3d427c360e1ef9c93d",
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-1.4B-Thinking/snapshots/3aaa2224253a92ca45cf2e3d427c360e1ef9c93d",
+      "local_dir_exists": true,
+      "revisions_file": "/home/mzaoad/loopedcot/prod/tasks/data/model_revisions.json"
+    },
+    "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=bbh --k=1 --caps=0 --no-extra-caps --horizon=1 --out=/tmp/live_preflight_owwab2xh --n=1",
+    "rc": 0,
+    "seconds": 9.3,
+    "n_rows": 1,
+    "stdout_tail": "[ouro_1_4b_think_bbh_natural_k1] N=1 caps=[0] horizon=1 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 1.0 hit 0.000, 1 tokens in 0s (9597.9 tok/s) [6s]\n    readout single 1/1 jobs b=1 rows 1 [7s] peak 2.87 GB\nDONE ouro_1_4b_think_bbh_natural_k1 1/1 cells in 6s peak 2.872 GB | acc_v2 {'0': 0.0}",
+    "stderr_tail": null
+  },
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 512,
+      "n": 2137,
+      "rc": 0,
+      "seconds": 8719.3,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_bbh_avg_gated_equation_resolved_b0.5/live_k4_B512",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=bbh --k=4 --caps=512 --no-extra-caps --horizon=512 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_bbh_avg_gated_equation_resolved_b0.5/live_k4_B512 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_bbh_avg_gated_equation_resolved_b0.5/live_k4_B512/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_1_4b_think_bbh_natural_k4_sub2137] N=2137 caps=[512] horizon=512 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 473.1 hit 0.332, 1011735 tokens in 7352s (137.6 tok/s) [7931s]\n    readout single 256/2137 jobs b=16 rows 256 [7989s] peak 26.33 GB\n    readout single 512/2137 jobs b=16 rows 512 [8050s] peak 26.33 GB\n    readout single 768/2137 jobs b=16 rows 768 [8147s] peak 26.33 GB\n    readout single 1024/2137 jobs b=16 rows 1024 [8246s] peak 26.33 GB\n    readout single 1280/2137 jobs b=16 rows 1280 [8365s] peak 26.33 GB\n    readout single 1536/2137 jobs b=16 rows 1536 [8480s] peak 26.33 GB\n    readout single 1792/2137 jobs b=16 rows 1792 [8561s] peak 26.33 GB\n    readout single 2048/2137 jobs b=16 rows 2048 [8673s] peak 26.33 GB\n    readout single 2137/2137 jobs b=9 rows 2137 [8717s] peak 26.49 GB\nDONE ouro_1_4b_think_bbh_natural_k4_sub2137 2137/2137 cells in 8717s peak 26.494 GB | acc_v2 {'512': 0.795}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 2137,
+  "live_acc": 0.7950397753860552,
+  "grid_acc_same_rows": 0.7927000467945718,
+  "delta_pp": 0.234,
+  "price_accounting": "promptfree",
+  "live_mean_price_layer_passes": 46759.547028544686,
+  "grid_mean_price_same_rows": 46722.97987833411,
+  "price_over_budget_pct": -24.21,
+  "n_flips": 107,
+  "flips": [
+    {
+      "row_idx": 13,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 15,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 68,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 71,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 79,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 80,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 84,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 103,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 118,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 128,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 184,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 203,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 230,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 233,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 246,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 301,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 308,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 373,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 374,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 386,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 399,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 403,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 418,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 419,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 448,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 450,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 451,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 461,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 469,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 471,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 491,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 493,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 591,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 734,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 744,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 843,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 940,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 949,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1005,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1475,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1518,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1536,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1563,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1583,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1633,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1661,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1666,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1671,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1674,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1676,
+      "cell": [
+        4,
+        512
+      ],
+      "grid": true,
+      "live": false
+    }
+  ],
+  "missing_rows": []
+}

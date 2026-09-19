@@ -1,0 +1,19 @@
+{
+  "depth_1_L1024_batch_vs_rows": 0.0,
+  "depth_1_L1024_batch_vs_rows_rel": 0.0,
+  "depth_1_L1024_logit_scale": 34.313392639160156,
+  "depth_1_L1024_vs_other_depth": 23.543394088745117,
+  "depth_3_L1024_batch_vs_rows": 0.0,
+  "depth_3_L1024_batch_vs_rows_rel": 0.0,
+  "depth_3_L1024_logit_scale": 32.37944793701172,
+  "depth_3_L1024_vs_other_depth": 21.571331024169922,
+  "max_abs_diff": 0.0,
+  "max_rel_diff": 0.0,
+  "rel_tol": 0.001,
+  "compared_in": "float32",
+  "waited_for_gpu": false,
+  "gpu_wait": {
+    "waited_s": 0
+  },
+  "depth_switch_is_effective": true
+}

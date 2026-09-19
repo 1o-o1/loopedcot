@@ -235,7 +235,7 @@
     "hf_hub_offline": "1",
     "mem_fraction": 0.85,
     "batch_cap": 32,
-    "time": "2026-09-18T01:34:47",
+    "time": "2026-09-19T01:57:34",
     "torch": "2.6.0+cu124",
     "transformers": "4.56.2",
     "cuda": "12.4",
@@ -453,7 +453,7 @@
   ],
   "passes_per_token": 72,
   "kv_bytes_per_token": 589824,
-  "load_seconds": 6.2,
+  "load_seconds": 16.3,
   "batch_width_pinned": 8,
   "strip_at_eos": true,
   "eos_cut": true,
@@ -472,9 +472,9 @@
     "n_selected": 114,
     "think_id": 4,
     "think_text": "</think>",
-    "cells_shared_cut": 0,
+    "cells_shared_cut": 386,
     "rows_continued": 114,
-    "cells_copied": 5000,
+    "cells_copied": 386,
     "cells_above_the_old_stop": 0,
     "rows_copied_whole": 386
   },
@@ -516,14 +516,14 @@
       ],
       "natural_stop_hit_frac": 0.078,
       "trace_tokens": 844659,
-      "generated_tokens": 377715,
-      "generate_seconds": 5060.13,
-      "tokens_per_s": 74.64537380772366
+      "generated_tokens": 0,
+      "generate_seconds": 0.0,
+      "tokens_per_s": null
     }
   },
   "chains_written": 0,
   "chains_path": "/home/mzaoad/loopedcot/artifacts/chains_ouro_1_4b_think_math500_k3.jsonl",
-  "cells_written": 5114,
+  "cells_written": 5500,
   "cells_expected": 5500,
   "by_budget": {
     "0": {
@@ -667,32 +667,26 @@
       "n_cal": 100
     },
     "8192": {
-      "n": 114,
+      "n": 500,
       "parse_rate_forced": 1.0,
-      "parse_rate_own": 0.2982456140350877,
-      "acc_forced": 0.6403508771929824,
-      "acc_own": 0.2631578947368421,
-      "acc_v2": 0.631578947368421,
-      "mean_layer_passes": 610215.7894736842,
-      "mean_n_cut": 7408.9473684210525,
-      "acc_v2_eval": 0.6063829787234043,
-      "n_eval": 94,
-      "acc_v2_cal": 0.75,
-      "n_cal": 20
+      "parse_rate_own": 0.834,
+      "acc_forced": 0.894,
+      "acc_own": 0.806,
+      "acc_v2": 0.896,
+      "mean_layer_passes": 276494.112,
+      "mean_n_cut": 2819.114,
+      "acc_v2_eval": 0.8925,
+      "n_eval": 400,
+      "acc_v2_cal": 0.91,
+      "n_cal": 100
     }
   },
   "batch_width_histogram": {
-    "generation": {
-      "8": 14,
-      "2": 1
-    },
-    "readout": {
-      "8": 14,
-      "2": 1
-    }
+    "generation": {},
+    "readout": {}
   },
   "parse_rate_min": 1.0,
-  "seconds": 5289.8,
-  "peak_gb": 49.525,
-  "complete": false
+  "seconds": 18.2,
+  "peak_gb": 2.672,
+  "complete": true
 }

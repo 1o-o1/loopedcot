@@ -1,0 +1,418 @@
+{
+  "model": "ouro_1_4b_think",
+  "task": "arc",
+  "arm": "avg_gated_equation_resolved",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7n2_arc_ouro_1_4b_think",
+  "budget_fraction": 0.5,
+  "budget": 31486.82302771855,
+  "default_cost": {
+    "k": 4,
+    "n": 938,
+    "mean": 62973.6460554371,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": 1.4285714285714286,
+    "sd_pts": 3.1097857397156434,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "deepest_depth_capped",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T256": 938
+      },
+      "mean_price": 25873.641025641024,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 65024.41025641024,
+      "default_cell_mean_price_eval": 65024.41025641025,
+      "default_cell_affordable_on_cal": false,
+      "default_cell_affordable_on_eval": false
+    }
+  },
+  "alloc_mean_price_layer_passes": 25873.641025641024,
+  "n_eval_used": 938,
+  "n_infeasible": 0,
+  "n_cal": 234,
+  "n_promoted": 134,
+  "chosen_histogram": {
+    "k4_B256": 938
+  },
+  "layers_per_loop": 24,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.8987206823027718,
+  "preflight": {
+    "model": "ouro_1_4b_think",
+    "task": "arc",
+    "adapter": null,
+    "python": "/home/mzaoad/loopedcot/.venv/bin/python",
+    "cwd": "/home/mzaoad/loopedcot",
+    "out_dir": "/tmp/live_preflight_pmdfz3c4",
+    "hf_hub_offline": "1",
+    "hf_home": "/home/mzaoad/loopedcot/hf",
+    "model_path": {
+      "name": "ouro_1_4b_think",
+      "base": "ouro_1_4b_think",
+      "repo": "ByteDance/Ouro-1.4B-Thinking",
+      "revision": "3aaa2224253a92ca45cf2e3d427c360e1ef9c93d",
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-1.4B-Thinking/snapshots/3aaa2224253a92ca45cf2e3d427c360e1ef9c93d",
+      "local_dir_exists": true,
+      "revisions_file": "/home/mzaoad/loopedcot/prod/tasks/data/model_revisions.json"
+    },
+    "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=arc --k=1 --caps=0 --no-extra-caps --horizon=1 --out=/tmp/live_preflight_pmdfz3c4 --n=1",
+    "rc": 0,
+    "seconds": 14.5,
+    "n_rows": 1,
+    "stdout_tail": "[ouro_1_4b_think_arc_natural_k1] N=1 caps=[0] horizon=1 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 1.0 hit 0.000, 1 tokens in 0s (5377.3 tok/s) [11s]\n    readout single 1/1 jobs b=1 rows 1 [12s] peak 2.77 GB\nDONE ouro_1_4b_think_arc_natural_k1 1/1 cells in 12s peak 2.765 GB | acc_v2 {'0': 0.0}",
+    "stderr_tail": null
+  },
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 256,
+      "n": 938,
+      "rc": 0,
+      "seconds": 1798.1,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_arc_avg_gated_equation_resolved_b0.5/live_k4_B256",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_1_4b_think --task=arc --k=4 --caps=256 --no-extra-caps --horizon=256 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_arc_avg_gated_equation_resolved_b0.5/live_k4_B256 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_1_4b_think_arc_avg_gated_equation_resolved_b0.5/live_k4_B256/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_1_4b_think_arc_natural_k4_sub938] N=938 caps=[256] horizon=256 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 250.0 hit 0.173, 234649 tokens in 1596s (147.0 tok/s) [1687s]\n    readout single 256/938 jobs b=16 rows 256 [1715s] peak 11.40 GB\n    readout single 512/938 jobs b=16 rows 512 [1743s] peak 11.40 GB\n    readout single 768/938 jobs b=16 rows 768 [1774s] peak 11.40 GB\n    readout single 938/938 jobs b=10 rows 938 [1795s] peak 11.69 GB\nDONE ouro_1_4b_think_arc_natural_k4_sub938 938/938 cells in 1795s peak 11.692 GB | acc_v2 {'256': 0.896}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 938,
+  "live_acc": 0.8955223880597015,
+  "grid_acc_same_rows": 0.8987206823027718,
+  "delta_pp": -0.32,
+  "price_accounting": "promptfree",
+  "live_mean_price_layer_passes": 25088.34115138593,
+  "grid_mean_price_same_rows": 25067.872068230277,
+  "price_over_budget_pct": -20.32,
+  "n_flips": 19,
+  "flips": [
+    {
+      "row_idx": 50,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 199,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 280,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 321,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 349,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 400,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 672,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 684,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 716,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 725,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 736,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 767,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 777,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 781,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 789,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 818,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 923,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1070,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1129,
+      "cell": [
+        4,
+        256
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}
