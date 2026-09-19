@@ -16,6 +16,9 @@ artifacts/s36/logs/
 artifacts/s36/train_logs/
 artifacts/s36/**/*.pt
 artifacts/s36/**/*.safetensors
+artifacts/s36/data/
+artifacts/s36/**/*.npy
+artifacts/s36/**/*.npz
 logs/
 __pycache__/
 *.pyc
