@@ -9,7 +9,7 @@
 #   bash slurm/v6.sh status           # what is done, running, failed; the stderr tail of every FAILED live check
 #   bash slurm/v6.sh collect          # Table 1 rows per pair, the gated deviation lines, the pooled live-minus-grid per arm and fraction
 # Every job log ends with RC=<exit code>, and the batch job exits with it. Re-running any mode only submits what is missing.
-# Knobs: V (v6; V=v7 renames every output alloc_v7_* / live_v7_*) ALLOC_CPUS (4) ALLOC_MEM (32gb) ALLOC_TIME (03:00:00) LIVE_TIME (24:00:00) LIVE_MEM (64gb) SBATCH_EXTRA MODELS TASKS
+# Knobs: V (v6; V=v7 renames every output alloc_v7_* / live_v7_*) LIVE_ALL (1 = no pair excluded from live) ALLOC_CPUS (4) ALLOC_MEM (32gb) ALLOC_TIME (03:00:00) LIVE_TIME (24:00:00) LIVE_MEM (64gb) SBATCH_EXTRA MODELS TASKS
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -49,7 +49,8 @@ sys.exit(0 if ok else 1)
 EOF
 }
 alloc_dir_of() { case "$1" in ouro_*think) echo "$PROD_ART/alloc_${V}n2_${2}_${1}" ;; *) echo "$PROD_ART/alloc_${V}_${2}_${1}" ;; esac; }
-live_pair_wanted() {  # the pairs the live check runs on
+live_pair_wanted() {  # the pairs the live check runs on; LIVE_ALL=1 lifts the exclusions (e.g. for the natural2 grids)
+  [ "${LIVE_ALL:-0}" = 1 ] && return 0
   case "$1" in huginn_0125) return 1 ;; ouro_2_6b_think) case "$2" in gsm8k|svamp) return 1 ;; esac ;; esac; return 0
 }
 
