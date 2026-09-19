@@ -59,6 +59,7 @@ case "$MODE" in
     for M in $MODELS; do for T in $TASKS; do
       if [ "$PROTO" != natural ]; then
         case "$PROTO:$M" in natural2:ouro_*think) ;; natural2:*) continue ;; esac   # natural2 exists for the Thinking checkpoints only
+        ls "$PROD_ART"/meta_${M}_${T}_${PROTO}_k*.json >/dev/null 2>&1 || continue   # this pair has no such grid at all: not part of the run
         grid_complete "$M" "$T" "$PROTO" || { echo "  not complete yet: $PROTO $T $M"; continue; }
       fi
       alloc_done "$PREFIX" "$T" "$M" && { echo "  done   $PREFIX $T $M"; continue; }
