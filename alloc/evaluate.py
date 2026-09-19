@@ -703,6 +703,20 @@ def noninferiority(cells_a, cells_b, ranking="lookup", n_labels=None, c_gate=0.0
 
 
 # ---------------------------------------------------------------- default cost
+def uncapped_caps(cells, ki, n):
+    """Return the cap indices at which prompt `n`'s chain at depth index `ki` ran to ITS natural
+    stop. The stop is the largest `natural_stop` the problem carries at that depth across caps: a
+    continuation grid (natural2h) keeps the old horizon as the stop on the cells it copied from
+    below it and the real stop on the cell it regenerated, so reading the stop cap by cap would
+    call the copied horizon cell "uncapped" and price the default at the old horizon."""
+    nstop, ncut = cells.nstop[ki, :, n], cells.ncut[ki, :, n]
+    fin = nstop[np.isfinite(nstop)]
+    if not len(fin):
+        return []
+    stop = float(np.max(fin))
+    return [j for j in range(len(cells.caps)) if not np.isnan(ncut[j]) and ncut[j] >= stop - 1e-9]
+
+
 def default_cost(cells, promptfree=False, k=None, split="eval"):
     """Return mean realised layer-token cost at the selected depth and natural stop, counting capped observations at the horizon and reporting their share."""
     ks = list(cells.ks)
@@ -712,9 +726,7 @@ def default_cost(cells, promptfree=False, k=None, split="eval"):
     field = cells.passes_pf if promptfree else cells.passes
     vals, n_hor = [], 0
     for n in sel:
-        nstop, ncut = cells.nstop[ki, :, n], cells.ncut[ki, :, n]
-        ok = [j for j in range(len(cells.caps))
-              if not (np.isnan(nstop[j]) or np.isnan(ncut[j])) and ncut[j] >= nstop[j] - 1e-9]
+        ok = uncapped_caps(cells, ki, n)
         if ok:
             j = min(ok, key=lambda j: cells.caps[j])       # the cheapest UNCAPPED realisation
         else:
@@ -736,9 +748,7 @@ def default_accuracy(cells, k=None, split="eval"):
     sel = cells.select(split)
     out = []
     for n in sel:
-        nstop, ncut = cells.nstop[ki, :, n], cells.ncut[ki, :, n]
-        ok = [j for j in range(len(cells.caps))
-              if not (np.isnan(nstop[j]) or np.isnan(ncut[j])) and ncut[j] >= nstop[j] - 1e-9]
+        ok = uncapped_caps(cells, ki, n)
         j = min(ok, key=lambda j: cells.caps[j]) if ok else len(cells.caps) - 1
         out.append(cells.acc[ki, j, n])
     return np.array(out, float)
