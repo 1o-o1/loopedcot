@@ -316,10 +316,18 @@ def run_live(model, task, chosen, row_ids, out_dir, python=None, adapter=None, h
     return runs
 
 
-def collect_live(runs, chosen):
-    """The live protocol-v2 label and realised layer passes per row, from the cells the live
-    generations wrote."""
+def price_field(promptfree):
+    """The row field that prices a generation the way alloc priced its budget: alloc run with
+    --promptfree charges the generated tokens only, so the live price must be read from the
+    prompt-free field, or the comparison is off by the prompt length times the depth."""
+    return "layer_passes_promptfree" if promptfree else "layer_passes"
+
+
+def collect_live(runs, chosen, promptfree=False):
+    """The live protocol-v2 label and realised layer passes per row (under alloc's accounting),
+    from the cells the live generations wrote."""
     live, price = {}, {}
+    field = price_field(promptfree)
     for r in runs:
         for fn in sorted(os.listdir(r["dir"])):
             if not (fn.startswith("cells_") and fn.endswith(".jsonl")):
@@ -328,7 +336,7 @@ def collect_live(runs, chosen):
                 rid = int(row.get("row_idx", row["idx"]))
                 if chosen.get(rid) == (int(row["k"]), int(row["B"])):
                     live[rid] = bool(row["correct_v2"])
-                    price[rid] = float(row.get("layer_passes") or float("nan"))
+                    price[rid] = float(row.get(field) or float("nan"))
     return live, price
 
 
@@ -427,7 +435,8 @@ def main(argv=None):
     runs = run_live(a.model, a.task, chosen, row_ids, out_dir, a.python, a.adapter,
                     cfg["horizon"], extra,
                     fail_path=os.path.splitext(dest)[0] + ".FAILED.json", context=out)
-    live, live_price = collect_live(runs, chosen)
+    promptfree = bool(res.get("promptfree"))
+    live, live_price = collect_live(runs, chosen, promptfree)
     have = [r for r in feasible if r in live]
     if feasible and not have:
         print("live check FAILED: no live row was generated (every generation exited non-zero; see the "
@@ -435,7 +444,8 @@ def main(argv=None):
         sys.exit(2)
     live_acc = float(np.mean([live[r] for r in have])) if have else None
     grid_acc = float(np.mean([grid_lab[r] for r in have])) if have else None
-    grid_price = (float(np.nanmean([cs.passes[ki[chosen[r][0]], bi[chosen[r][1]], ni[r]] for r in have]))
+    passes = cs.passes_pf if promptfree else cs.passes
+    grid_price = (float(np.nanmean([passes[ki[chosen[r][0]], bi[chosen[r][1]], ni[r]] for r in have]))
                   if have else None)
     mean_live_price = float(np.nanmean([live_price[r] for r in have])) if have else None
     flips = [{"row_idx": r, "cell": list(chosen[r]), "grid": grid_lab[r], "live": live[r]}
@@ -444,6 +454,7 @@ def main(argv=None):
                 "grid_acc_same_rows": grid_acc,
                 "delta_pp": (None if live_acc is None or grid_acc is None
                              else round(100.0 * (live_acc - grid_acc), 3)),
+                "price_accounting": ("promptfree" if promptfree else "prompt-inclusive"),
                 "live_mean_price_layer_passes": mean_live_price,
                 "grid_mean_price_same_rows": grid_price,
                 "price_over_budget_pct": (None if mean_live_price is None

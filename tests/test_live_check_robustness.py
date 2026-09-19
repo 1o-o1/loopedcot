@@ -143,3 +143,19 @@ class TestArms(unittest.TestCase):
                 lc.main(["--model", "m", "--task", "gsm8k", "--alloc-dir", d, "--arm", "avg_gated_equation",
                          "--budget-fraction", "0.5"])
         self.assertEqual(cm.exception.code, 2)
+
+
+class TestPriceAccounting(unittest.TestCase):
+    def test_the_live_price_is_read_under_the_accounting_alloc_priced_the_budget_in(self):
+        """An alloc run with --promptfree charges generated tokens only; the live price must then come
+        from layer_passes_promptfree, else every check reports hundreds of percent over budget."""
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "cells_x.jsonl"), "w") as f:
+            f.write(json.dumps({"row_idx": 7, "k": 4, "B": 512, "correct_v2": True,
+                                "layer_passes": 60000, "layer_passes_promptfree": 4000}) + "
+")
+        runs = [{"dir": d}]
+        chosen = {7: (4, 512)}
+        self.assertEqual(lc.collect_live(runs, chosen, promptfree=True)[1][7], 4000.0)
+        self.assertEqual(lc.collect_live(runs, chosen, promptfree=False)[1][7], 60000.0)
+        self.assertEqual(lc.price_field(True), "layer_passes_promptfree")
