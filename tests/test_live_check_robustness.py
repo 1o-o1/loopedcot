@@ -152,8 +152,7 @@ class TestPriceAccounting(unittest.TestCase):
         d = tempfile.mkdtemp()
         with open(os.path.join(d, "cells_x.jsonl"), "w") as f:
             f.write(json.dumps({"row_idx": 7, "k": 4, "B": 512, "correct_v2": True,
-                                "layer_passes": 60000, "layer_passes_promptfree": 4000}) + "
-")
+                                "layer_passes": 60000, "layer_passes_promptfree": 4000}) + "\n")
         runs = [{"dir": d}]
         chosen = {7: (4, 512)}
         self.assertEqual(lc.collect_live(runs, chosen, promptfree=True)[1][7], 4000.0)
