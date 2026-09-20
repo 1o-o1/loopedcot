@@ -484,13 +484,22 @@ def draw_allowance(p, n, tol=0.05, sd_mult=3.0):
     return max(float(tol), float(sd_mult) * se)
 
 
+# The one drop reason that is a variant's rule rather than a draw gone missing (build_target, fallback
+# false): V10 adds these visits back to the realised T histogram.
+DESIGN_DROP_REASON = "no_fitting_chain_and_no_fallback"
+
+
 def v10_draw_weights(man, tol=0.05, sd_mult=3.0):
     """Return the V10 record: every source's realised T and depth histogram against its intended weights.
 
     The manifest carries both sides -- the table stage 0 wrote and the histogram the draw realised
     -- so the gate compares the objective on disk with the objective on paper, per source and per
     weight. Dropped draws are the only mechanism that can move the two apart at large n, and they
-    are counted per T in the same manifest.
+    are counted per T in the same manifest. A drop the variant makes by definition -- `fallback:
+    false` drops every visit whose T no chain fits, the whole point of the nocut ablation -- is not
+    a draw that went missing: those visits are added back to the realised T histogram from
+    `dropped_by_src_T`, so the gate keeps checking the draw and stops failing the variant for its
+    own rule. Every other drop reason still counts against the histogram.
     """
     rec = {"tol": float(tol), "sd_mult": float(sd_mult), "variant": man.get("variant"),
            "draw": man.get("draw_rule"),
@@ -499,9 +508,17 @@ def v10_draw_weights(man, tol=0.05, sd_mult=3.0):
     want = man.get("draw_weights_intended") or {}
     counts = {"budget": man.get("visits_by_src_T") or {},
               "depth": man.get("visits_by_src_depth") or {}}
+    design_drops = man.get("dropped_by_src_T") or {}
     for what in ("budget", "depth"):
         for src, intended in sorted((want.get(what) or {}).items()):
             ct = {str(k): int(v) for k, v in (counts[what].get(src) or {}).items()}
+            added_back = 0
+            if what == "budget":
+                for t, reasons in (design_drops.get(src) or {}).items():
+                    k = int((reasons or {}).get(DESIGN_DROP_REASON, 0))
+                    if k:
+                        ct[str(t)] = ct.get(str(t), 0) + k
+                        added_back += k
             n = sum(ct.values())
             realised = histogram(ct)
             worst_key, worst_dev, worst_allow, ok = None, 0.0, float(tol), True
@@ -515,7 +532,8 @@ def v10_draw_weights(man, tol=0.05, sd_mult=3.0):
             rec["by_source"]["%s_%s" % (what, src)] = {
                 "n_visits": int(n), "max_abs_dev": worst_dev, "worst_key": worst_key,
                 "allowance_at_worst_key": worst_allow, "sampling_bound_binds": worst_allow > tol,
-                "within_tol": bool(ok), "intended": intended, "realised": realised}
+                "within_tol": bool(ok), "intended": intended, "realised": realised,
+                "design_drops_added_back": int(added_back)}
             rec["worst"] = max(rec["worst"], worst_dev)
             rec["ok"] = rec["ok"] and ok
     rec["ok"] = bool(rec["ok"] and rec["by_source"])
@@ -1203,6 +1221,7 @@ def main(argv):
     n_by_src_depth = defaultdict(Counter)
     dropped = Counter()
     dropped_by_T = defaultdict(Counter)
+    dropped_by_src_T = defaultdict(lambda: defaultdict(Counter))   # V10 reads the design drops per source
     MAXTRIES = 400000
     while sup_total < budget and tries < MAXTRIES:
         tries += 1
@@ -1234,6 +1253,7 @@ def main(argv):
         if ids is None:
             dropped[info["dropped"]] += 1
             dropped_by_T[budget_key(T)][info["dropped"]] += 1
+            dropped_by_src_T[src][budget_key(T)][info["dropped"]] += 1
             continue
         L = cfg.block_len_for(len(ids))            # the smallest bucket that holds this visit
         if L is None:
@@ -1241,6 +1261,7 @@ def main(argv):
             # delete the answer supervision at exactly the large budgets this recipe repairs.
             dropped["longer_than_longest_block"] += 1
             dropped_by_T[budget_key(T)]["longer_than_longest_block"] += 1
+            dropped_by_src_T[src][budget_key(T)]["longer_than_longest_block"] += 1
             continue
         ns = int(info["n_supervised"])
         if ns <= 0:
@@ -1363,6 +1384,8 @@ def main(argv):
         "chain_used": dict(Counter(v["chain_used"] for v in visits)),
         "dropped_draws": dict(dropped), "dropped_by_T": {t: dict(d) for t, d in
                                                          dropped_by_T.items()},
+        "dropped_by_src_T": {s: {t: dict(d) for t, d in by_t.items()}
+                             for s, by_t in dropped_by_src_T.items()},
         "drop_share_of_draws": round(drop_share, 5),
         "drop_share_over_warn": bool(drop_share > float(cfg["drop_share_warn"])),
         "supervised_in_blocks": int(sum(int(a["mask"].sum()) for a in arrays.values())),

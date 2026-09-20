@@ -321,3 +321,22 @@ def test_the_readme_prints_both_formulas_and_both_weight_tables():
         for k, v in s["depth_weights"].items():
             assert "%.3f" % v in head, (src, k, v)
     assert "V10" in text and "theory_weights_sha256" in text
+
+
+def test_v10_adds_a_nocut_design_drop_back_and_nothing_else():
+    """nocut (fallback false) drops every visit whose T no chain fits; V10 must not fail the variant
+    for its own rule, and must still fail a draw that lost the same visits for any other reason."""
+    intended = {"0": 0.25, "16": 0.25, "32": 0.25, "none": 0.25}
+    man = {"variant": "nocut", "draw_rule": "theory",
+           "draw_weights_intended": {"budget": {"gsm8k": intended}, "depth": {}},
+           "visits_by_src_T": {"gsm8k": {"0": 3000, "16": 30, "32": 3000, "none": 3000}},
+           "visits_by_src_depth": {},
+           "dropped_by_src_T": {"gsm8k": {"16": {G.DESIGN_DROP_REASON: 2970}}}}
+    ok = G.v10_draw_weights(man)
+    assert ok["ok"], ok["by_source"]
+    assert ok["by_source"]["budget_gsm8k"]["design_drops_added_back"] == 2970
+    assert ok["by_source"]["budget_gsm8k"]["n_visits"] == 12000
+    man["dropped_by_src_T"] = {"gsm8k": {"16": {"no_correct_chain": 2970}}}
+    bad = G.v10_draw_weights(man)
+    assert not bad["ok"]
+    assert bad["by_source"]["budget_gsm8k"]["design_drops_added_back"] == 0

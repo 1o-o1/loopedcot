@@ -280,7 +280,9 @@ the depth mix `budget_longest` draws from, separating the depth sampling from th
 - **V10 draw weights** - the realised `T` and depth histograms, per source, sit within 0.05 of the
   weights `theory_weights.json` intended. The manifest carries both sides, so this is a check of the
   objective on disk against the objective on paper; the only way they can part is a dropped draw,
-  which the same manifest counts per `T`. Below a few thousand visits the multinomial sampling error
+  which the same manifest counts per `T` and per source. The one drop a variant makes by its own
+  rule, `fallback: false` dropping every visit whose `T` no chain fits (nocut), is added back to the
+  realised `T` histogram before the comparison; every other drop reason counts against it. Below a few thousand visits the multinomial sampling error
   of the histogram is larger than 0.05, so the bound there is three of its own standard errors
   instead, reported per table as `sampling_bound_binds`.
 - **V9 contamination** - every chain's question is a pool question, and the pool was screened
