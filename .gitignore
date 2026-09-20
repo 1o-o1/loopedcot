@@ -9,6 +9,10 @@ artifacts/*
 !artifacts/alloc_*/
 !artifacts/alloc_*_all_tables_*.md
 !artifacts/live_*.json
+!artifacts/forced8k/
+artifacts/forced8k/*
+!artifacts/forced8k/cells_*.jsonl
+!artifacts/forced8k/meta_*.json
 # the S36 training run root travels except its weights and logs: chains, targets, gates, cells, manifests, train records
 !artifacts/s36/
 artifacts/s36/adapters/
