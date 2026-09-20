@@ -15,11 +15,48 @@ def parse_budgets(s):
     return out
 
 
+def prod_tasks():
+    """Return the evaluation harness's own task module (prod/tasks), or None outside the checkout.
+
+    It holds the rows of record and the split of record. Nothing here re-implements either: the
+    seeded permutation that labels a row `cal` or `eval` lives in prod.tasks.split_labels and is
+    called, never copied.
+    """
+    root = os.path.dirname(HERE)
+    if not os.path.isdir(os.path.join(root, "prod", "tasks")):
+        return None
+    if root not in sys.path:
+        sys.path.append(root)
+    import prod.tasks as PT
+    return PT
+
+
+def production_rows(task):
+    """Return (every row of the task in dataset order, its split label), the production grids' own
+    row set: prod/tasks/data/rows_<task>.jsonl labelled by prod.tasks.split_labels, which is what
+    the base grids' `split` field was written from."""
+    PT = prod_tasks()
+    if PT is None:
+        raise SystemExit("eval_rows=production needs the evaluation harness (prod/tasks) in the "
+                         "checkout; run with --eval-rows=s32 outside it")
+    rows, labels = PT.rows(task), list(PT.split_labels(task))
+    assert len(rows) == len(labels), (task, len(rows), len(labels))
+    return rows, labels
+
+
+def grid_label(name, eval_rows):
+    """Return the checkpoint label a grid's files carry. A production-split grid measures a
+    different row set from the S32 subset, so it is written as `<name>_full` and can never land on
+    the other's cells, budget or meta files."""
+    return "%s_full" % name if str(eval_rows) == "production" else str(name)
+
+
 def main(argv):
     """Generate once per budget, score every cap of that generation, and append one resumable cell row per (question, budget, cap); returns a process exit code."""
     NAME, TASK = argv[0], argv[1]
     cfg_path, root, variant = G.DEFAULT_CONFIG, None, None
     K, NP, SUFFIX, ADAPTER, WAIT, GRID_OVR = 4, None, "", None, True, None
+    SEED, EVAL_ROWS = None, None
     for a in argv[2:]:
         k, _, v = a.lstrip("-").partition("=")
         if k == "config":
@@ -38,17 +75,27 @@ def main(argv):
             ADAPTER = v
         elif k == "budgets":
             GRID_OVR = parse_budgets(v)
+        elif k == "seed":
+            SEED = int(v)
+        elif k == "eval-rows":
+            EVAL_ROWS = v
         elif k == "no-wait":
             WAIT = False
     G.require_root(root, "run_grid.py")
     cfg = G.load_config(cfg_path)
     variant = variant or cfg["default_variant"]
     WITH_LINE = bool(cfg.variant(variant)["budget_line"])
+    # the command line beats the config key; both are checked against the implemented values
+    EVAL_ROWS = str(EVAL_ROWS if EVAL_ROWS is not None else cfg["eval_rows"])
+    if EVAL_ROWS not in G.EVAL_ROWS_VALUES:
+        raise SystemExit("--eval-rows=%r; implemented values are %s"
+                         % (EVAL_ROWS, list(G.EVAL_ROWS_VALUES)))
     P = G.paths(root)
     G.ensure_dirs(P)
     if ADAPTER is None and NAME != "A0":
         ADAPTER = os.path.join(P["adapters"], NAME)
-    TAG = "%s_%s_k%d%s" % (TASK, NAME, K, SUFFIX)
+    LABEL = grid_label(NAME, EVAL_ROWS)
+    TAG = "%s_%s_k%d%s" % (TASK, LABEL, K, SUFFIX)
     GRID = GRID_OVR if GRID_OVR is not None else cfg["eval_budgets"]
     CAPS = [int(c) for c in cfg["eval_standard_caps"]]
     HORIZON = int(cfg["eval_horizon"])     # the no-limit pass runs to here, not to the harness default
@@ -66,12 +113,16 @@ def main(argv):
                             gpu_procs, load_ckpt, Appender, load_base)
     from s3_patch import patch_universal_cache
     import torch
-    print("[s36 run %s variant=%s frac=%.2f line=%s] %s | %s"
-          % (TAG, variant, MEM_FRACTION, WITH_LINE, nvsmi(), gpu_procs()), flush=True)
+    print("[s36 run %s variant=%s rows=%s frac=%.2f line=%s] %s | %s"
+          % (TAG, variant, EVAL_ROWS, MEM_FRACTION, WITH_LINE, nvsmi(), gpu_procs()), flush=True)
 
-    ev, cal = split_rows(TASK)
-    rows = ev + cal
-    split = ["eval"] * len(ev) + ["cal"] * len(cal)
+    if EVAL_ROWS == "production":
+        # full N, in dataset order, split-labelled exactly as the base grids are
+        rows, split = production_rows(TASK)
+    else:
+        ev, cal = split_rows(TASK)
+        rows = ev + cal
+        split = ["eval"] * len(ev) + ["cal"] * len(cal)
     if NP:
         rows, split = rows[:NP], split[:NP]
     N = len(rows)
@@ -99,15 +150,16 @@ def main(argv):
     SUF = tok(suffix_text, add_special_tokens=False)["input_ids"]
 
     # the exemplar block must be the one the targets were built against, byte for byte
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
+    man = G.jload(G.manifest_path(P, G.variant_key(cfg, variant, SEED)), {}) or {}
     G.check_exemplars(tok, cfg, man.get("exemplar_sha256"), tasks=[TASK])
     if TASK in ("math", "math500"):
         G.check_exemplar_source(G.math_shot_source())
 
     META = os.path.join(P["artifacts"], "meta_%s.json" % TAG)
     meta = G.jload(META, {}) or {}
-    meta.update({"name": NAME, "variant": variant, "task": TASK, "k": K, "n_problems": N,
-                 "n_eval": min(len(ev), N), "n_cal": max(0, N - len(ev)),
+    meta.update({"name": LABEL, "checkpoint": NAME, "variant": variant, "task": TASK, "k": K,
+                 "eval_rows": EVAL_ROWS, "n_problems": N,
+                 "n_eval": split.count("eval"), "n_cal": split.count("cal"),
                  "grid_budgets": [str(t) for t in GRID], "standard_caps": CAPS,
                  "horizon": HORIZON, "harness_default_horizon": MAXB,
                  "budget_line": WITH_LINE,
@@ -254,7 +306,7 @@ def main(argv):
                     if (int(rows[i]["idx"]), G.budget_key(T), B) in done:
                         continue
                     row = {"idx": i, "row_idx": rows[i]["idx"], "split": split[i],
-                           "name": NAME, "variant": variant, "task": TASK, "k": K,
+                           "name": LABEL, "variant": variant, "task": TASK, "k": K,
                            "budget": ("none" if T is None else int(T)),
                            "budget_line": bl_text, "no_budget_line": (not WITH_LINE), "B": B,
                            "correct": bool(G.ans_eq_fixed(pred, gold, TASK)), "pred": pred,

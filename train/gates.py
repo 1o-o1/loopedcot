@@ -28,9 +28,9 @@ def get_tok(cfg):
     return t
 
 
-def load_arrays(cfg, P, variant):
-    """Return one variant's block arrays keyed by block length, plus its visit spans; padding is included in the arrays and excluded by every span."""
-    D = G.data_dir(P, variant)
+def load_arrays(cfg, P, key):
+    """Return one variant key's block arrays keyed by block length, plus its visit spans; padding is included in the arrays and excluded by every span."""
+    D = G.data_dir(P, key)
     arrays = {}
     for name in sorted(os.listdir(D)):
         if name.startswith("blocks_") and name.endswith(".npy"):
@@ -50,7 +50,7 @@ def load_arrays(cfg, P, variant):
 V4_REL_TOL = 1e-3
 
 
-def run_v4(cfg, P, variant, CK, wait=False):
+def run_v4(cfg, P, variant, CK, wait=False, key=None):
     """Check on GPU that a batched forward at one depth equals the same blocks forwarded singly (in
     float32, within V4_REL_TOL of the logit scale), and that another depth differs; waits for an idle
     GPU only when asked; returns a process exit code."""
@@ -59,8 +59,9 @@ def run_v4(cfg, P, variant, CK, wait=False):
     # the preflight is a two-minute job: it waits only under the shared-box policy, never on a
     # scheduled job and never when --no-wait says the caller has the GPU already
     waited = G.wait_for_gpu(os.path.join(P["logs"], "gpu_wait.log")) if wait else {"waited_s": 0}
-    arrays, _spans = load_arrays(cfg, P, variant)
-    sched = json.load(open(os.path.join(G.data_dir(P, variant), "schedule.json"), encoding="utf-8"))
+    key = key or variant
+    arrays, _spans = load_arrays(cfg, P, key)
+    sched = json.load(open(os.path.join(G.data_dir(P, key), "schedule.json"), encoding="utf-8"))
     from s32_common import load_base
     tok, model = load_base()
     patch_universal_cache(model)
@@ -109,8 +110,9 @@ def run_v4(cfg, P, variant, CK, wait=False):
 
 
 # ================================================================= V1, V2, V3-CONTEXT, V9, V10 (CPU)
-def run_cpu(cfg, P, variant, CK):
+def run_cpu(cfg, P, variant, CK, key=None):
     """Run the CPU gates (V1 prompt parity, V2 masks, V3-CONTEXT with its negative control, V9 pool membership, V10 draw weights) and stop on the first failure; returns a process exit code."""
+    key = key or variant
     tok = get_tok(cfg)
     from s32_common import build_prompts
     A = cfg.variant(variant)
@@ -176,11 +178,11 @@ def run_cpu(cfg, P, variant, CK):
     print("[V1] %d prompts checked, %d diffs" % (v1["n_checked"], v1["diffs"]), flush=True)
 
     # ---------------------------------------------------------------- V2
-    visits = [json.loads(l) for l in open(os.path.join(G.data_dir(P, variant), "visits.jsonl"),
+    visits = [json.loads(l) for l in open(os.path.join(G.data_dir(P, key), "visits.jsonl"),
                                           encoding="utf-8")]
     records, _hs = G.load_records(cfg, P)
     bykey = {(r["src"], r["pool_i"]): r for r in records}
-    arrays, spans = load_arrays(cfg, P, variant)
+    arrays, spans = load_arrays(cfg, P, key)
     L_ = ["# V2: loss masks", "",
           "20 visits rebuilt from data/visits.jsonl, every token printed with the supervised ones",
           "marked. The prompt, the budget line, the forced suffix and the PADDING must never be",
@@ -288,7 +290,7 @@ def run_cpu(cfg, P, variant, CK):
     shots = (G.math_shot_source()
              if any(cfg.eval_task(s) in ("math", "math500") for s in cfg.sources) else None)
     G.check_exemplar_source(shots)
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
+    man = G.jload(G.manifest_path(P, key), {}) or {}
     G.check_exemplars(tok, cfg, man.get("exemplar_sha256"))
     v9 = {"n_chains_questions": n_h, "not_in_pool": missing,
           "pool_jsonl": cfg["pool_jsonl"], "pool_sha256": pool_sha256,
@@ -337,7 +339,7 @@ def run_cpu(cfg, P, variant, CK):
 def main(argv):
     """Dispatch to the CPU gates or the GPU preflight for one variant; returns a process exit code."""
     mode = "--v4" if "--v4" in argv else "--cpu"
-    cfg_path, root, variant, sources = G.DEFAULT_CONFIG, None, None, None
+    cfg_path, root, variant, sources, seed = G.DEFAULT_CONFIG, None, None, None, None
     for a in argv:
         k, _, v = a.lstrip("-").partition("=")
         if k == "config":
@@ -348,15 +350,19 @@ def main(argv):
             variant = v
         elif k == "sources":
             sources = v
+        elif k == "seed":
+            seed = int(v)
     G.require_root(root, "gates.py")
     cfg = G.load_config(cfg_path, sources)
     variant = variant or cfg["default_variant"]
+    # the gates read the blocks and the manifest stage 2 wrote, so they take the same seed
+    key = G.variant_key(cfg, variant, seed)
     P = G.paths(root)
     G.ensure_dirs(P)
     CK = os.path.join(P["gates"], "checks.json")
     if mode != "--v4":
-        return run_cpu(cfg, P, variant, CK)
-    return run_v4(cfg, P, variant, CK, wait=G.should_wait_for_gpu(argv))
+        return run_cpu(cfg, P, variant, CK, key=key)
+    return run_v4(cfg, P, variant, CK, wait=G.should_wait_for_gpu(argv), key=key)
 
 
 if __name__ == "__main__":

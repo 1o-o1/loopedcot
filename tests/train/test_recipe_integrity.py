@@ -405,7 +405,7 @@ def test_v4_preflight_takes_its_wait_from_the_flags(tmp_path, monkeypatch):
     gates = load_module("recipe_gates_wait", "gates.py")
     seen = {}
 
-    def fake_v4(cfg, P, variant, CK, wait):
+    def fake_v4(cfg, P, variant, CK, wait, key=None):
         seen["wait"] = wait
         return 0
 

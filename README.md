@@ -293,8 +293,8 @@ $PROD_PYTHON -m train.targets --variant=budget_longest --root=$R
 $PROD_PYTHON -m train.gates --cpu --variant=budget_longest --root=$R   # V1 V2 V3-CONTEXT V9 V10
 $PROD_PYTHON -m train.gates --v4 --variant=budget_longest --no-wait --root=$R
 $PROD_PYTHON -m train.train s36_budget_longest --variant=budget_longest --no-wait --root=$R
-$PROD_PYTHON -m train.run_grid s36_budget_longest gsm8k --variant=budget_longest --k=4 --no-wait --root=$R
-$PROD_PYTHON -m train.analysis --name=s36_budget_longest --ref=ouro_1_4b_base --ref-dir=$PROD_ART --root=$R
+$PROD_PYTHON -m train.run_grid s36_budget_longest gsm8k --variant=budget_longest --k=4 --no-wait --root=$R   # writes cells_gsm8k_s36_budget_longest_full_k4.jsonl (production rows and split; --eval-rows=s32 for the 300+100 subset)
+$PROD_PYTHON -m train.analysis --name=s36_budget_longest_full --ref=ouro_1_4b_base --ref-dir=$PROD_ART --root=$R
 ```
 
 `train.analysis` loads its reference as `<ref-dir>/cells_<task>_<ref>_k<k>.jsonl`, so the

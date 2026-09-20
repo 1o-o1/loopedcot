@@ -98,6 +98,39 @@ class Config(dict):
 SUPPORTED = {"budget_line_position": "after_question_before_answer_prefix",
              "schedule": "cosine", "loss": "ce_sum_over_window_supervised", "protocol": "v2"}
 
+# `draw` says where a visit's T comes from, `depth` where its block depth comes from. A variant with
+# no `depth` field keeps the pairing the two original draws had: theory -> the theory depth table,
+# anything else -> the flat `depth_probabilities` mix.
+DRAW_VALUES = ("theory", "uniform", "none_only")
+DEPTH_VALUES = ("theory", "config")          # plus "fixed:<d>", a depth held at one value
+RULE_VALUES = ("longest_fitting", "shortest_fitting")
+EVAL_ROWS_VALUES = ("production", "s32")     # which question rows a grid evaluates
+
+
+def check_variants(c):
+    """Refuse a variant field no stage implements, naming the variant, the field and the values."""
+    depths = sorted(int(k) for k in c["depth_probabilities"])
+    for name, v in (c.get("variants") or {}).items():
+        rule = str(v.get("rule"))
+        if rule not in RULE_VALUES:
+            raise ValueError("variant %r has rule=%r; implemented rules are %s"
+                             % (name, rule, list(RULE_VALUES)))
+        draw = str(v.get("draw", "theory"))
+        if draw not in DRAW_VALUES:
+            raise ValueError("variant %r has draw=%r; implemented draws are %s"
+                             % (name, draw, list(DRAW_VALUES)))
+        if v.get("depth") is None:
+            continue
+        d = str(v["depth"])
+        if d.startswith("fixed:"):
+            tail = d.split(":", 1)[1]
+            if not tail.isdigit() or int(tail) not in depths:
+                raise ValueError("variant %r has depth=%r; a fixed depth must be one of %s"
+                                 % (name, d, depths))
+        elif d not in DEPTH_VALUES:
+            raise ValueError("variant %r has depth=%r; implemented depths are %s plus fixed:<d>"
+                             % (name, d, list(DEPTH_VALUES)))
+
 
 def load_config(path=None, sources=None):
     """Return parsed YAML configuration, optionally restricted to a comma-separated list of source tasks; lengths and budgets are tokens."""
@@ -111,6 +144,12 @@ def load_config(path=None, sources=None):
     for key, only in SUPPORTED.items():
         assert str(c[key]) == only, "config %s=%r; only %r is implemented" % (key, c[key], only)
     assert bool(c["eos_strip"]), "the parsers always strip the end-of-text string; eos_strip=false is not implemented"
+    er = str(c.get("eval_rows", "production"))
+    if er not in EVAL_ROWS_VALUES:
+        raise ValueError("config eval_rows=%r; implemented values are %s"
+                         % (er, list(EVAL_ROWS_VALUES)))
+    c["eval_rows"] = er
+    check_variants(c)
     # one micro width per bucket, and one window size for every bucket: an accumulation window that
     # was 32 blocks in one bucket and 24 in another would weight the buckets differently
     nb = int(c["effective_batch_blocks"])
@@ -158,6 +197,20 @@ def data_dir(P, variant):
     d = os.path.join(P["data"], str(variant))
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def variant_key(cfg, variant, seed=None):
+    """Return the name stage 2's files are keyed by: the variant, plus the seed when it is not the
+    config's own. Two seeds of one variant are two different draws, so they must not share one
+    data directory or one manifest; the config's seed keeps today's paths exactly."""
+    if seed is None or int(seed) == int(cfg["seed"]):
+        return str(variant)
+    return "%s_seed%d" % (variant, int(seed))
+
+
+def manifest_path(P, key):
+    """Return the target manifest of one variant key (variant, or variant_seed<n>)."""
+    return os.path.join(P["artifacts"], "target_manifest_%s.json" % key)
 
 
 def blocks_fingerprint(arrays):
@@ -325,19 +378,40 @@ def load_theory_weights(cfg, path=None):
     return tw, sha
 
 
+def draw_rule(cfg, variant):
+    """Return where one variant draws T from: theory, uniform, or none_only (T is always no-limit)."""
+    return str(cfg.variant(variant).get("draw", "theory"))
+
+
+def depth_source(cfg, variant):
+    """Return where one variant draws the block depth from: theory, config, or fixed:<d>.
+
+    A variant that does not say keeps the pairing the two original draws had, so the theory
+    variants read the depth table and the others take the flat `depth_probabilities` mix.
+    """
+    d = cfg.variant(variant).get("depth")
+    if d:
+        return str(d)
+    return "theory" if draw_rule(cfg, variant) == "theory" else "config"
+
+
 def uses_theory(cfg, variant):
     """Return whether one variant draws T and the block depth from the theory tables or from the flat mix."""
-    return str(cfg.variant(variant).get("draw", "theory")) == "theory"
+    return draw_rule(cfg, variant) == "theory"
 
 
 def budget_draw(cfg, tw, variant, src):
     """Return one source's budget grid and the probability of each entry, in grid order.
 
     A theory variant reads the table; `uniform_longest` draws every entry of the grid with equal
-    probability, which is what every variant did before the weights existed.
+    probability, which is what every variant did before the weights existed; a `none_only` baseline
+    draws the no-limit entry every time, so its grid is that one entry.
     """
+    draw = draw_rule(cfg, variant)
     grid = cfg.budget_grid_for(src)
-    if not uses_theory(cfg, variant):
+    if draw == "none_only":
+        return [None], np.array([1.0])
+    if draw != "theory":
         return grid, np.full(len(grid), 1.0 / len(grid))
     w = tw["sources"][src]["budget_weights"]
     p = np.array([float(w[budget_key(t)]) for t in grid], float)
@@ -348,11 +422,15 @@ def budget_draw(cfg, tw, variant, src):
 def depth_draw(cfg, tw, variant, src):
     """Return the block depths and the probability of each, for one source and variant.
 
-    A theory variant reads that source's depth table; `uniform_longest` takes the fixed
-    `depth_probabilities` mix, the same for every source.
+    A theory depth reads that source's depth table; `config` takes the fixed `depth_probabilities`
+    mix, the same for every source; `fixed:<d>` holds every block at one depth, so its list is that
+    one depth.
     """
+    which = depth_source(cfg, variant)
+    if which.startswith("fixed:"):
+        return [int(which.split(":", 1)[1])], np.array([1.0])
     depths = cfg.depths
-    if not uses_theory(cfg, variant):
+    if which == "config":
         p = np.array([float(cfg["depth_probabilities"][d]) for d in depths], float)
     else:
         w = tw["sources"][src]["depth_weights"]
@@ -1072,6 +1150,7 @@ def main(argv):
     A = cfg.variant(variant)
     budget = budget if budget is not None else int(cfg["supervised_token_budget"])
     seed = seed if seed is not None else int(cfg["seed"])
+    KEY = variant_key(cfg, variant, seed)
     P = paths(root)
     ensure_dirs(P)
     rng = np.random.default_rng(seed)
@@ -1097,14 +1176,14 @@ def main(argv):
     # old uniform T and the fixed depth mix; the tables are still loaded and recorded, so the two
     # variants differ only in what they draw with.
     tw, tw_sha = load_theory_weights(cfg)
-    T_GRID_BY_SRC, T_P_BY_SRC, D_P_BY_SRC = {}, {}, {}
+    T_GRID_BY_SRC, T_P_BY_SRC, D_BY_SRC, D_P_BY_SRC = {}, {}, {}, {}
     depths = cfg.depths
     for s in srcs:
         T_GRID_BY_SRC[s], T_P_BY_SRC[s] = budget_draw(cfg, tw, variant, s)
-        _d, D_P_BY_SRC[s] = depth_draw(cfg, tw, variant, s)
+        D_BY_SRC[s], D_P_BY_SRC[s] = depth_draw(cfg, tw, variant, s)
     want = intended_weights(cfg, tw, variant, srcs)
     print("[targets] draw=%s; T weights %s"
-          % ("theory" if uses_theory(cfg, variant) else "uniform",
+          % (draw_rule(cfg, variant),
              {s: {k: round(v, 4) for k, v in want["budget"][s].items()} for s in srcs}),
           flush=True)
     print("[targets] depth weights %s"
@@ -1142,7 +1221,8 @@ def main(argv):
         r = records[by_src[src][int(rng.integers(0, len(by_src[src])))]]
         grid = T_GRID_BY_SRC[src]                  # T is drawn over THIS source's grid, with THIS
         T = grid[int(rng.choice(len(grid), p=T_P_BY_SRC[src]))]      # source's weights
-        depth = int(depths[int(rng.choice(len(depths), p=D_P_BY_SRC[src]))])
+        ds = D_BY_SRC[src]                         # one entry when the variant fixes the depth
+        depth = int(ds[int(rng.choice(len(ds), p=D_P_BY_SRC[src]))])
         fullplus = bool(T is None and rng.random() < float(cfg["fullplus_p"]))
         try:
             ids, msk, info = build_target(cfg, tok, variant, src, r["question"], r["gold"], T,
@@ -1209,8 +1289,9 @@ def main(argv):
     drop_by_L = {str(L): int(a["blocks"].shape[0]) - int(used_by_L[L])
                  for L, a in sorted(arrays.items())}
 
-    # one directory per variant: the trainer must never pick up another variant's blocks
-    DATA = data_dir(P, variant)
+    # one directory per variant, and per seed when the seed is not the config's: the trainer must
+    # never pick up another variant's blocks, nor another seed's draw of the same variant
+    DATA = data_dir(P, KEY)
     for L, Aa in arrays.items():
         np.save(os.path.join(DATA, "blocks_%d.npy" % L), Aa["blocks"])
         np.save(os.path.join(DATA, "mask_%d.npy" % L), Aa["mask"])
@@ -1231,7 +1312,8 @@ def main(argv):
 
     tok_total = int(sum(int(a["blocks"].size) for a in arrays.values()))
     man = {
-        "variant": variant, "variant_config": A, "seed": seed, "supervised_token_budget": budget,
+        "variant": variant, "variant_key": KEY, "variant_config": A, "seed": seed,
+        "supervised_token_budget": budget,
         "data_dir": DATA, "blocks_sha256": blocks_fingerprint(arrays), "pad_id": int(pad_id),
         "exemplar_sha256": exemplar_fingerprints(tok, cfg),
         "supervised_tokens_scheduled": sup_scheduled,
@@ -1268,7 +1350,7 @@ def main(argv):
         "visits_by_src_depth": {s: dict(n_by_src_depth[s]) for s in n_by_src_depth},
         # the objective's two draws: what the theory asked for, and what the draw realised. V10
         # compares them; they can only differ through drops, which are counted above.
-        "draw_rule": "theory" if uses_theory(cfg, variant) else "uniform",
+        "draw_rule": draw_rule(cfg, variant), "depth_rule": depth_source(cfg, variant),
         "theory_weights_json": THEORY_WEIGHTS, "theory_weights_sha256": tw_sha,
         "theory_weights_formulas": tw.get("formulas"),
         "draw_weights_intended": want,
@@ -1292,7 +1374,7 @@ def main(argv):
                                     for d in depths},
         "v3_context": v3, "draw_tries": tries}
     man["v10_draw_weights"] = v10_draw_weights(man)
-    jdump(man, os.path.join(P["artifacts"], "target_manifest_%s.json" % variant))
+    jdump(man, manifest_path(P, KEY))
     print(json.dumps({k: man[k] for k in ("variant", "supervised_tokens_drawn", "n_visits",
                                           "blocks_by_len", "optimiser_steps",
                                           "supervised_tokens_per_opt_step",

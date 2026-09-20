@@ -209,6 +209,8 @@ refuses blocks whose manifest names another variant or whose content hash does n
 | `nobudget` | same as `budget_longest` | **no line, train or eval** | yes | theory |
 | `nocut` | longest that fits | yes | **no**, those visits are dropped | theory |
 | `uniform_longest` | same as `budget_longest` | yes | yes | **uniform** |
+| `plain_sft` | longest correct chain, nothing to fit | **no line** | **no**, never reached | **none_only**, depth fixed at 4 |
+| `plain_sft_mix` | longest correct chain, nothing to fit | **no line** | **no**, never reached | **none_only**, theory depth mix |
 
 `uniform_longest` is the ablation that prices the theory weights themselves: the same target rule and
 the same line, drawing `T` uniformly over the source's grid and the depth from the flat
@@ -221,6 +223,25 @@ reference grid go first, because those two are what Table 1 needs; `nobudget` se
 prices the budget line itself and is the one ablation a reviewer will ask for; `budget_shortest`,
 `nocut` and `uniform_longest` only if time remains. Each variant is about 15 h of idle Spark time (train
 plus grid), so the order is the schedule.
+
+## Runs beyond the two scheduled variants
+
+**Full-size evaluation.** `eval_rows: production`, the default, evaluates every row of
+`prod/tasks/data/rows_<task>.jsonl` (GSM8K 1319, MATH500 500, CSQA 1221, AQuA 254), labelled `cal`
+or `eval` by the harness's own `prod.tasks.split_labels`, so rows and split are the base grids' own.
+Its files carry the label `<name>_full` (`cells_<task>_<name>_full_k<k>.jsonl`, the budget file and
+the meta likewise) and `analysis.py --name=<name>_full` reads them, so a full-N grid never lands on
+the 300+100 files `eval_rows: s32` writes. `run_grid.py --eval-rows=production|s32` beats the config.
+
+**Any variant, any seed.** `VARIANTS="a b c"` is the list both launchers index into (index i takes
+variant i, or variant i/4 and task i%4 in `grids_s36.sbatch`), and `EVAL_ROWS` reaches the grid.
+`SEED=<n>` other than `config.yaml`'s seed names the run `s36_<variant>_seed<n>` and keys stage 2's
+directory and manifest `<variant>_seed<n>`; the default seed keeps today's names and paths.
+
+**Baselines without the objective.** `plain_sft` draws `T = none` on every visit at a fixed depth 4:
+the base model's own full correct chain, no budget line, no cut, nothing for the fallback to do --
+ordinary self-distillation, the control for the whole objective. `plain_sft_mix` is that target with
+the depth mix `budget_longest` draws from, separating the depth sampling from the budget conditioning.
 
 ## Files
 

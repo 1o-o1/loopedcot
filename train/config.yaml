@@ -55,9 +55,13 @@ eval_horizon: 4096                  # generation horizon of the no-limit pass; t
 chain_tail_chars: 200               # characters of the cut chain stored per cell as chain_tail
 
 # ---------------------------------------------------------------- target rule per variant (--variant)
-# `draw` selects where T and the block depth come from: `theory` reads that source's tables in
-# train/data/theory_weights.json, `uniform` draws T uniformly over the source's grid and the depth
-# from depth_probabilities below. Only the uniform_longest ablation uses `uniform`.
+# `draw` selects where T comes from: `theory` reads that source's table in
+# train/data/theory_weights.json, `uniform` draws T uniformly over the source's grid, `none_only`
+# draws T = no limit every time (the two plain-SFT baselines). `depth` selects where the block
+# depth comes from: `theory` reads the source's depth table, `config` takes depth_probabilities
+# below, `fixed:<d>` holds every block at one depth. A variant that names no `depth` keeps the
+# pairing the two original draws had: theory -> theory, anything else -> config. An unknown value
+# in either field is refused when the config is loaded.
 variants:
   budget_longest:                   # THE RECIPE
     rule: longest_fitting           # T>0: the LONGEST correct chain among {A,B} with at most T tokens
@@ -84,6 +88,18 @@ variants:
     budget_line: true
     fallback: true
     draw: uniform                   # uniform T over the source's grid, fixed depth_probabilities
+  plain_sft:                        # BASELINE, not scheduled: the objective removed entirely
+    rule: longest_fitting
+    budget_line: false              # no control line, train or eval
+    fallback: false                 # unreachable: a no-limit draw never cuts
+    draw: none_only                 # T = no limit on every visit, so the target is the full chain
+    depth: fixed:4                  # every block at the default operating point
+  plain_sft_mix:                    # BASELINE, not scheduled: plain_sft with the depth mix back
+    rule: longest_fitting
+    budget_line: false
+    fallback: false
+    draw: none_only
+    depth: theory                   # the depth mix budget_longest draws from
 default_variant: budget_longest
 # Target kinds in every variant: T=0 -> DIRECT (suffix + answer, only answer and EOS supervised);
 # T=none -> the variant-selected full correct chain + EOS, and in a fullplus_p share also the
@@ -129,5 +145,9 @@ loss: ce_sum_over_window_supervised # the only implemented objective; train.py r
 
 # ---------------------------------------------------------------- evaluation
 n_answer_tokens: {gsm8k: 12, math500: 32, svamp: 8, aqua: 8, csqa: 8, arc: 8}  # task read-out token limits
+eval_rows: production               # which question rows a grid evaluates: `production` = every row
+# of prod/tasks/data/rows_<task>.jsonl, split-labelled by the harness's own split_labels (full N:
+# gsm8k 1319, math500 500, csqa 1221, aqua 254), written as cells_<task>_<name>_full_k<k>.jsonl;
+# `s32` = the S32 subset (the first 300 rows as eval, the next 100 as cal), today's files.
 protocol: v2                        # own answer when it parses inside the cut, else the forced read-out
 eos_strip: true                     # strip the end-of-text string before every parse

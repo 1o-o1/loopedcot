@@ -200,7 +200,10 @@ def test_grid_twice_generates_matching_lines_without_duplicate_rows(cfg, tok, mo
     monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
     monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda: 0)
     with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as root:
-        args = ["A0", "gsm8k", "--budgets=0,3,none", "--no-wait", f"--root={root}"]
+        # --eval-rows=s32 keeps this pinned to the S32 subset the fake split_rows above returns;
+        # the production default reads the harness's own rows and writes the _full files instead
+        args = ["A0", "gsm8k", "--budgets=0,3,none", "--eval-rows=s32", "--no-wait",
+                f"--root={root}"]
         assert run_grid.main(args) == 0
         path = Path(root) / "artifacts/cells_gsm8k_A0_k4.jsonl"
         first = path.read_bytes()

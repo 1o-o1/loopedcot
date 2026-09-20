@@ -88,7 +88,7 @@ def block_ce_sum(base, x, mask, depth):
 def main(argv):
     """Train one variant's adapter over its own blocks and write train_config_<variant>.json with realised supervised tokens, content tokens and layer passes; returns a process exit code."""
     NAME = argv[0] if argv and not argv[0].startswith("-") else "s36"
-    cfg_path, root, variant = G.DEFAULT_CONFIG, None, None
+    cfg_path, root, variant, seed = G.DEFAULT_CONFIG, None, None, None
     ckpt_every, wait, max_steps = None, True, None
     for a in argv:
         k, _, v = a.lstrip("-").partition("=")
@@ -98,6 +98,8 @@ def main(argv):
             root = v
         elif k == "variant":
             variant = v
+        elif k == "seed":
+            seed = int(v)
         elif k == "ckpt-every":
             ckpt_every = int(v)
         elif k == "max-steps":
@@ -107,6 +109,8 @@ def main(argv):
     G.require_root(root, "train.py")
     cfg = G.load_config(cfg_path)
     variant = variant or cfg["default_variant"]
+    # the blocks and the manifest are stage 2's, so the trainer takes the seed stage 2 drew with
+    KEY = G.variant_key(cfg, variant, seed)
     ckpt_every = ckpt_every if ckpt_every is not None else int(cfg["ckpt_every"])
     P = G.paths(root)
     G.ensure_dirs(P)
@@ -115,7 +119,7 @@ def main(argv):
               else {"waited_s": 0})
 
     # ---------------------------------------------------------------- data
-    DATA = G.data_dir(P, variant)
+    DATA = G.data_dir(P, KEY)
     arrays = {}
     for name in sorted(os.listdir(DATA)):
         if name.startswith("blocks_") and name.endswith(".npy"):
@@ -125,7 +129,7 @@ def main(argv):
                          "length": np.load(os.path.join(DATA, "length_%d.npy" % L)),
                          "depth": np.load(os.path.join(DATA, "bdepth_%d.npy" % L))}
     assert arrays, "no blocks_<L>.npy in %s -- run targets.py --variant=%s first" % (DATA, variant)
-    man = G.jload(os.path.join(P["artifacts"], "target_manifest_%s.json" % variant), {}) or {}
+    man = G.jload(G.manifest_path(P, KEY), {}) or {}
     check_data_matches_variant(arrays, man, variant)
     with open(os.path.join(DATA, "spans.jsonl"), encoding="utf-8") as f:
         spans = [json.loads(line) for line in f if line.strip()]
@@ -201,7 +205,7 @@ def main(argv):
         prog = (step - warmup) / max(1, n_opt - warmup)
         return LR * 0.5 * (1.0 + math.cos(math.pi * min(1.0, prog)))
 
-    META = os.path.join(P["artifacts"], "train_config_%s.json" % variant)
+    META = os.path.join(P["artifacts"], "train_config_%s.json" % KEY)
     meta = G.jload(META, {}) or {}
     meta.update({
         "name": NAME, "variant": variant, "variant_config": cfg.variant(variant), "seed": int(cfg["seed"]),
