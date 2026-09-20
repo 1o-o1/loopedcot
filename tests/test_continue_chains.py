@@ -413,3 +413,24 @@ def test_fill_shared_cuts_reads_the_stop_off_the_highest_cap():
     # a row that never stopped is not shared: it has to be regenerated
     none = {B: {"B": B, "n_cut": B, "natural_stop": None, "pred": "n"} for B in caps_old}
     assert fill_shared_cuts(AP(), caps_old + [8192], none, lambda B: False) == []
+
+
+import unittest  # noqa: E402
+
+
+class TestExtendForcedHorizon(unittest.TestCase):
+    """--extend-forced-horizon re-opens a finished forced row only when the horizon grew."""
+
+    def test_reopen_rule(self):
+        from prod.generate import reopen_for_longer_horizon as R, build_parser
+        fin = {"ids": [1] * 4096, "done": True}
+        self.assertFalse(R(fin, 8192, forced=True, extend=True))      # horizon grew: carry on
+        self.assertTrue(R(fin, 4096, forced=True, extend=True))       # same horizon: stays done
+        self.assertTrue(R(fin, 8192, forced=True, extend=False))      # flag off: untouched
+        self.assertTrue(R(fin, 8192, forced=False, extend=True))      # natural rows: untouched
+        self.assertFalse(R({"ids": [1] * 10, "done": False}, 8192, forced=True, extend=True))
+        a = build_parser().parse_args(["--model", "m", "--task", "gsm8k", "--k", "4",
+                                       "--protocol", "forced", "--extend-forced-horizon"])
+        self.assertTrue(a.extend_forced_horizon)
+        self.assertFalse(build_parser().parse_args(["--model", "m", "--task", "gsm8k", "--k", "4"])
+                         .extend_forced_horizon)

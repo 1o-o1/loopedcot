@@ -130,6 +130,11 @@ def build_parser():
                    help="the horizon the source grid ran at (default: the `horizon` its cells "
                         "file's _header row records)")
     p.add_argument("--save-traces", dest="save_traces", default="1")
+    p.add_argument("--extend-forced-horizon", dest="extend_forced_horizon", action="store_true",
+                   help="forced protocol only: carry a FINISHED forced job on to a longer "
+                        "--forced-horizon from its own trace checkpoint (copied into --out with the "
+                        "same --shards/--shard) instead of regenerating; refuses when the checkpoint "
+                        "does not hold every row of the shard")
     p.add_argument("--no-eos-cut", dest="eos_cut", action="store_false", default=True,
                    help="use the older S9a cut rule with no eos branch, which S9c and S9f "
                         "copied; gate G1 needs it to reproduce those two spikes exactly")
@@ -246,6 +251,17 @@ def seed_from_chain(chain_row, pieces, tail_window, stopper=None):
 CONTINUE_MODES = ("think_tag", "horizon")
 #: characters of the cut text stored per row as `chain_tail`
 CHAIN_TAIL_CHARS = 200
+
+
+def reopen_for_longer_horizon(rec, hor, forced, extend):
+    """A checkpointed forced row is done exactly when its trace reached the horizon it ran at (no
+    forced row stops for any other reason). Under --extend-forced-horizon a finished row whose ids
+    are shorter than the CURRENT horizon is re-opened, so the protocol carries on from its stored
+    state (ids and fstate) to the new horizon instead of regenerating the first span."""
+    done = bool(rec["done"])
+    if extend and forced and done and len(rec["ids"]) < hor:
+        return False
+    return done
 
 
 def iter_jsonl(path):
@@ -845,9 +861,17 @@ def main(argv=None):
                                "prompt_tokens_min_max": [min(plen), max(plen)]}
         tp = os.path.join(out_dir, "trace_%s_%s.jsonl" % (tag, key))
         cur = {i: {"ids": [], "done": False} for i in range(N)}
-        for i, r in load_ckpt(tp, lambda r: int(r["idx"])).items():
+        loaded = load_ckpt(tp, lambda r: int(r["idx"]))
+        if forced and a.extend_forced_horizon:
+            have = sum(1 for i in loaded if i < N)
+            if have < N:
+                raise SystemExit("--extend-forced-horizon: %s holds %d of this shard's %d rows; copy the "
+                                 "finished forced job's trace checkpoint into --out first, and use the "
+                                 "same --shards and --shard it ran with" % (tp, have, N))
+        for i, r in loaded.items():
             if i < N:
-                cur[i] = {"ids": r["ids"], "done": bool(r["done"])}
+                cur[i] = {"ids": r["ids"],
+                          "done": reopen_for_longer_horizon(r, hor, forced, a.extend_forced_horizon)}
                 if forced and r.get("fstate"):
                     # the forced row resumes its protocol state, not only its ids (see
                     # fstate_to_json for what is lost without this)
