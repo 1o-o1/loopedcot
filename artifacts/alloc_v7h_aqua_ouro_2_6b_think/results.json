@@ -31,11 +31,11 @@
   }
  },
  "read": {
-  "unparsed": 0,
-  "header": 2,
   "rows": 5588,
+  "header": 2,
+  "unparsed": 0,
   "unparsed_paths": [],
-  "cached_files": 1,
+  "cached_files": 2,
   "files": 2,
   "cache": true,
   "cache_dir": null

@@ -1,0 +1,189 @@
+{
+  "name": "s36_nobudget",
+  "variant": "nobudget",
+  "variant_config": {
+    "rule": "longest_fitting",
+    "budget_line": false,
+    "fallback": true,
+    "draw": "theory"
+  },
+  "seed": 20260914,
+  "blocks_by_len": {
+    "1024": 27883,
+    "1536": 1752,
+    "2048": 8
+  },
+  "one_visit_per_block": true,
+  "packing": "one visit per block, right-padded, pad mask 0, causal forward, no attention mask",
+  "tokens_in_blocks": 21032079,
+  "padding_share": 0.32718,
+  "supervised_token_budget": 1200000,
+  "supervised_tokens_drawn": 1200045,
+  "supervised_tokens_scheduled": 1189926,
+  "blocks_dropped_as_remainder": 43,
+  "supervised_tokens_planned": 1189926,
+  "supervised_density": 0.03838958775223573,
+  "visits_by_T": {
+    "32": 5299,
+    "128": 2213,
+    "0": 5825,
+    "64": 3149,
+    "512": 1726,
+    "16": 4429,
+    "256": 1885,
+    "1024": 1604,
+    "none": 3283,
+    "2048": 230
+  },
+  "visits_by_kind": {
+    "CHAIN": 16026,
+    "DIRECT": 5825,
+    "FALLBACK": 7159,
+    "CHAIN_PLUS": 633
+  },
+  "fallback_share_overall": 0.24150726984448267,
+  "supervised_share_by_source": {
+    "csqa": 0.14608535513251586,
+    "math": 0.33327250228116445,
+    "aqua": 0.24224674908024282,
+    "gsm8k": 0.27839539350607684
+  },
+  "supervised_share_by_format": {
+    "letter_paren": 0.3883321042127587,
+    "math_boxed": 0.33327250228116445,
+    "numeric_hash": 0.27839539350607684
+  },
+  "micro_by_block_len": {
+    "1024": 4,
+    "1536": 2,
+    "2048": 2
+  },
+  "accum_by_block_len": {
+    "1024": 8,
+    "1536": 16,
+    "2048": 16
+  },
+  "effective_batch_blocks": 32,
+  "padding_share_by_block_len": {
+    "1024": 0.33508,
+    "1536": 0.24391,
+    "2048": 0.23395
+  },
+  "chains_horizon_by_source": {
+    "gsm8k": 1024,
+    "math": 2048,
+    "csqa": 1024,
+    "aqua": 1024
+  },
+  "n_micro_batches": 7832,
+  "n_opt_steps": 925,
+  "warmup_steps": 28,
+  "lr": 0.0002,
+  "weight_decay": 0.0,
+  "betas": [
+    0.9,
+    0.95
+  ],
+  "grad_clip": 1.0,
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.0,
+    "targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "n_trainable_params": 15138816,
+  "loss": "ce_sum_over_window_supervised",
+  "loss_detail": "CE SUM from lm_head(hidden_states_list[d-1]) on the masked target tokens, divided by the accumulation window's own supervised-token total; padding is mask 0 and never enters the sum",
+  "lr_schedule": "cosine",
+  "blocks_sha256": "0599eb7b3830405a10704c47b33a4c3dde8d1aa2f842c64e96830ddd41eddfff",
+  "data_dir": "/home/mzaoad/loopedcot/artifacts/s36/data/nobudget",
+  "gradient_checkpointing": false,
+  "depth_probabilities": {
+    "1": 0.1,
+    "2": 0.3,
+    "3": 0.2,
+    "4": 0.4
+  },
+  "budget_grid_by_source": {
+    "gsm8k": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "math": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "2048",
+      "none"
+    ],
+    "csqa": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "aqua": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ]
+  },
+  "block_lens": [
+    1024,
+    1536,
+    2048,
+    2560,
+    3072
+  ],
+  "control_line": "none",
+  "gpu_wait": {
+    "waited_s": 0
+  },
+  "errors": {},
+  "supervised_tokens": 1189926,
+  "padded_tokens": 31195136,
+  "content_tokens": 20983961,
+  "layer_passes_forward": 1177318680,
+  "layer_passes_fwd_bwd": 3531956040,
+  "opt_steps_done": 925,
+  "mean_loss_first_10": 0.497480202817637,
+  "mean_loss_last_10": 0.1245356309493788,
+  "seconds": 5358.0,
+  "train_seconds": 5351.9,
+  "seconds_per_opt_step": 5.786,
+  "content_tokens_per_s": 3920.9,
+  "padded_tokens_per_s": 5828.8,
+  "peak_gb": 48.248,
+  "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_nobudget"
+}

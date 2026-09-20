@@ -1,0 +1,506 @@
+{
+  "variant": "plain_sft",
+  "variant_key": "plain_sft",
+  "variant_config": {
+    "rule": "longest_fitting",
+    "budget_line": false,
+    "fallback": false,
+    "draw": "none_only",
+    "depth": "fixed:4"
+  },
+  "seed": 20260914,
+  "supervised_token_budget": 1200000,
+  "data_dir": "/home/mzaoad/loopedcot/artifacts/s36/data/plain_sft",
+  "blocks_sha256": "aef48cf4ae7c2bc2ce1ee7282691a32e625912733e1586474d3eba42a2e40e9a",
+  "pad_id": 0,
+  "exemplar_sha256": {
+    "gsm8k": "931391a38fe2cfccb48a624ece3d9949e8034d5d3e75aacc2a361b06b67b8001",
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7",
+    "csqa": "47fff635592d5b3bb1665fc540f49045f73d26b0d4646f81e9cd0085262e6159",
+    "aqua": "62ea68b3f45231e70b1c8f2facbc8ad086d0a2e52097ef05abc38e431c65a1d2"
+  },
+  "supervised_tokens_scheduled": 1188802,
+  "blocks_dropped_as_remainder": 42,
+  "micro_by_block_len": {
+    "1024": 4,
+    "1536": 2,
+    "2048": 2
+  },
+  "accum_by_block_len": {
+    "1024": 8,
+    "1536": 16,
+    "2048": 16
+  },
+  "effective_batch_blocks": 32,
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.0,
+    "targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "supervised_tokens_drawn": 1200149,
+  "n_visits": 12874,
+  "n_records": 7273,
+  "chains": {
+    "gsm8k_A": {
+      "n": 3000,
+      "n_kept": 2959,
+      "kept_frac": 0.9863333333333333
+    },
+    "gsm8k_B": {
+      "n": 3688,
+      "n_kept": 2873,
+      "kept_frac": 0.7790130151843818
+    },
+    "math_A": {
+      "n": 1360,
+      "n_kept": 1295,
+      "kept_frac": 0.9522058823529411
+    },
+    "math_B": {
+      "n": 1588,
+      "n_kept": 965,
+      "kept_frac": 0.6076826196473551
+    },
+    "csqa_A": {
+      "n": 1832,
+      "n_kept": 1801,
+      "kept_frac": 0.9830786026200873
+    },
+    "csqa_B": {
+      "n": 1500,
+      "n_kept": 1328,
+      "kept_frac": 0.8853333333333333
+    },
+    "aqua_A": {
+      "n": 1773,
+      "n_kept": 1716,
+      "kept_frac": 0.9678510998307953
+    },
+    "aqua_B": {
+      "n": 1896,
+      "n_kept": 1574,
+      "kept_frac": 0.830168776371308
+    }
+  },
+  "one_visit_per_block": true,
+  "packing": "one visit per block, smallest fitting bucket, right-padded, pad mask 0",
+  "block_lens": [
+    1024,
+    1536,
+    2048,
+    2560,
+    3072
+  ],
+  "chains_horizon_by_source": {
+    "gsm8k": 1024,
+    "math": 2048,
+    "csqa": 1024,
+    "aqua": 1024
+  },
+  "budget_grid_by_source": {
+    "gsm8k": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "math": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "2048",
+      "none"
+    ],
+    "csqa": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "aqua": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ]
+  },
+  "blocks_by_len": {
+    "1024": 11439,
+    "1536": 1427,
+    "2048": 8
+  },
+  "visits_by_block_len": {
+    "1024": 11439,
+    "1536": 1427,
+    "2048": 8
+  },
+  "blocks_used_by_len": {
+    "1024": 11424,
+    "1536": 1408,
+    "2048": 0
+  },
+  "blocks_dropped_as_remainder_by_len": {
+    "1024": 15,
+    "1536": 19,
+    "2048": 8
+  },
+  "buckets_with_no_window": [
+    "2048"
+  ],
+  "tokens_in_blocks": 9577653,
+  "padded_tokens_in_blocks": 13921792,
+  "padding_share": 0.31204,
+  "padding_share_by_block_len": {
+    "1024": 0.33001,
+    "1536": 0.21663,
+    "2048": 0.22809
+  },
+  "visits_by_T": {
+    "none": 12874
+  },
+  "supervised_by_T": {
+    "none": 1200149
+  },
+  "visits_by_kind": {
+    "CHAIN": 10325,
+    "CHAIN_PLUS": 2549
+  },
+  "supervised_by_kind": {
+    "CHAIN": 952375,
+    "CHAIN_PLUS": 247774
+  },
+  "fallback_share_overall": 0.0,
+  "fallback_share_by_src_T": {
+    "csqa": {
+      "none": 0.0
+    },
+    "math": {
+      "none": 0.0
+    },
+    "aqua": {
+      "none": 0.0
+    },
+    "gsm8k": {
+      "none": 0.0
+    }
+  },
+  "visits_by_src_T": {
+    "csqa": {
+      "none": 3715
+    },
+    "math": {
+      "none": 1643
+    },
+    "aqua": {
+      "none": 3704
+    },
+    "gsm8k": {
+      "none": 3812
+    }
+  },
+  "visits_by_src_depth": {
+    "csqa": {
+      "4": 3715
+    },
+    "math": {
+      "4": 1643
+    },
+    "aqua": {
+      "4": 3704
+    },
+    "gsm8k": {
+      "4": 3812
+    }
+  },
+  "draw_rule": "none_only",
+  "depth_rule": "fixed:4",
+  "theory_weights_json": "/home/mzaoad/loopedcot/train/data/theory_weights.json",
+  "theory_weights_sha256": "9c3e1e1acb678cb031cec820bfcadb7fa39db0ef2bb7cbe9b493b0328011785c",
+  "theory_weights_formulas": {
+    "budget": "w(T) proportional to mean over depths k of clip((1 - G_k(T)) * (c_k(>T) - l_k(T)), 0), normalised over the source's numeric budgets and then mixed w = 0.5 * uniform + 0.5 * normalised; the no-limit entry takes the uniform share. G_k(T) is the settled share at cap T, c_k(>T) the last-cap accuracy of the questions not settled by T, l_k(T) their accuracy at T. Calibration split only.",
+    "depth": "the share of calibration prompts an average-budget lookup allocator assigns to each depth, pooled over 16 log-spaced budgets from the cheapest cell of the median-prompt cost matrix to the default cost (deepest depth at natural stop), priced (L_fixed + kL)(P + E_cal[min(len_k, T)] + R) with L=24, L_fixed=0 and R = suffix + answer allowance; normalised and then mixed w = 0.5 * uniform + 0.5 * normalised, the same rule as the budget weights; then the deepest depth is raised to at least 0.20 and the shallower depths rescaled to 1 - 0.20, because the deepest depth is the released default Table 1 checks at 1.0x."
+  },
+  "draw_weights_intended": {
+    "budget": {
+      "gsm8k": {
+        "none": 1.0
+      },
+      "math": {
+        "none": 1.0
+      },
+      "csqa": {
+        "none": 1.0
+      },
+      "aqua": {
+        "none": 1.0
+      }
+    },
+    "depth": {
+      "gsm8k": {
+        "4": 1.0
+      },
+      "math": {
+        "4": 1.0
+      },
+      "csqa": {
+        "4": 1.0
+      },
+      "aqua": {
+        "4": 1.0
+      }
+    }
+  },
+  "draw_histogram_realised": {
+    "budget": {
+      "csqa": {
+        "none": 1.0
+      },
+      "math": {
+        "none": 1.0
+      },
+      "aqua": {
+        "none": 1.0
+      },
+      "gsm8k": {
+        "none": 1.0
+      }
+    },
+    "depth": {
+      "csqa": {
+        "4": 1.0
+      },
+      "math": {
+        "4": 1.0
+      },
+      "aqua": {
+        "4": 1.0
+      },
+      "gsm8k": {
+        "4": 1.0
+      }
+    }
+  },
+  "supervised_share_by_source": {
+    "csqa": 0.11050127942447147,
+    "math": 0.33313863528611865,
+    "aqua": 0.25794047239134477,
+    "gsm8k": 0.2984196128980652
+  },
+  "supervised_share_by_format": {
+    "letter_paren": 0.3684417518158162,
+    "math_boxed": 0.33313863528611865,
+    "numeric_hash": 0.2984196128980652
+  },
+  "share_caps": {
+    "source": {
+      "cap": 0.3333333333,
+      "active": true,
+      "draws_refused": 2047,
+      "realised": {
+        "csqa": 0.11050127942447147,
+        "math": 0.33313863528611865,
+        "aqua": 0.25794047239134477,
+        "gsm8k": 0.2984196128980652
+      },
+      "n_sources": 4,
+      "max_realised": 0.33313863528611865,
+      "within_cap": true
+    },
+    "format": {
+      "cap": 0.5,
+      "active": true,
+      "draws_refused": 3,
+      "realised": {
+        "letter_paren": 0.3684417518158162,
+        "math_boxed": 0.33313863528611865,
+        "numeric_hash": 0.2984196128980652
+      },
+      "n_formats": 3,
+      "max_realised": 0.3684417518158162,
+      "within_cap": true
+    },
+    "applied_from_supervised_token": 0
+  },
+  "pool_jsonl": "train/data/pool.jsonl",
+  "pool_sha256": "7d5569c32611a90afc57a3655052b0338dd12d30346f4c0938ebb544758d81d3",
+  "chain_used": {
+    "A": 12425,
+    "B": 449
+  },
+  "dropped_draws": {},
+  "dropped_by_T": {},
+  "drop_share_of_draws": 0.0,
+  "drop_share_over_warn": false,
+  "supervised_in_blocks": 1200149,
+  "supervised_density": 0.08620650272608583,
+  "micro_batches": 3560,
+  "optimiser_steps": 401,
+  "supervised_tokens_per_opt_step": 2964.6,
+  "depth_fraction_realised": {
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0,
+    "4": 1.0
+  },
+  "v3_context": {
+    "n_spans": 12874,
+    "n_supervised_tokens": 1200149,
+    "n_failing_spans": 0,
+    "failures_by_reason": {},
+    "ok": true,
+    "detail": []
+  },
+  "draw_tries": 14924,
+  "v10_draw_weights": {
+    "tol": 0.05,
+    "sd_mult": 3.0,
+    "variant": "plain_sft",
+    "draw": "none_only",
+    "theory_weights_sha256": "9c3e1e1acb678cb031cec820bfcadb7fa39db0ef2bb7cbe9b493b0328011785c",
+    "by_source": {
+      "budget_aqua": {
+        "n_visits": 3704,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "none": 1.0
+        },
+        "realised": {
+          "none": 1.0
+        }
+      },
+      "budget_csqa": {
+        "n_visits": 3715,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "none": 1.0
+        },
+        "realised": {
+          "none": 1.0
+        }
+      },
+      "budget_gsm8k": {
+        "n_visits": 3812,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "none": 1.0
+        },
+        "realised": {
+          "none": 1.0
+        }
+      },
+      "budget_math": {
+        "n_visits": 1643,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "none": 1.0
+        },
+        "realised": {
+          "none": 1.0
+        }
+      },
+      "depth_aqua": {
+        "n_visits": 3704,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "4": 1.0
+        },
+        "realised": {
+          "4": 1.0
+        }
+      },
+      "depth_csqa": {
+        "n_visits": 3715,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "4": 1.0
+        },
+        "realised": {
+          "4": 1.0
+        }
+      },
+      "depth_gsm8k": {
+        "n_visits": 3812,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "4": 1.0
+        },
+        "realised": {
+          "4": 1.0
+        }
+      },
+      "depth_math": {
+        "n_visits": 1643,
+        "max_abs_dev": 0.0,
+        "worst_key": null,
+        "allowance_at_worst_key": 0.05,
+        "sampling_bound_binds": false,
+        "within_tol": true,
+        "intended": {
+          "4": 1.0
+        },
+        "realised": {
+          "4": 1.0
+        }
+      }
+    },
+    "worst": 0.0,
+    "ok": true
+  }
+}

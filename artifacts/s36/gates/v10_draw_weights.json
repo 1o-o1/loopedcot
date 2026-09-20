@@ -1,7 +1,7 @@
 {
   "tol": 0.05,
   "sd_mult": 3.0,
-  "variant": "budget_longest",
+  "variant": "nobudget",
   "draw": "theory",
   "theory_weights_sha256": "9c3e1e1acb678cb031cec820bfcadb7fa39db0ef2bb7cbe9b493b0328011785c",
   "by_source": {

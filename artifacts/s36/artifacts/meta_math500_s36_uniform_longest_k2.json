@@ -1,0 +1,248 @@
+{
+  "name": "s36_uniform_longest",
+  "variant": "uniform_longest",
+  "task": "math500",
+  "k": 2,
+  "n_problems": 400,
+  "n_eval": 300,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": true,
+  "exemplar_sha256": {
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 32,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_uniform_longest",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_uniform_longest"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "\nBudget: 0 tokens.",
+      "budget_line_tokens": 8,
+      "prompt_tokens_mean": 996.08,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "\nBudget: 32 tokens.",
+      "budget_line_tokens": 9,
+      "prompt_tokens_mean": 997.08,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 31.32,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.905
+    },
+    "128": {
+      "budget_line": "\nBudget: 128 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 998.08,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 116.295,
+      "natural_stop_median": 128,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.8
+    },
+    "512": {
+      "budget_line": "\nBudget: 512 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 998.08,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 387.1525,
+      "natural_stop_median": 456,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.4275
+    },
+    "2048": {
+      "budget_line": "\nBudget: 2048 tokens.",
+      "budget_line_tokens": 11,
+      "prompt_tokens_mean": 999.08,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 615.27,
+      "natural_stop_median": 466,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.075
+    },
+    "none": {
+      "budget_line": "\nBudget: no limit.",
+      "budget_line_tokens": 7,
+      "prompt_tokens_mean": 995.08,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 728.49,
+      "natural_stop_median": 457,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.065
+    }
+  },
+  "cells_written": 6000,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_math500_s36_uniform_longest_k2.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_math500_s36_uniform_longest_k2.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 300,
+        "acc": 0.20666666666666667,
+        "acc_own": 0.0,
+        "acc_v2": 0.20666666666666667
+      }
+    },
+    "32": {
+      "32": {
+        "n": 300,
+        "acc": 0.27,
+        "acc_own": 0.05,
+        "acc_v2": 0.27
+      }
+    },
+    "128": {
+      "128": {
+        "n": 300,
+        "acc": 0.3333333333333333,
+        "acc_own": 0.12,
+        "acc_v2": 0.3333333333333333
+      }
+    },
+    "512": {
+      "512": {
+        "n": 300,
+        "acc": 0.5233333333333333,
+        "acc_own": 0.4066666666666667,
+        "acc_v2": 0.5166666666666667
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 300,
+        "acc": 0.5933333333333334,
+        "acc_own": 0.5866666666666667,
+        "acc_v2": 0.5966666666666667
+      }
+    },
+    "none": {
+      "0": {
+        "n": 300,
+        "acc": 0.21,
+        "acc_own": 0.0,
+        "acc_v2": 0.21
+      },
+      "16": {
+        "n": 300,
+        "acc": 0.20666666666666667,
+        "acc_own": 0.0,
+        "acc_v2": 0.20666666666666667
+      },
+      "32": {
+        "n": 300,
+        "acc": 0.22666666666666666,
+        "acc_own": 0.0033333333333333335,
+        "acc_v2": 0.22333333333333333
+      },
+      "64": {
+        "n": 300,
+        "acc": 0.26,
+        "acc_own": 0.023333333333333334,
+        "acc_v2": 0.26
+      },
+      "128": {
+        "n": 300,
+        "acc": 0.30666666666666664,
+        "acc_own": 0.07333333333333333,
+        "acc_v2": 0.30666666666666664
+      },
+      "256": {
+        "n": 300,
+        "acc": 0.36,
+        "acc_own": 0.16666666666666666,
+        "acc_v2": 0.3566666666666667
+      },
+      "512": {
+        "n": 300,
+        "acc": 0.51,
+        "acc_own": 0.38,
+        "acc_v2": 0.49666666666666665
+      },
+      "1024": {
+        "n": 300,
+        "acc": 0.5533333333333333,
+        "acc_own": 0.5433333333333333,
+        "acc_v2": 0.5566666666666666
+      },
+      "2048": {
+        "n": 300,
+        "acc": 0.5533333333333333,
+        "acc_own": 0.5533333333333333,
+        "acc_v2": 0.5566666666666666
+      },
+      "4096": {
+        "n": 300,
+        "acc": 0.5533333333333333,
+        "acc_own": 0.5533333333333333,
+        "acc_v2": 0.5566666666666666
+      }
+    }
+  },
+  "seconds": 2533.6,
+  "peak_gb": 71.585
+}
