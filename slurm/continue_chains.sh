@@ -10,6 +10,7 @@
 #   bash slurm/continue_chains.sh retry   # resubmit every c1 and c2 job that is not RC=0 and not running/pending; a node
 #                                         # whose job died at CUDA start is added to logs/bad_nodes.txt and excluded
 #   bash slurm/continue_chains.sh c2more  # the four extra k=2 Thinking jobs, only once c2 is done and GPUs are idle
+#   bash slurm/continue_chains.sh c2all   # every remaining cell with 2 percent or more chains at the 4096 horizon (73 jobs, includes c2more)
 #   bash slurm/continue_chains.sh status  # finished / failed counts, and the last 30 log lines of every failed job
 #   bash slurm/continue_chains.sh report  # per c2 job: rows continued, share stopped before 8192, accuracy at caps 4096 and 8192
 # Every job log starts with the node, CUDA_VISIBLE_DEVICES and nvidia-smi -L, and ends with RC=<exit code of
@@ -33,6 +34,10 @@ TASKS="gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag"
 # StrategyQA. The full >= 5% horizon-hit list is 83 jobs and was cut to these ten on 2026-09-17.
 HITLIST="${HITLIST:-ouro_1_4b_think:math500:4 ouro_1_4b_think:math500:3 ouro_1_4b_think:aqua:4 ouro_1_4b_think:aqua:3 ouro_2_6b_think:math500:4 ouro_2_6b_think:math500:3 ouro_2_6b_think:aqua:4 ouro_2_6b_think:aqua:3 mcleish_llama32_r32:math500:8 mcleish_llama32_r32:strategyqa:8}"
 HITLIST_MORE="ouro_1_4b_think:math500:2 ouro_1_4b_think:aqua:2 ouro_2_6b_think:math500:2 ouro_2_6b_think:aqua:2"
+# Every remaining (model, task, depth) whose 4096-horizon chains hit the horizon on 2 percent or more of
+# the questions (counted on the natural2 grids for the Thinking models and the natural grids for McLeish,
+# 2026-09-20), heaviest first: the shallow depths, where the Thinking models run long. 73 jobs.
+HITLIST_ALL="ouro_1_4b_think:aqua:1 ouro_1_4b_think:strategyqa:1 ouro_1_4b_think:bbh:1 ouro_1_4b_think:math500:1 ouro_1_4b_think:csqa:1 mcleish_llama32_r32:strategyqa:1 mcleish_llama32_r32:hellaswag:1 ouro_2_6b_think:math500:1 ouro_1_4b_think:hellaswag:1 ouro_2_6b_think:bbh:1 mcleish_llama32_r32:math500:1 ouro_2_6b_think:aqua:1 ouro_1_4b_think:gsm8k:1 mcleish_llama32_r32:mmlu:1 ouro_2_6b_think:strategyqa:1 ouro_1_4b_think:arc:1 ouro_1_4b_think:svamp:1 mcleish_llama32_r32:aqua:1 ouro_1_4b_think:aqua:2 ouro_1_4b_think:math500:2 mcleish_llama32_r32:bbh:1 ouro_1_4b_think:mmlu:1 mcleish_llama32_r32:math500:2 ouro_1_4b_think:bbh:2 ouro_2_6b_think:math500:2 ouro_2_6b_think:hellaswag:1 ouro_2_6b_think:csqa:1 mcleish_llama32_r32:strategyqa:2 ouro_2_6b_think:svamp:1 ouro_2_6b_think:mmlu:1 mcleish_llama32_r32:gsm8k:1 ouro_2_6b_think:gsm8k:1 ouro_2_6b_think:aqua:2 mcleish_llama32_r32:hellaswag:2 mcleish_llama32_r32:strategyqa:4 mcleish_llama32_r32:bbh:2 mcleish_llama32_r32:math500:4 ouro_1_4b_think:mmlu:2 ouro_1_4b_think:hellaswag:2 ouro_1_4b_think:csqa:2 ouro_1_4b_think:strategyqa:2 ouro_2_6b_think:bbh:2 mcleish_llama32_r32:aqua:2 mcleish_llama32_r32:mmlu:2 ouro_1_4b_think:svamp:2 ouro_1_4b_think:gsm8k:2 ouro_2_6b_think:arc:1 ouro_2_6b_think:svamp:2 mcleish_llama32_r32:svamp:1 ouro_2_6b_think:hellaswag:2 mcleish_llama32_r32:gsm8k:2 ouro_1_4b_think:arc:2 ouro_2_6b_think:mmlu:2 ouro_2_6b_think:csqa:2 ouro_2_6b_think:strategyqa:2 ouro_2_6b_think:bbh:3 ouro_1_4b_think:gsm8k:3 mcleish_llama32_r32:aqua:4 ouro_2_6b_think:mmlu:4 ouro_2_6b_think:hellaswag:3 ouro_2_6b_think:csqa:3 ouro_2_6b_think:bbh:4 ouro_1_4b_think:gsm8k:4 ouro_2_6b_think:mmlu:3 ouro_2_6b_think:hellaswag:4 mcleish_llama32_r32:hellaswag:4 ouro_2_6b_think:gsm8k:2 ouro_2_6b_think:csqa:4 mcleish_llama32_r32:aqua:8 ouro_1_4b_think:arc:3 ouro_2_6b_think:strategyqa:4 ouro_1_4b_think:arc:4 ouro_2_6b_think:strategyqa:3"
 
 width_for() {  # the batch width for 8192-token sequences: half the width the 4096 grid used for this model/depth
   case "$1:$2" in
@@ -133,6 +138,7 @@ case "$MODE" in
     echo "c1 job ids in logs/c1_jobs.txt" ;;
   c2)      submit_c2_list "$HITLIST" ;;
   c2more)  submit_c2_list "$HITLIST_MORE" ;;
+  c2all)   submit_c2_list "$HITLIST_ALL" ;;
   retry)   do_retry ;;
   status)
     for stage in c1 c2; do
@@ -188,5 +194,5 @@ for mp in sorted(glob.glob(os.path.join(art, "meta_*_natural2h_k*.json"))):
 EOF
     ;;
   *)
-    echo "usage: bash slurm/continue_chains.sh run|probe|c1|c2|retry|c2more|status|report"; exit 1 ;;
+    echo "usage: bash slurm/continue_chains.sh run|probe|c1|c2|retry|c2more|c2all|status|report"; exit 1 ;;
 esac
