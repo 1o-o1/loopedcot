@@ -170,5 +170,20 @@
   "gpu_wait": {
     "waited_s": 0
   },
-  "errors": {}
+  "errors": {},
+  "supervised_tokens": 1188588,
+  "padded_tokens": 31260672,
+  "content_tokens": 21245771,
+  "layer_passes_forward": 1192242792,
+  "layer_passes_fwd_bwd": 3576728376,
+  "opt_steps_done": 925,
+  "mean_loss_first_10": 0.6190788152925337,
+  "mean_loss_last_10": 0.0931488805399588,
+  "seconds": 5342.8,
+  "train_seconds": 5336.9,
+  "seconds_per_opt_step": 5.77,
+  "content_tokens_per_s": 3980.9,
+  "padded_tokens_per_s": 5857.4,
+  "peak_gb": 48.259,
+  "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_budget_longest"
 }

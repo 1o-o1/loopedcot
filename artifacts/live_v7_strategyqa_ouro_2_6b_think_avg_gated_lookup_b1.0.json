@@ -1,0 +1,430 @@
+{
+  "model": "ouro_2_6b_think",
+  "task": "strategyqa",
+  "arm": "avg_gated_lookup",
+  "accounting": "expected",
+  "alloc_dir": "/home/mzaoad/loopedcot/artifacts/alloc_v7n2_strategyqa_ouro_2_6b_think",
+  "budget_fraction": 1.0,
+  "budget": 144151.57386934673,
+  "default_cost": {
+    "k": 4,
+    "n": 1990,
+    "mean": 144151.57386934673,
+    "promptfree": true,
+    "n_at_horizon": 0,
+    "horizon_share": 0.0
+  },
+  "gate": {
+    "family": null,
+    "margin_pts": -2.2222222222222223,
+    "sd_pts": 3.0491423100866406,
+    "opened": false,
+    "reverted": true,
+    "reference": {
+      "rule": "deepest_depth_capped",
+      "k": 4,
+      "lambda": 0.0,
+      "cells": {
+        "k4_T2048": 1990
+      },
+      "mean_price": 139969.28,
+      "affordable_on_average": true,
+      "default_cell_mean_price_cal": 150468.48,
+      "default_cell_mean_price_eval": 150468.48,
+      "default_cell_affordable_on_cal": false,
+      "default_cell_affordable_on_eval": false
+    }
+  },
+  "alloc_mean_price_layer_passes": 139969.28,
+  "n_eval_used": 1990,
+  "n_infeasible": 0,
+  "n_cal": 300,
+  "n_promoted": 200,
+  "chosen_histogram": {
+    "k4_B2048": 1990
+  },
+  "layers_per_loop": 48,
+  "layers_fixed": 0,
+  "grid_acc_at_picks": 0.7788944723618091,
+  "preflight": null,
+  "config": {
+    "caps": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "caps_extra": [],
+    "horizon": 4096,
+    "forced_horizon": 4096,
+    "forced_budgets": [
+      0,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "think_tag_is_stop": true,
+    "forced_block": {
+      "enabled": false,
+      "models": [
+        "ouro_1_4b_base",
+        "ouro_1_4b_think",
+        "ouro_2_6b_base",
+        "ouro_2_6b_think"
+      ],
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ],
+      "ks": null,
+      "n": null
+    },
+    "batch_width": 16,
+    "batch_cap": 32,
+    "batch_width_overrides": {
+      "ouro_2_6b_base": {
+        "3": 8,
+        "4": 8
+      },
+      "ouro_2_6b_think": {
+        "3": 8,
+        "4": 8
+      },
+      "huginn_0125": {
+        "16": 8,
+        "32": 4
+      }
+    },
+    "split_seed": 20260908,
+    "n_cal": 100,
+    "datasets": {
+      "gsm8k": 1319,
+      "math500": 500,
+      "svamp": 300,
+      "aqua": 254,
+      "csqa": 1221,
+      "arc": 1172,
+      "strategyqa": 2290,
+      "bbh": 2437,
+      "mmlu": 2000,
+      "hellaswag": 2000
+    },
+    "depths": {
+      "ouro_1_4b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_1_4b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_base": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ouro_2_6b_think": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "huginn_0125": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "mcleish_llama32_r32": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "depths_extra": {
+      "mcleish_llama32_r32": {
+        "gsm8k": [
+          16,
+          32
+        ]
+      }
+    },
+    "bbh_subtasks": [
+      "date_understanding",
+      "logical_deduction_five_objects",
+      "tracking_shuffled_objects_three_objects",
+      "sports_understanding",
+      "boolean_expressions",
+      "multistep_arithmetic_two",
+      "word_sorting",
+      "navigate",
+      "causal_judgement",
+      "temporal_sequences"
+    ],
+    "mem_util": 0.85,
+    "prompt_allowance": 1536,
+    "placement_horizon": null,
+    "workers_per_gpu": 1,
+    "cluster_factor": 4.0,
+    "budget_fractions": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "version": "PP3"
+  },
+  "config_sha256": "99546724049d64f042e483de39c0cb4f6e208fb1ae0b1e42eecd2177b2acc9d0",
+  "runs": [
+    {
+      "k": 4,
+      "B": 2048,
+      "n": 1990,
+      "rc": 0,
+      "seconds": 42553.6,
+      "dir": "/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_strategyqa_avg_gated_lookup_b1.0/live_k4_B2048",
+      "cmd": "/home/mzaoad/loopedcot/.venv/bin/python -m prod.generate --model=ouro_2_6b_think --task=strategyqa --k=4 --caps=2048 --no-extra-caps --horizon=2048 --out=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_strategyqa_avg_gated_lookup_b1.0/live_k4_B2048 --only-rows=/home/mzaoad/loopedcot/artifacts/live_check_ouro_2_6b_think_strategyqa_avg_gated_lookup_b1.0/live_k4_B2048/row_ids.json",
+      "tail_lines": 40,
+      "stdout_tail": "[ouro_2_6b_think_strategyqa_natural_k4_sub1990] N=1990 caps=[2048] horizon=2048 | 0 MiB, 98304 MiB | \n  pass single: natural stop mean 580.4 hit 0.968, 1157009 tokens in 40905s (28.3 tok/s) [41763s]\n    readout single 128/1990 jobs b=8 rows 128 [41805s] peak 34.13 GB\n    readout single 256/1990 jobs b=8 rows 256 [41848s] peak 34.13 GB\n    readout single 384/1990 jobs b=8 rows 384 [41890s] peak 34.13 GB\n    readout single 512/1990 jobs b=8 rows 512 [41934s] peak 34.13 GB\n    readout single 640/1990 jobs b=8 rows 640 [41978s] peak 34.13 GB\n    readout single 768/1990 jobs b=8 rows 768 [42023s] peak 34.13 GB\n    readout single 896/1990 jobs b=8 rows 896 [42069s] peak 34.13 GB\n    readout single 1024/1990 jobs b=8 rows 1024 [42116s] peak 34.13 GB\n    readout single 1152/1990 jobs b=8 rows 1152 [42165s] peak 34.13 GB\n    readout single 1280/1990 jobs b=8 rows 1280 [42214s] peak 34.13 GB\n    readout single 1408/1990 jobs b=8 rows 1408 [42263s] peak 34.13 GB\n    readout single 1536/1990 jobs b=8 rows 1536 [42315s] peak 34.13 GB\n    readout single 1664/1990 jobs b=8 rows 1664 [42371s] peak 34.13 GB\n    readout single 1792/1990 jobs b=8 rows 1792 [42429s] peak 34.13 GB\n    readout single 1920/1990 jobs b=8 rows 1920 [42500s] peak 34.13 GB\n    readout single 1990/1990 jobs b=6 rows 1990 [42551s] peak 34.78 GB\nDONE ouro_2_6b_think_strategyqa_natural_k4_sub1990 1990/1990 cells in 42551s peak 34.781 GB | acc_v2 {'2048': 0.777}",
+      "stderr_tail": null
+    }
+  ],
+  "n_live_rows": 1990,
+  "live_acc": 0.7773869346733668,
+  "grid_acc_same_rows": 0.7788944723618091,
+  "delta_pp": -0.151,
+  "price_accounting": "promptfree",
+  "live_mean_price_layer_passes": 113657.53567839196,
+  "grid_mean_price_same_rows": 113051.24020100503,
+  "price_over_budget_pct": -21.15,
+  "n_flips": 23,
+  "flips": [
+    {
+      "row_idx": 12,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 131,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 175,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 233,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 280,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 324,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 498,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 547,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 572,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 662,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 680,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1103,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1497,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 1955,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 1979,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2188,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 2197,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2231,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 2234,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 2238,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2254,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": true,
+      "live": false
+    },
+    {
+      "row_idx": 2257,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    },
+    {
+      "row_idx": 2272,
+      "cell": [
+        4,
+        2048
+      ],
+      "grid": false,
+      "live": true
+    }
+  ],
+  "missing_rows": []
+}
