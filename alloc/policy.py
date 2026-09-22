@@ -110,17 +110,36 @@ GATE_SELECT_FRAC = 0.7
 # ---------------------------------------------------------------- structured deviation families
 # v5. The gate's bar has to cover the winner's curse of whatever set the deviating cell was chosen
 # from, and that bias grows with how many cells were in the running. The free set is 40 cells on
-# these grids, so a real 5-point edge can sit under the bar. These families are tested IN ORDER,
-# SMALLEST FIRST, and the first whose verified margin over the fallback clears the bar wins:
+# these grids, so a real 5-point edge can sit under the bar. Each family is a Lagrangian policy
+# restricted to its own cells, each tested the same way against the fallback, and which of the ones
+# that clear the bar is RUN is GATE_FAMILY_RULE below:
 #
 #   F0  the deepest depth at cap 0            1 cell   -- "the chain buys nothing" (HellaSwag)
 #   F1  the deepest depth at any cap          |caps|   -- "the chain is worth less than its length"
 #   F2  one depth shallower, at any cap       |caps|   -- "the last loop pass buys nothing" (MATH500)
 #   F3  the free set                          all      -- v4's behaviour, and the last resort
 #
-# The order is a fixed, pre-registered sequence, not a search: F0 and F2 name the two shapes the
-# twenty grids actually show, and a family is only reached when every smaller one has failed.
+# The SET is fixed and pre-registered, not searched: F0 and F2 name the two shapes the twenty grids
+# actually show, and the order below is smallest first.
 DEVIATION_FAMILIES = ("F0", "F1", "F2", "F3")
+
+# Which of the families that CLEAR the bar is run (evaluate.avg_gated_vectors).
+#
+#   "first"  the smallest that clears, testing F0 upwards and stopping at the first -- v5 to v7.
+#   "best"   the FROZEN default. Every family is measured, and among those that clear the bar on
+#            EVERY fold the one with the largest MEAN verified margin over the folds is run; ties go
+#            to the smaller family, and if none clears the arm reverts as before.
+#
+# "first" makes the arm's accuracy non-monotone in the budget, because a small family that clears
+# by a hair at one budget is run in place of a large one that clears by twenty points: over the 49
+# production pairs 36 fall somewhere as the budget RISES, McLeish/GSM8K from 49.4 to 5.4 near
+# 0.25x where F0 clears, and Ouro-2.6B Think/GSM8K stops at F2 for 74.0 at 0.5x where F3 gives
+# 89.7. Nothing about the test itself changes under "best" -- same folds, same bar, same
+# reference, same pricing -- only which cleared family is taken. The bar still carries each
+# family's own winner's curse, so a large family has to clear a wider bar to be in the running at
+# all; what "best" removes is the order's veto over families it never tested.
+GATE_FAMILY_RULES = ("first", "best")
+GATE_FAMILY_RULE = "best"
 
 
 def family_cells(ks, caps, family):

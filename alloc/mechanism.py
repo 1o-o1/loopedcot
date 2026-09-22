@@ -82,11 +82,14 @@ SETTLE_BINS = ((0, 0), (16, 32), (64, 128), (256, 512), (1024, 4096))
 def settle_time(cells, pos):
     """Return the FIRST settled token cap INDEX per (depth, prompt); len(caps) means never settled.
 
-    Settled at cap T means the forced read-out at T and at every cap after it equals the last cap's
-    read-out and parses -- `commitment` above. That Boolean is a suffix in the cap by construction,
-    so "the first settled cap" is well defined, and a question whose read-out never stops moving, or
-    whose final read-out does not parse, is encoded at len(caps): BEYOND the last cap, never equal
-    to it. Label free: only read-outs are read, never a label.
+    Settled at cap T means the settle answer at T and at every cap after it equals the last cap's
+    and parses -- `commitment` above. The settle answer is `cells.pred`, which
+    `cells.SETTLE_ANSWER` picks: under "scored" it is the answer the label scores -- the chain's own
+    answer when it wrote one inside the cut, else the forced read-out -- so the label is constant
+    from the settle cap on; under "forced" it is the forced read-out alone. That Boolean is a suffix
+    in the cap by construction, so "the first settled cap" is well defined, and a question whose
+    answer never stops moving, or whose final answer does not parse, is encoded at len(caps):
+    BEYOND the last cap, never equal to it. Label free: only answers are read, never a label.
     """
     A = commitment(cells, pos)
     nb = len(cells.caps)

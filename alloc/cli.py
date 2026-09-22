@@ -8,6 +8,12 @@ import numpy as np
 from . import cells as C
 from . import evaluate as E
 from . import policy as P
+from . import prefix as PX
+
+# How the prompt is charged. `prompt_free` and `prompt_inclusive` are the two prices `policy.Cost`
+# carries; `prefix_cached` is prompt-inclusive pricing on a grid whose prompts have had the shared
+# exemplar block taken off them, which is the price a server holding a prefix cache pays.
+PRICINGS = ("prompt_free", "prompt_inclusive", "prefix_cached")
 
 
 def _args(argv=None):
@@ -61,12 +67,20 @@ def _args(argv=None):
     p.add_argument("--no-families", action="store_true",
                    help="test only the free set of cells at the gate, as v4 did, instead of the "
                         "frozen structured families F0 (deepest depth at cap 0), F1 (deepest "
-                        "depth at any cap), F2 (one depth shallower) and F3 (the free set) in "
-                        "that order. The comparison flag, not the default")
+                        "depth at any cap), F2 (one depth shallower) and F3 (the free set), of "
+                        "which the one that runs is policy.GATE_FAMILY_RULE. The comparison flag, "
+                        "not the default")
     p.add_argument("--n-labels", type=int, default=None)
     p.add_argument("--boot", type=int, default=2000)
     p.add_argument("--cal-draws", type=int, default=100)
-    p.add_argument("--promptfree", action="store_true")
+    p.add_argument("--pricing", default=None, choices=list(PRICINGS),
+                   help="which prompt tokens a cell is charged for: `prompt_inclusive` the whole "
+                        "prompt at every loop pass (the default), `prompt_free` none of it, "
+                        "`prefix_cached` all but the exemplar block a prefix cache holds, measured "
+                        "per block from the checkpoint's own tokenizer. The default cost and every "
+                        "budget re-anchor under whichever is chosen")
+    p.add_argument("--promptfree", action="store_true",
+                   help="an alias of --pricing prompt_free")
     p.add_argument("--accounting", default="cap", choices=list(P.ACCOUNTINGS) + ["all"],
                    help="how a cell is charged: `cap` the whole cap, `expected` the calibration "
                         "mean realised length at that cell, `realised` the prompt's own measured "
@@ -130,6 +144,44 @@ def resolve_geometry(a):
         "cannot price %r: pass --layers-per-loop (and --fixed-layers), or --model-config with a "
         "file that holds this model's shape. Only a 24-layer fully recurrent checkpoint has a "
         "built-in default." % model)
+
+
+def resolve_pricing(a):
+    """Return the pricing to run: --pricing, or --promptfree, which is its prompt_free alias."""
+    if a.pricing is None:
+        return "prompt_free" if a.promptfree else "prompt_inclusive"
+    if a.promptfree and a.pricing != "prompt_free":
+        raise SystemExit("--promptfree is an alias of --pricing prompt_free and contradicts "
+                         "--pricing %s" % a.pricing)
+    return a.pricing
+
+
+def apply_prefix_cache(cells, cells_dir, checkpoint, task, protocol):
+    """Return (the grid priced as if the exemplar block were cached, what was measured).
+
+    The prompts are rebuilt with the settings the run itself recorded and tokenised with the
+    checkpoint's own pinned tokenizer; the rebuilt token counts are compared with the stored ones,
+    and the share that match is reported rather than assumed, because the shared prefix is only the
+    measured quantity where the rebuild reproduces the run.
+    """
+    tok, tinfo = PX.tokenizer_for(checkpoint)
+    shape = PX.run_prompt_settings(cells_dir, checkpoint, task, protocol)
+    S = PX.shared_prefix(cells, tok, chat_template=shape["chat_template"],
+                         add_special_tokens=shape["add_special_tokens"],
+                         think_tag_is_stop=shape["think_tag_is_stop"])
+    enc, keys = PX.prompt_token_ids(cells, tok, chat_template=shape["chat_template"],
+                                    add_special_tokens=shape["add_special_tokens"],
+                                    think_tag_is_stop=shape["think_tag_is_stop"])
+    rebuilt = np.array([len(e) for e in enc], float)
+    stored = np.asarray(cells.ptok, float)
+    info = {"tokenizer": tinfo, "prompt_settings": shape,
+            "n_blocks": len(set(keys)),
+            "shared_tokens_mean": float(S.mean()), "shared_tokens_min": float(S.min()),
+            "shared_tokens_max": float(S.max()),
+            "shared_share_of_mean_prompt": float(S.mean() / stored.mean()),
+            "rebuilt_prompt_tokens_match": float((rebuilt == stored).mean()),
+            "n_prompt_tokens_mismatched": int((rebuilt != stored).sum())}
+    return PX.with_prefix_cached(cells, S), info
 
 
 def accountings_of(a):
@@ -219,6 +271,13 @@ def main(argv=None):
     n_cal, why = C.resolve_n_cal(cs, a.n_cal)
     cs, split_record = C.promote_calibration(cs, n_cal)
     split_record["reason"] = why
+    # Under `prefix_cached` the shared exemplar block is taken off every prompt and the run is then
+    # priced prompt-inclusive on what is left, which is the price a server holding the cache pays.
+    pricing = resolve_pricing(a)
+    promptfree = (pricing == "prompt_free")
+    prefix_info = None
+    if pricing == "prefix_cached":
+        cs, prefix_info = apply_prefix_cache(cs, a.cells, a.checkpoint, a.task, a.protocol)
     cards = {cs.name: card(cs, a.n_labels)}
     accs, primary = accountings_of(a)
     gate_folds = P.resolve_gate_folds(a.gate_mode, a.gate_folds)
@@ -226,7 +285,9 @@ def main(argv=None):
                    n_select=a.n_select, n_verify=a.n_verify,
                    families=not bool(a.no_families), gate_folds=gate_folds)
     res = {"task": a.task, "checkpoint": a.checkpoint, "protocol": a.protocol, "reference": a.reference,
-           "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
+           "pricing": pricing, "promptfree": bool(promptfree),
+           "prefix_cache": prefix_info,
+           "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
            "gate_mode": a.gate_mode, "one_se": bool(a.one_se),
            # In the header so every artifact carries them: the ranking of record, and how many
            # directions of the split a deviation was earned in.
@@ -241,6 +302,8 @@ def main(argv=None):
            "read": dict(cs.read_stats, cache=bool(a.cache), cache_dir=a.cache_dir),
            "families": not bool(a.no_families),
            "deviation_families": list(P.DEVIATION_FAMILIES),
+           # which of the families that clear the bar is run (policy.GATE_FAMILY_RULE)
+           "gate_family_rule": P.GATE_FAMILY_RULE,
            "accounting": a.accounting, "accounting_priced": primary,
            "accountings_tabulated": accs, "gain": {}}
     arms = [("lookup", dict(ranking="lookup", c_gate=0.0)),
@@ -251,11 +314,11 @@ def main(argv=None):
             ("gated_equation", dict(ranking="equation", c_gate=a.c_gate)),
             ("gated_equation_resolved", dict(ranking="equation_resolved", c_gate=a.c_gate))]
     for name, spec in arms:
-        res["gain"][name] = E.gain_over_normal(cs, promptfree=a.promptfree, n_boot=a.boot,
+        res["gain"][name] = E.gain_over_normal(cs, promptfree=promptfree, n_boot=a.boot,
                                                n_cal_draws=a.cal_draws, seed=a.seed,
                                                accounting=primary, **dict(gate_kw, **spec))
-    res["default_cost"] = E.default_cost(cs, promptfree=a.promptfree)
-    tables = {acc: E.table1(cs, promptfree=a.promptfree, c_gate=a.c_gate, seed=a.seed,
+    res["default_cost"] = E.default_cost(cs, promptfree=promptfree)
+    tables = {acc: E.table1(cs, promptfree=promptfree, c_gate=a.c_gate, seed=a.seed,
                             accounting=acc, avg_budget=a.avg_budget, **gate_kw) for acc in accs}
     # Each table's picks block is lifted out of the table (it is the bulk of the file) into
     # `picks`, keyed by accounting, beside the calibration ids they were fitted on.
@@ -294,15 +357,20 @@ def main(argv=None):
         # The reference is re-split to the SAME calibration size, so the two checkpoints still
         # carry identical evaluation ids and `assert_paired` has something to pair.
         ref, _rrec = C.promote_calibration(ref, n_cal)
+        if pricing == "prefix_cached":
+            # the reference's own prompts and its own tokenizer: two checkpoints tokenise the same
+            # exemplar block differently, so the shared prefix is measured per checkpoint
+            ref, res["reference_prefix_cache"] = apply_prefix_cache(ref, rdir, a.reference, a.task,
+                                                                    a.protocol)
         cards[ref.name] = card(ref, a.n_labels)
         E.assert_paired(cs, ref)
         res["contrasts"] = {
-            w: E.contrast(cs, ref, which=w, promptfree=a.promptfree, n_boot=a.boot, seed=a.seed,
+            w: E.contrast(cs, ref, which=w, promptfree=promptfree, n_boot=a.boot, seed=a.seed,
                           accounting=primary)
             for w in ("Bstar", "Blow")}
-        res["noninferiority"] = E.noninferiority(cs, ref, promptfree=a.promptfree,
+        res["noninferiority"] = E.noninferiority(cs, ref, promptfree=promptfree,
                                                  n_boot=a.boot, seed=a.seed, accounting=primary)
-        res["reference_default_cost"] = E.default_cost(ref, promptfree=a.promptfree)
+        res["reference_default_cost"] = E.default_cost(ref, promptfree=promptfree)
 
     def _j(o):
         if isinstance(o, (np.floating, np.integer)):

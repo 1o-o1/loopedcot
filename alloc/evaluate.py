@@ -320,6 +320,20 @@ def family_score(cells, score, family):
     return None if not np.isfinite(out).any() else out
 
 
+def _mean_fold_margin(per_fold):
+    """Return the mean of a deviation's VERIFIED margins over the folds, in percentage points.
+
+    This is what `policy.GATE_FAMILY_RULE == "best"` ranks the families that cleared the bar by. It
+    is the mean of the same per-fold margins the bar was applied to, one per direction of the split,
+    so no fold's own luck decides the ranking on its own. NaN if any fold's margin is missing, which
+    cannot happen for a family that cleared: clearing needs a finite margin in every fold.
+    """
+    vals = [d.get("margin_pts") for d in per_fold]
+    if not vals or any(v is None for v in vals):
+        return float("nan")
+    return float(np.mean(vals))
+
+
 def family_margin(cells, ver_pos, cost, X, order_f, seed=7, gate_boot=pol.GATE_BOOT):
     """Return (paired mean margin, paired bootstrap SD) of one family's policy over normal
     operation, measured on the VERIFICATION questions' own labels at one budget.
@@ -983,6 +997,10 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             # the further folds' own verified margins, where more than one fold was demanded
             "gate_folds_per_budget": [v.get("gate_folds") for v in V],
             "gate_fold_detail": [v.get("gate_fold_detail") for v in V],
+            # which of the families that cleared the bar was run, and what the others measured
+            "gate_family_rule": [v.get("gate_family_rule") for v in V],
+            "gate_family_cleared": [v.get("gate_family_cleared") for v in V],
+            "gate_family_mean_margin_pts": [v.get("gate_family_mean_margin_pts") for v in V],
             "gate_draw_frac_positive": [v.get("gate_draw_frac_positive") for v in V],
             # gain over normal is not defined for an average budget: normal operation is a
             # per-prompt cap policy and the two are not priced the same way. The paired
@@ -1063,7 +1081,8 @@ def table1(cells, promptfree=False, fractions=BUDGET_FRACTIONS, c_gate=pol.DEFAU
             "budgets": [float(x) for x in Xs],
             "default_cost": dc, "n_eval": int(len(ev)), "c_gate": float(c_gate),
             "gate_mode": gate_mode, "one_se": bool(one_se), "gate_c": float(c),
-            "families": bool(families), "oracle": orc, "oracle_gap_fraction": float(fractions[one]),
+            "families": bool(families), "gate_family_rule": pol.GATE_FAMILY_RULE,
+            "oracle": orc, "oracle_gap_fraction": float(fractions[one]),
             "gate_sizes": gate_sizes, "rows": rows,
             "picks": {"n_eval": int(len(ev)), "evaluation_ids": [int(cells.idx[n]) for n in ev],
                       "arms": picks_out}}
@@ -1354,11 +1373,14 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
     depth fits on average; only below that -- where not even the cheapest cell fits -- is there
     nothing to revert to and the Lagrangian policy stands.
 
-    `families` (v5) tries the structured deviation families F0 to F2 first, smallest first, each
-    one a Lagrangian policy restricted to that family's cells and each tested the same way against
-    the reference on the verification questions. The first to clear the bar is run and the row
-    records it. F3, the free set, is the test below and v4's behaviour exactly, so a family can
-    only add a deviation the structured test earned, never take one away.
+    `families` (v5) tries the structured deviation families F0 to F2 as well as F3, the free set,
+    each one a Lagrangian policy restricted to that family's cells and each tested the same way
+    against the reference on the verification questions. Which of the families that CLEAR the bar is
+    run is `policy.GATE_FAMILY_RULE`: "first" walks them smallest first and stops at the first that
+    clears, "best" measures them all and runs the one with the largest mean verified margin over the
+    folds, ties to the smaller family. F3 alone is v4's behaviour exactly, so a family can only add
+    a deviation the structured test earned, never take one away. The row records the rule, which
+    families cleared, and each cleared family's mean margin.
     """
     if gate_mode not in pol.GATE_MODES:
         raise ValueError("unknown gate mode %r; expected one of %s"
@@ -1418,7 +1440,9 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
             rec.update({"gate_mode": "split", "gate_c": c, "gate_margin_pts": None,
                         "gate_sd_pts": None, "gate_reverted": False, "deviation_family": None,
                         "family_decisions": [], "gate_folds": int(folds), "gate_fold_detail": None,
-                        "gate_draw_frac_positive": None, "gate_sizes": sizes})
+                        "gate_draw_frac_positive": None, "gate_sizes": sizes,
+                        "gate_family_rule": None, "gate_family_cleared": None,
+                        "gate_family_mean_margin_pts": None})
             rec.update(ref_blank)
             if not on:
                 continue
@@ -1450,7 +1474,21 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
                         pol.paired_margin_sd(arm_i, fold_ref[i], n_boot=gate_boot, seed=seed),
                         True)
 
-            hit = None
+            # Which of the families that CLEAR the bar is run is policy.GATE_FAMILY_RULE. Under
+            # "first" the families are walked smallest first and the walk stops at the first that
+            # clears; under "best" every one is measured and the one with the largest MEAN verified
+            # margin over the folds is run, ties to the smaller family. Nothing else differs: the
+            # folds, the bar, the reference and the pricing are the same test either way, and with
+            # no family clearing the arm reverts as before.
+            rule = pol.GATE_FAMILY_RULE
+            if rule not in pol.GATE_FAMILY_RULES:
+                raise ValueError("unknown gate family rule %r; expected one of %s"
+                                 % (rule, ", ".join(pol.GATE_FAMILY_RULES)))
+            take_best = (rule == "best")
+            rec["gate_family_rule"] = rule
+            # one entry per family that cleared: (family, its score surface or None for the free
+            # set, fold 1's margin and SD, the further folds' detail, the mean margin over folds)
+            cands = []
             for fam in (pol.DEVIATION_FAMILIES[:-1] if families else ()):
                 Sf = family_score(cells, S, fam)
                 if Sf is None:
@@ -1484,64 +1522,85 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
                      "folds": (per_fold[1:] or None)})
                 if passed:
                     m_f, sd_f = fold_margin(0, Sf)[:2]
-                    rec["gate_fold_detail"] = per_fold[1:] or None
-                    hit = (fam, Sf, m_f, sd_f)
-                    break
-            if hit is not None:
-                fam, Sf, m_f, sd_f = hit
-                # The same selection-half diagnostic the free set carries: each draw refits the
-                # score and the multiplier INSIDE the family on a resample of the selection half
-                # and remeasures the same verification margin.
-                fpos = []
+                    cands.append((fam, Sf, m_f, sd_f, per_fold[1:] or None,
+                                  _mean_fold_margin(per_fold)))
+                    if not take_best:
+                        break
+            # F3, the free set: each fold's own whole policy against its own reference. Under
+            # "best" it is measured whatever the structured families did, because the rule ranks it
+            # beside them; under "first" it is reached only when none of them cleared.
+            if take_best or not cands:
+                a, b = pol.avg_picks(S, ver_prices, rec["lambda"])
+                arm = np.asarray(cells.acc[a, b, ver], float)
+                margin = _nanmean(arm - ref)
+                sd = pol.paired_margin_sd(arm, ref, n_boot=gate_boot, seed=seed)
+                free_ok = pol.gate_passes(margin, sd, c)
+                free_folds = []
+                for i in range(1, len(halves)):
+                    m_i, sd_i, met_i = fold_margin(i, fold_S[i])
+                    ok_i = met_i and pol.gate_passes(m_i, sd_i, c)
+                    free_ok = free_ok and ok_i
+                    free_folds.append({"margin_pts": (100 * m_i if m_i == m_i else None),
+                                       "sd_pts": (100 * sd_i if sd_i == sd_i else None),
+                                       "bar_pts": (100 * c * sd_i if sd_i == sd_i else None),
+                                       "opened": bool(ok_i),
+                                       "affordable_on_average": bool(met_i),
+                                       "n_verification": int(len(halves[i][1]))})
+                rec["gate_fold_detail"] = free_folds or None
+                # The selection half is bootstrapped in its turn: each draw refits the score and
+                # the multiplier on a resample of it and remeasures the same verification margin,
+                # so the share positive says how much of the verdict is the selection half own luck.
+                pos = []
                 for dsel, _lab in plan:
-                    Sd = family_score(cells, cell_scores_boot(cells, sel, cost, Pm, Rm, dsel,
-                                                              ranking=ranking), fam)
-                    if Sd is None:
-                        continue
+                    Sd = cell_scores_boot(cells, sel, cost, Pm, Rm, dsel, ranking=ranking)
                     lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
                     ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
-                    fpos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
-                keep = {k: rec[k] for k in (("gate_mode", "gate_c", "gate_sizes", "gate_folds",
-                                             "gate_fold_detail", "family_decisions")
-                                            + tuple(ref_blank))}
-                rec.update(pol.avg_budget_vectors(cells, ev, sel, cost, [X], Sf)[0])
-                rec.update(keep)
-                rec.update({"gate_margin_pts": 100 * m_f, "gate_sd_pts": 100 * sd_f,
-                            "gate_reverted": False, "deviation_family": fam,
-                            "gate_draw_frac_positive": (float(np.mean(fpos)) if fpos else None)})
+                    pos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
+                rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
+                rec["gate_draw_frac_positive"] = float(np.mean(pos)) if pos else None
+                if free_ok:
+                    cands.append(("F3", None, margin, sd, free_folds or None,
+                                  _mean_fold_margin([{"margin_pts": 100 * margin}] + free_folds)))
+            rec["gate_family_cleared"] = [t[0] for t in cands]
+            rec["gate_family_mean_margin_pts"] = {t[0]: t[5] for t in cands}
+            if not cands:
+                _revert_to_reference(rec, cells, ev, cost, ea, eb, X)
                 continue
-            # F3, the free set: each fold's own whole policy against its own reference.
-            a, b = pol.avg_picks(S, ver_prices, rec["lambda"])
-            arm = np.asarray(cells.acc[a, b, ver], float)
-            margin = _nanmean(arm - ref)
-            sd = pol.paired_margin_sd(arm, ref, n_boot=gate_boot, seed=seed)
-            free_ok = pol.gate_passes(margin, sd, c)
-            free_folds = []
-            for i in range(1, len(halves)):
-                m_i, sd_i, met_i = fold_margin(i, fold_S[i])
-                ok_i = met_i and pol.gate_passes(m_i, sd_i, c)
-                free_ok = free_ok and ok_i
-                free_folds.append({"margin_pts": (100 * m_i if m_i == m_i else None),
-                                   "sd_pts": (100 * sd_i if sd_i == sd_i else None),
-                                   "bar_pts": (100 * c * sd_i if sd_i == sd_i else None),
-                                   "opened": bool(ok_i), "affordable_on_average": bool(met_i),
-                                   "n_verification": int(len(halves[i][1]))})
-            rec["gate_fold_detail"] = free_folds or None
-            # The selection half is bootstrapped in its turn: each draw refits the score and the
-            # multiplier on a resample of it and remeasures the same verification margin, so the
-            # share positive says how much of the verdict is the selection half own luck.
-            pos = []
-            for dsel, _lab in plan:
-                Sd = cell_scores_boot(cells, sel, cost, Pm, Rm, dsel, ranking=ranking)
-                lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
-                ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
-                pos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
-            rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * margin, 100 * sd
-            rec["gate_draw_frac_positive"] = float(np.mean(pos)) if pos else None
-            if free_ok:
+            # `cands` is in family order, so a strictly larger mean margin is needed to displace a
+            # smaller family: ties go to the smaller one.
+            hit = cands[0]
+            if take_best:
+                for cnd in cands[1:]:
+                    if cnd[5] > hit[5]:
+                        hit = cnd
+            fam, Sf, m_f, sd_f, fold_detail, _mm = hit
+            rec["gate_fold_detail"] = fold_detail
+            if fam == "F3":
+                rec["gate_margin_pts"], rec["gate_sd_pts"] = 100 * m_f, 100 * sd_f
                 rec["deviation_family"] = "F3"
                 continue
-            _revert_to_reference(rec, cells, ev, cost, ea, eb, X)
+            # The same selection-half diagnostic the free set carries: each draw refits the score
+            # and the multiplier INSIDE the family on a resample of the selection half and
+            # remeasures the same verification margin.
+            fpos = []
+            for dsel, _lab in plan:
+                Sd = family_score(cells, cell_scores_boot(cells, sel, cost, Pm, Rm, dsel,
+                                                          ranking=ranking), fam)
+                if Sd is None:
+                    continue
+                lam_d, _sp, _met = pol.lambda_for_budget(Sd, sel_prices[:, :, dsel], X)
+                ad, bd = pol.avg_picks(Sd, ver_prices, lam_d)
+                fpos.append(_nanmean(np.asarray(cells.acc[ad, bd, ver], float) - ref) > 0)
+            keep = {k: rec[k] for k in (("gate_mode", "gate_c", "gate_sizes", "gate_folds",
+                                         "gate_fold_detail", "family_decisions",
+                                         "gate_family_rule", "gate_family_cleared",
+                                         "gate_family_mean_margin_pts")
+                                        + tuple(ref_blank))}
+            rec.update(pol.avg_budget_vectors(cells, ev, sel, cost, [X], Sf)[0])
+            rec.update(keep)
+            rec.update({"gate_margin_pts": 100 * m_f, "gate_sd_pts": 100 * sd_f,
+                        "gate_reverted": False, "deviation_family": fam,
+                        "gate_draw_frac_positive": (float(np.mean(fpos)) if fpos else None)})
         return out
 
     S = np.asarray(score, float)
@@ -1556,7 +1615,9 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
         rec.update({"gate_mode": "whole", "gate_c": c, "gate_margin_pts": None,
                     "gate_sd_pts": None, "gate_reverted": False, "deviation_family": None,
                     "family_decisions": [], "gate_folds": 1, "gate_fold_detail": None,
-                    "gate_draw_frac_positive": None, "gate_sizes": sizes})
+                    "gate_draw_frac_positive": None, "gate_sizes": sizes,
+                    "gate_family_rule": None, "gate_family_cleared": None,
+                    "gate_family_mean_margin_pts": None})
         rec.update(ref_blank)
         if not on:
             continue
@@ -1730,8 +1791,16 @@ def table1_markdown(t1):
                 % (orc["cell"][0], orc["cell"][1], orc["acc_pts"], orc["n_eval"],
                    t1.get("oracle_gap_fraction", 1.0))]
         if t1.get("families"):
-            out += ["", "Deviation families opened at some budget: %s."
-                    % (", ".join(fams) if fams else "none")]
+            rule = t1.get("gate_family_rule")
+            out += ["", "Deviation families opened at some budget: %s. Of the families that CLEAR "
+                    "the bar the one that RUNS is set by `policy.GATE_FAMILY_RULE` = `%s`: %s. The "
+                    "folds, the bar, the reference and the pricing are the same test under either "
+                    "rule; only which cleared family is taken differs."
+                    % ((", ".join(fams) if fams else "none"), rule,
+                       ("the smallest family that clears, tested F0 upwards"
+                        if rule == "first" else
+                        "the cleared family with the largest mean verified margin over the folds, "
+                        "ties to the smaller family"))]
     dcell = t1["rows"].get("default_cell")
     if dcell:
         avg = ", ".join("%.2fx %s" % (f, "yes" if ok else "no")

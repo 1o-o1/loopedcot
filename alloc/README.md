@@ -48,6 +48,19 @@ The price of a cell for question `i`, in layer-token passes:
 
     cost(k, T, i) = (L_fixed + k * L) * (P_i + T + R_i)
     prompt-free   = (L_fixed + k * L) * (T + R_i)
+    prefix-cached = (L_fixed + k * L) * (P_i - S_i + T + R_i)
+
+`--pricing` picks which of the three a run is charged at; `--promptfree` is the old name of
+`--pricing prompt_free`. `S_i` is the longest common TOKEN prefix among the questions that carry
+question `i`'s few-shot exemplar block, measured by rebuilding the prompts with the package's own
+builder and tokenising them with the checkpoint's own pinned tokenizer (`alloc/prefix.py`, and the
+run's own meta files for the prompt settings it used). A cache is keyed on the text it holds, not on
+the task slot, so a task whose questions all share one block gets one value and a pooled task (BBH's
+ten subtasks, MMLU's four subjects) gets one per subtask. The grid is copied with `P_i` and the
+realised layer passes reduced, so the default cost re-anchors too and every budget
+`X = f * default_cost` is consistent with the accounting it was set under. The one-off cost of
+FILLING the cache -- one entry per block and depth, since a block's state at depth 1 is not its
+state at depth 4 -- is not inside these prices.
 
 `L` is the layers inside one loop pass, `L_fixed` the layers paid once per token whatever `k` is,
 `P_i` the prompt length. The layer counts differ by family and nothing guesses them: a fully
@@ -120,10 +133,18 @@ numbers per depth:
     l_k        accuracy of the not-yet-arrived cells at k         -- labels
     A_hat(k,T) = G_k(T) * c_k + (1 - G_k(T)) * l_k
 
-A question has **arrived** at cap `T` at depth `k` when the forced read-out at every cap from `T` up
-to the largest loaded cap equals the read-out at that largest cap. No gold label and no
-answer-string search, so `G` costs no labels; a read-out that does not parse never equals anything
+A question has **arrived** at cap `T` at depth `k` when its settle answer at every cap from `T` up
+to the largest loaded cap equals the one at that largest cap. No gold label and no
+answer-string search, so `G` costs no labels; an answer that does not parse never equals anything
 and so never arrives. (Prefix Consistency, Lanham arXiv 2307.13702 — the one external source here.)
+
+The settle answer is set by `cells.SETTLE_ANSWER`. `"scored"`, the rule of record, is the answer the
+label of record scores at that cell: the chain's own answer when it wrote one inside the cut, else
+the forced read-out. Once that answer stops changing the label stops changing, so the
+settle-resolved identity is exact on a fully labelled grid. `"forced"` is the earlier rule, the
+forced read-out alone; under it the label can change after the settle cap when the chain's own
+answer differs from the forced read-out. `Cells.pred_forced` keeps the forced read-out under either
+rule.
 
 `c_k` and `l_k` are the only labelled inputs and come from the first `n_labels` calibration
 questions in id order, so labels can be traded against accuracy. `l_k` falls back to `c_k` at a
@@ -354,8 +375,9 @@ the extra ids off the front of the evaluation split, which shrinks by exactly as
 (`cells.promote_calibration`, `--n-cal` to override); the gate's cut is then 70/30 OF that size
 rather than a fixed 70 and 30, which at the frozen 100 is the frozen 70 and 30 and nothing about
 these grids moves. **The structured deviation families** replace the free set as what the gate is
-allowed to deviate to, tested in order, smallest first, the first whose verification margin clears
-the bar winning: `F0` the deepest depth at cap 0, `F1` the deepest depth at any cap, `F2` one depth
+allowed to deviate to, each tested on its own against the fallback on the verification questions
+(which of the ones that clear the bar RUNS is `GATE_FAMILY_RULE`, v8 below): `F0` the deepest depth
+at cap 0, `F1` the deepest depth at any cap, `F2` one depth
 shallower at any cap, `F3` the free set, which is v4 exactly and is the last resort, so a family
 can only add a deviation the structured test earned and never take one away. Fewer cells in the
 running means less of a winner's curse for the bar to cover, and both gated arms record which
@@ -378,6 +400,24 @@ and the oracle gap rises 2.03 to 2.08, and the condition was that the gain rise.
 even: on the ten production grids they win at every size and cut the gap (2.11 to 2.06, 2.32 to
 1.94, 2.55 to 1.95); on the ten S33 spike grids they lose, +1.26 to +1.11, and those rows are the
 larger numbers. The families are on by default; `--no-families` turns them off.
+
+**v8: which cleared family runs (`policy.GATE_FAMILY_RULE`).** The family ORDER decided more than
+which shapes were tested: walking F0 upwards and stopping at the first family whose verified margin
+clears the bar means a one-cell family clearing by a hair is run in place of the free set clearing by
+forty points, and the arm's accuracy is then not monotone in the budget. Over the 49 production pairs
+36 fall somewhere as the budget RISES -- McLeish/GSM8K from 49.4 to 5.4 near 0.25x where F0 clears
+first, Ouro-2.6B Think/GSM8K stopping at F2 for 74.0 at 0.5x where F3 gives 89.7 -- and the gated arm
+sits more than a point under the best single calibration cell on 19 of the 49 at some fraction.
+`GATE_FAMILY_RULE = "best"` is the default: every family is measured, and among those that clear
+the bar on EVERY fold the one with the largest MEAN verified margin over the folds is run, ties to
+the smaller family, and with none clearing the arm reverts exactly as before. `"first"` restores the
+order. Nothing else about the test moves -- the same folds, the same bar, the same
+`normal_at_budget` reference, the same pricing, and each family's bar still carries its own family's
+winner's curse, so a large family has to clear a wider bar to be in the running at all; what changes
+is only that the order no longer vetoes families it never tested. Each gated average-budget row
+records `gate_family_rule`, `gate_family_cleared` and `gate_family_mean_margin_pts` per budget, the
+table and `results.json` carry the rule, and `tests/alloc/test_gate_family_rule.py` separates the two
+rules on one grid where F0 clears by 20 points and F3 by 49.
 
 ## Gain, contrast, Table 1
 
@@ -414,6 +454,7 @@ row with a bootstrap interval over questions.
                         [--reference NAME] [--c-gate 0.5] [--n-labels 30] \
                         [--gate-mode split|whole] [--one-se] [--n-select 70] [--n-verify 30] \
                         [--gate-folds 1|2] [--n-cal 150] [--no-families] \
+                        [--pricing prompt_free|prompt_inclusive|prefix_cached] \
                         [--accounting cap|realised|expected|all] [--avg-budget] \
                         [--ks 1,2,4,8] [--caps 0,64,512,4096] \
                         [--cache-dir DIR | --no-cache] --out OUTDIR
@@ -453,6 +494,7 @@ accounting, the first of the list, so `all` tabulates three and prices the rest 
 | `alloc/mechanism.py` | arrival, `G`, `c`, `l`, `A_hat`, the reconstruction error and noise floor; settle time, its distribution, the sparse-cap bins, `P_k(s=j)`, `c_k(j)`, `l_k(T)` and `A_res` |
 | `alloc/policy.py` | the three prices, the 16 budgets, `B*`/`B_low`, all three rankings, affordability, normal operation, both gates (`MeasuredGate`, the default, and its folds; `Gate`, the predicted one `whole` keeps), the one-standard-error rule, the paired margin SD, the average-budget multiplier, the 70/30 proportion and the four deviation families |
 | `alloc/evaluate.py` | gain over normal, contrasts, non-inferiority, default cost, Table 1, the calibration split, the gate sweep, the family tests, the oracle gap, each arm against its own fallback |
+| `alloc/prefix.py` | the prefix-cached pricing: the run's own prompt settings, the checkpoint's pinned tokenizer, the shared token prefix per exemplar block, and the grid copy priced on what is left of each prompt |
 | `tests/` | a planted first-answer-is-best grid the pooled identity must misrank and the resolved one must lead with cap 0, the resolved identity reproducing its own calibration surface exactly, the sparse-cap fallbacks, the four resolved arms in Table 1 and in its picks, the card's four RMSEs, the two-fold gate withholding a deviation one fold keeps, and a reproduction of compute.py's resolved evaluation RMSE on a production grid to 0.05; a planted optimum, both file-name and row shapes, a 6x10 grid out to cap 4096, the gate, the pairing assertion, the three accountings and the default cell at 1.0x, a planted tie the average budget must spend elsewhere, a planted winner's curse the split gate must close, a planted cap-0 optimum it must keep and a planted wrong-signed surface where the predicted margin opens the gate and the measured one reverts, a reproduction test against frozen real numbers, and the v5 file: the size rule, the promotion, the proportional split, the four families on a true cap-0 plant and on a losing one, the oracle gap, the fallback interval, the frozen defaults |
 
 Rerunning the real grids reproduces 26 frozen numbers to **0.05 points** (tolerance 0.1): headline

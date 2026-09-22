@@ -48,6 +48,19 @@ TASK_KIND = {
 BBH_TASKS = ("date_understanding", "logical_deduction_five_objects",
              "tracking_shuffled_objects_three_objects")
 
+# Which answer the settle event is read off (mechanism.commitment reads `Cells.pred`).
+#   "scored"  the answer the label of record scores at that cell: the chain's own answer when it
+#             wrote one inside the cut, else the forced read-out. Once this answer stops changing
+#             the label stops changing, so "the label is constant after the settle cap" holds by
+#             construction and the settle-resolved identity is exact on a fully labelled grid.
+#   "forced"  the forced read-out alone. The label of record can then still move after the settle
+#             cap wherever the chain's own answer differs from the forced read-out: over the 49
+#             measured pairs that is 0.4 percent of settled cells, and an identity error above one
+#             point on 9 of them.
+# `Cells.pred_forced` always keeps the forced read-out, whatever this says.
+SETTLE_ANSWER = "scored"
+SETTLE_ANSWERS = ("scored", "forced")
+
 EOS_STR = "<|endoftext|>"
 RE_PAREN = re.compile(r"\(([A-F])\)")
 RE_BARE = re.compile(r"^[^A-Za-z0-9]*([A-F])\b")
@@ -382,7 +395,12 @@ class Cells(object):
         self._ki, self._bi, self._ni = ki, bi, ni
         shape = (len(self.ks), len(self.caps), len(self.idx))
         self.acc = np.full(shape, np.nan)
-        self.pred = np.empty(shape, dtype=object)
+        if SETTLE_ANSWER not in SETTLE_ANSWERS:
+            raise ValueError("SETTLE_ANSWER must be one of %s, got %r"
+                             % (", ".join(SETTLE_ANSWERS), SETTLE_ANSWER))
+        self.settle_answer = SETTLE_ANSWER
+        self.pred = np.empty(shape, dtype=object)          # the answer the settle event reads
+        self.pred_forced = np.empty(shape, dtype=object)   # the forced read-out, always
         self.own = np.full(shape, np.nan)
         self.nstop = np.full(shape, np.nan)
         self.ncut = np.full(shape, np.nan)
@@ -408,8 +426,12 @@ class Cells(object):
             pred = r.get("pred")
             if task in BBH_TASKS and pred is None:
                 pred = bbh_parse(r.get("answer_text"))
-            self.pred[a, c, n] = norm_answer(pred)
-            self.own[a, c, n] = float(r.get("trace_answer") not in (None, "None", ""))
+            own_answer = r.get("trace_answer")
+            has_own = own_answer not in (None, "None", "")
+            self.pred_forced[a, c, n] = norm_answer(pred)
+            self.pred[a, c, n] = (norm_answer(own_answer) if has_own and SETTLE_ANSWER == "scored"
+                                  else self.pred_forced[a, c, n])
+            self.own[a, c, n] = float(has_own)
             self.nstop[a, c, n] = _f(r.get("natural_stop"))
             self.ncut[a, c, n] = _f(r.get("n_cut"))
             self.answer_tokens_realised[a, c, n] = _f(r.get("n_answer_tokens"))

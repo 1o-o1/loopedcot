@@ -21,6 +21,7 @@ Three changes are tested here.
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -37,15 +38,21 @@ ONE = E.BUDGET_FRACTIONS.index(1.0)
 _T1 = {}
 
 
-def t1(which, families, c_gate=P.DEFAULT_C_GATE, n_select=50, n_verify=50, folds=None):
-    """`folds` None is the frozen default, two; 1 is the one-direction gate kept for comparison."""
-    key = (which, families, c_gate, n_select, n_verify, folds)
+def t1(which, families, c_gate=P.DEFAULT_C_GATE, n_select=50, n_verify=50, folds=None, rule=None):
+    """`folds` None is the frozen default, two; 1 is the one-direction gate kept for comparison.
+
+    `rule` None takes policy.GATE_FAMILY_RULE, the default of record; the two tests below that read
+    the family ORDER itself pass "first", which is the order this file was written against.
+    """
+    rule = rule or P.GATE_FAMILY_RULE
+    key = (which, families, c_gate, n_select, n_verify, folds, rule)
     if key not in _T1:
         surf = null_surface() if which == "null" else true_surface()
-        _T1[key] = E.table1(planted(surf), accounting="expected", avg_budget=True,
-                            n_labels_grid=(30,), gate_draws=10, n_boot=50, c_gate=c_gate,
-                            gate_mode="split", n_select=n_select, n_verify=n_verify,
-                            families=families, gate_folds=folds)
+        with mock.patch.object(P, "GATE_FAMILY_RULE", rule):
+            _T1[key] = E.table1(planted(surf), accounting="expected", avg_budget=True,
+                                n_labels_grid=(30,), gate_draws=10, n_boot=50, c_gate=c_gate,
+                                gate_mode="split", n_select=n_select, n_verify=n_verify,
+                                families=families, gate_folds=folds)
     return _T1[key]
 
 
@@ -221,9 +228,14 @@ class TestTheFamiliesKeepATrueCapZeroOptimum(unittest.TestCase):
     """The plant where cap 0 really is 15 points better than the default cell."""
 
     def test_F0_opens_on_the_true_surface_in_one_direction(self):
-        """One fold: F0 clears the bar on the verification half at +12.0 +/- 8.7."""
+        """One fold: F0 clears the bar on the verification half at +12.0 +/- 8.7.
+
+        Read under the family ORDER (`rule="first"`), which is what this assertion is about. Under
+        GATE_FAMILY_RULE "best" F2 clears by more on this plant and runs instead, which is
+        test_gate_family_rule.py's subject.
+        """
         for arm in (P.AVG_GATED, "gated_equation"):
-            row = t1("true", True, folds=1)["rows"][arm]
+            row = t1("true", True, folds=1, rule="first")["rows"][arm]
             self.assertEqual(row["deviation_family"][ONE], "F0", arm)
 
     def test_two_folds_take_the_cap_zero_family_that_BOTH_halves_earn(self):
@@ -244,8 +256,9 @@ class TestTheFamiliesKeepATrueCapZeroOptimum(unittest.TestCase):
         row = t1("true", True)["rows"][P.AVG_GATED]
         self.assertEqual(list(row["cells_used"][ONE]), ["k%d_T0" % KS[-2]])
         self.assertFalse(row["gate_reverted"][ONE])
-        # one fold buys the deepest depth's own cap-0 cell instead
-        self.assertEqual(list(t1("true", True, folds=1)["rows"][P.AVG_GATED]["cells_used"][ONE]),
+        # one fold, under the family ORDER, buys the deepest depth's own cap-0 cell instead
+        self.assertEqual(list(t1("true", True, folds=1,
+                                 rule="first")["rows"][P.AVG_GATED]["cells_used"][ONE]),
                          ["k%d_T0" % KS[-1]])
 
     def test_the_true_deviation_is_worth_what_it_was_planted_at(self):

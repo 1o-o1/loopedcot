@@ -16,6 +16,7 @@
 # flags: they come from train/config.yaml (eval_horizon, eval_standard_caps). Depths follow the
 # recipe: MATH500 at k=4 and k=2, AQuA at k=4 and k=1, the rest at k=4. Rows resume per (question,
 # budget, cap), so a re-submission after a time limit continues.
+# DEPTHS="1 2 3 4" overrides the per-task depth list (the same list for every task).
 #
 # EVAL_ROWS (default `production`) chooses the rows. `production` evaluates every row of
 # prod/tasks/data/rows_<task>.jsonl at full N -- gsm8k 1319, math500 500, csqa 1221, aqua 254 --
@@ -72,11 +73,15 @@ SEEDARG=""
 SEEDTAG=""
 if [ "$SEED" != "$DEFAULT_SEED" ]; then SEEDARG="--seed=$SEED"; SEEDTAG="_seed$SEED"; fi
 NAME="s36_${VARIANT}${SEEDTAG}"               # the adapter train.py wrote, and the cells file name
-case "$TASK" in
-  math500) KS="4 2" ;;
-  aqua)    KS="4 1" ;;
-  *)       KS="4" ;;
-esac
+if [ -n "${DEPTHS:-}" ]; then
+  KS="$DEPTHS"                              # one list for every task, e.g. DEPTHS="1 2 3 4"
+else
+  case "$TASK" in                           # default: the depths the S36 grids were run at
+    math500) KS="4 2" ;;
+    aqua)    KS="4 1" ;;
+    *)       KS="4" ;;
+  esac
+fi
 echo "[s36 grids] task $I: variant=$VARIANT name=$NAME grid_task=$TASK depths=$KS rows=$EVAL_ROWS seed=$SEED root=$R"
 
 RC=0
