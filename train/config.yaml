@@ -88,6 +88,22 @@ variants:
     budget_line: true
     fallback: true
     draw: uniform                   # uniform T over the source's grid, fixed depth_probabilities
+  uniform_longest_theorydepth:      # ABLATION: uniform T, the SAME depth mix as budget_longest,
+    rule: longest_fitting           # so the contrast against budget_longest is the budget draw only
+    budget_line: true
+    fallback: true
+    draw: uniform
+    depth: theory
+  budget_longest_configdepth:       # ABLATION: theory T, the flat depth mix, so the contrast
+    rule: longest_fitting           # against uniform_longest is the budget draw only
+    budget_line: true
+    fallback: true
+    draw: theory
+    depth: config
+# The two pairs above are the one-factor contrasts. budget_longest vs uniform_longest changes both
+# draws: measured on the landed manifests, the depth-4 block share is 0.2016 against 0.3970 and the
+# optimiser-step count 925 against 669, while the supervised-token budget is the same 1.2M. A
+# difference between those two arms cannot be attributed to the budget weights.
   plain_sft:                        # BASELINE, not scheduled: the objective removed entirely
     rule: longest_fitting
     budget_line: false              # no control line, train or eval
