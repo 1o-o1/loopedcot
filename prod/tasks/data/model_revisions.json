@@ -17,10 +17,10 @@
         "dtype_bytes": 2
       },
       "refs_main_written": true,
-      "local_dir": "C:\\Users\\sas11\\.cache\\huggingface\\hub\\models--ByteDance--Ouro-1.4B\\snapshots\\574fa66cb8bf5abdc979642d01cf2b79b16bfab1",
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-1.4B/snapshots/574fa66cb8bf5abdc979642d01cf2b79b16bfab1",
       "bytes": 2875038874,
       "n_files": 13,
-      "download_seconds": 0.1,
+      "download_seconds": 22.2,
       "verified": true
     },
     "ouro_1_4b_think": {
@@ -39,7 +39,12 @@
         "entries": "ouro",
         "dtype_bytes": 2
       },
-      "verified": false
+      "refs_main_written": true,
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-1.4B-Thinking/snapshots/3aaa2224253a92ca45cf2e3d427c360e1ef9c93d",
+      "bytes": 2875359612,
+      "n_files": 13,
+      "download_seconds": 22.8,
+      "verified": true
     },
     "ouro_2_6b_base": {
       "repo": "ByteDance/Ouro-2.6B",
@@ -57,7 +62,12 @@
         "entries": "ouro",
         "dtype_bytes": 2
       },
-      "verified": false
+      "refs_main_written": true,
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-2.6B/snapshots/1ed04250da1a9936042725d302e81c8fa2ab5abd",
+      "bytes": 5341718984,
+      "n_files": 13,
+      "download_seconds": 40.8,
+      "verified": true
     },
     "ouro_2_6b_think": {
       "repo": "ByteDance/Ouro-2.6B-Thinking",
@@ -75,7 +85,12 @@
         "entries": "ouro",
         "dtype_bytes": 2
       },
-      "verified": false
+      "refs_main_written": true,
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--ByteDance--Ouro-2.6B-Thinking/snapshots/f1edd81e7ac41355db670500ceaf204e0f73af68",
+      "bytes": 5342034960,
+      "n_files": 13,
+      "download_seconds": 41.2,
+      "verified": true
     },
     "huginn_0125": {
       "repo": "tomg-group-umd/huginn-0125",
@@ -95,7 +110,12 @@
         "entries": "raven",
         "dtype_bytes": 2
       },
-      "verified": false
+      "refs_main_written": true,
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--tomg-group-umd--huginn-0125/snapshots/bb6621b65e90b6a4b9b29ef88dc83866d450470c",
+      "bytes": 15651519639,
+      "n_files": 16,
+      "download_seconds": 128.2,
+      "verified": true
     },
     "mcleish_llama32_r32": {
       "repo": "smcleish/Recurrent-Llama-3.2-train-recurrence-32",
@@ -115,19 +135,18 @@
         "entries": "raven",
         "dtype_bytes": 2
       },
-      "verified": false
+      "refs_main_written": true,
+      "local_dir": "/home/mzaoad/loopedcot/hf/hub/models--smcleish--Recurrent-Llama-3.2-train-recurrence-32/snapshots/a5f6f126e9d9302445346844f1d7d29d111a06eb",
+      "bytes": 5558274592,
+      "n_files": 12,
+      "download_seconds": 46.7,
+      "verified": true
     }
   },
-  "resolved_at": "2026-09-12T21:53:57",
+  "resolved_at": "2026-09-13T00:50:54",
   "transformers_pin": "4.56.2",
   "source": "huggingface hub, public, no token",
   "offline_after_install": true,
-  "verify_ok": false,
-  "verify_notes": {
-    "ouro_1_4b_think": " local snapshot missing",
-    "ouro_2_6b_base": " local snapshot missing",
-    "ouro_2_6b_think": " local snapshot missing",
-    "huginn_0125": " local snapshot missing",
-    "mcleish_llama32_r32": " local snapshot missing"
-  }
+  "verify_ok": true,
+  "verify_notes": {}
 }

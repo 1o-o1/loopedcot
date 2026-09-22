@@ -6,10 +6,10 @@
 # incomplete prints SKIP in this job's log; its own output is in logs/alloc_<task>_<model>.log.
 #SBATCH --job-name=loopedcot_alloc
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=128gb
+#SBATCH --cpus-per-task=256
+#SBATCH --mem=512gb
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/alloc_%j.out
+#SBATCH --output=logs/l_alloc_%j.out
 # add --partition=... / --account=... as your cluster requires
 set -u
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")/..}"
