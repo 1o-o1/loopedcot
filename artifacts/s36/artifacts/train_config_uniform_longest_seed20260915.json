@@ -1,0 +1,193 @@
+{
+  "name": "s36_uniform_longest_seed20260915",
+  "variant": "uniform_longest",
+  "variant_config": {
+    "rule": "longest_fitting",
+    "budget_line": true,
+    "fallback": true,
+    "draw": "uniform"
+  },
+  "seed": 20260914,
+  "blocks_by_len": {
+    "1024": 19523,
+    "1536": 1757,
+    "2048": 7,
+    "3072": 3
+  },
+  "one_visit_per_block": true,
+  "packing": "one visit per block, right-padded, pad mask 0, causal forward, no attention mask",
+  "tokens_in_blocks": 15613270,
+  "padding_share": 0.31261,
+  "supervised_token_budget": 1200000,
+  "supervised_tokens_drawn": 1200071,
+  "supervised_tokens_scheduled": 1182559,
+  "blocks_dropped_as_remainder": 74,
+  "supervised_tokens_planned": 1182559,
+  "supervised_density": 0.05283431399758808,
+  "visits_by_T": {
+    "256": 2313,
+    "64": 2284,
+    "1024": 2320,
+    "none": 2385,
+    "16": 2234,
+    "32": 2284,
+    "0": 2392,
+    "128": 2327,
+    "512": 2424,
+    "2048": 327
+  },
+  "visits_by_kind": {
+    "CHAIN": 14843,
+    "FALLBACK": 3617,
+    "DIRECT": 2392,
+    "CHAIN_PLUS": 438
+  },
+  "fallback_share_overall": 0.16989196806012213,
+  "supervised_share_by_source": {
+    "csqa": 0.13596112230026391,
+    "gsm8k": 0.28193081909320367,
+    "math": 0.3333294446745234,
+    "aqua": 0.24877861393200904
+  },
+  "supervised_share_by_format": {
+    "letter_paren": 0.3847397362322729,
+    "numeric_hash": 0.28193081909320367,
+    "math_boxed": 0.3333294446745234
+  },
+  "micro_by_block_len": {
+    "1024": 4,
+    "1536": 2,
+    "2048": 2,
+    "3072": 1
+  },
+  "accum_by_block_len": {
+    "1024": 8,
+    "1536": 16,
+    "2048": 16,
+    "3072": 32
+  },
+  "effective_batch_blocks": 32,
+  "padding_share_by_block_len": {
+    "1024": 0.3233,
+    "1536": 0.23442,
+    "2048": 0.23458,
+    "3072": 0.13303
+  },
+  "chains_horizon_by_source": {
+    "gsm8k": 1024,
+    "math": 2048,
+    "csqa": 1024,
+    "aqua": 1024
+  },
+  "n_micro_batches": 5736,
+  "n_opt_steps": 663,
+  "warmup_steps": 20,
+  "lr": 0.0002,
+  "weight_decay": 0.0,
+  "betas": [
+    0.9,
+    0.95
+  ],
+  "grad_clip": 1.0,
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.0,
+    "targets": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "n_trainable_params": 15138816,
+  "loss": "ce_sum_over_window_supervised",
+  "loss_detail": "CE SUM from lm_head(hidden_states_list[d-1]) on the masked target tokens, divided by the accumulation window's own supervised-token total; padding is mask 0 and never enters the sum",
+  "lr_schedule": "cosine",
+  "blocks_sha256": "2314de94ba602940f7c956d33376549cdfc94360ca88ab74e2b17f1f3074f6ff",
+  "data_dir": "/home/mzaoad/loopedcot/artifacts/s36/data/uniform_longest_seed20260915",
+  "gradient_checkpointing": false,
+  "depth_probabilities": {
+    "1": 0.1,
+    "2": 0.3,
+    "3": 0.2,
+    "4": 0.4
+  },
+  "budget_grid_by_source": {
+    "gsm8k": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "math": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "2048",
+      "none"
+    ],
+    "csqa": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ],
+    "aqua": [
+      "0",
+      "16",
+      "32",
+      "64",
+      "128",
+      "256",
+      "512",
+      "1024",
+      "none"
+    ]
+  },
+  "block_lens": [
+    1024,
+    1536,
+    2048,
+    2560,
+    3072
+  ],
+  "control_line": "\nBudget: %d tokens. | \nBudget: no limit.  (never supervised)",
+  "gpu_wait": {
+    "waited_s": 0
+  },
+  "errors": {},
+  "supervised_tokens": 1182559,
+  "padded_tokens": 22609920,
+  "content_tokens": 15534590,
+  "layer_passes_forward": 1082943888,
+  "layer_passes_fwd_bwd": 3248831664,
+  "opt_steps_done": 663,
+  "mean_loss_first_10": 0.3339533204960111,
+  "mean_loss_last_10": 0.07771702304120882,
+  "seconds": 4789.5,
+  "train_seconds": 4783.1,
+  "seconds_per_opt_step": 7.214,
+  "content_tokens_per_s": 3247.8,
+  "padded_tokens_per_s": 4727.0,
+  "peak_gb": 48.26,
+  "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_uniform_longest_seed20260915"
+}

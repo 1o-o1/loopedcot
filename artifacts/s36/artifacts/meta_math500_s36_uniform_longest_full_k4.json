@@ -1,0 +1,252 @@
+{
+  "name": "s36_uniform_longest_full",
+  "checkpoint": "s36_uniform_longest",
+  "variant": "uniform_longest",
+  "task": "math500",
+  "k": 4,
+  "eval_rows": "production",
+  "n_problems": 500,
+  "n_eval": 400,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": true,
+  "exemplar_sha256": {
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 32,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_uniform_longest",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_uniform_longest"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [
+    "OOM read none b=20: CUDA out of memory. Tried to allocate 398.00 MiB. GPU 0 has a total capacity of 95.15 GiB of which 13.83 GiB is free. Including non-PyTorch memory, this process has 81.31 GiB memory in use. 80.88 GiB allowed; Of the allocated memory 80.66 GiB is allocated by PyTorch, and 88.48 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "\nBudget: 0 tokens.",
+      "budget_line_tokens": 8,
+      "prompt_tokens_mean": 994.13,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "\nBudget: 32 tokens.",
+      "budget_line_tokens": 9,
+      "prompt_tokens_mean": 995.13,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 30.798,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.878
+    },
+    "128": {
+      "budget_line": "\nBudget: 128 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 996.13,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 107.99,
+      "natural_stop_median": 128,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.654
+    },
+    "512": {
+      "budget_line": "\nBudget: 512 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 996.13,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 367.47,
+      "natural_stop_median": 420,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.4
+    },
+    "2048": {
+      "budget_line": "\nBudget: 2048 tokens.",
+      "budget_line_tokens": 11,
+      "prompt_tokens_mean": 997.13,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 574.32,
+      "natural_stop_median": 423,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.058
+    },
+    "none": {
+      "budget_line": "\nBudget: no limit.",
+      "budget_line_tokens": 7,
+      "prompt_tokens_mean": 993.13,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 676.286,
+      "natural_stop_median": 420,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.056
+    }
+  },
+  "cells_written": 7500,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_math500_s36_uniform_longest_full_k4.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_math500_s36_uniform_longest_full_k4.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 400,
+        "acc": 0.2075,
+        "acc_own": 0.0,
+        "acc_v2": 0.2075
+      }
+    },
+    "32": {
+      "32": {
+        "n": 400,
+        "acc": 0.29,
+        "acc_own": 0.0675,
+        "acc_v2": 0.28
+      }
+    },
+    "128": {
+      "128": {
+        "n": 400,
+        "acc": 0.3875,
+        "acc_own": 0.21,
+        "acc_v2": 0.385
+      }
+    },
+    "512": {
+      "512": {
+        "n": 400,
+        "acc": 0.5975,
+        "acc_own": 0.475,
+        "acc_v2": 0.6
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 400,
+        "acc": 0.68,
+        "acc_own": 0.665,
+        "acc_v2": 0.68
+      }
+    },
+    "none": {
+      "0": {
+        "n": 400,
+        "acc": 0.205,
+        "acc_own": 0.0,
+        "acc_v2": 0.205
+      },
+      "16": {
+        "n": 400,
+        "acc": 0.2175,
+        "acc_own": 0.0,
+        "acc_v2": 0.2175
+      },
+      "32": {
+        "n": 400,
+        "acc": 0.2375,
+        "acc_own": 0.0025,
+        "acc_v2": 0.235
+      },
+      "64": {
+        "n": 400,
+        "acc": 0.3,
+        "acc_own": 0.025,
+        "acc_v2": 0.2975
+      },
+      "128": {
+        "n": 400,
+        "acc": 0.33,
+        "acc_own": 0.09,
+        "acc_v2": 0.325
+      },
+      "256": {
+        "n": 400,
+        "acc": 0.44,
+        "acc_own": 0.215,
+        "acc_v2": 0.4375
+      },
+      "512": {
+        "n": 400,
+        "acc": 0.5725,
+        "acc_own": 0.4825,
+        "acc_v2": 0.575
+      },
+      "1024": {
+        "n": 400,
+        "acc": 0.6575,
+        "acc_own": 0.645,
+        "acc_v2": 0.66
+      },
+      "2048": {
+        "n": 400,
+        "acc": 0.665,
+        "acc_own": 0.66,
+        "acc_v2": 0.6675
+      },
+      "4096": {
+        "n": 400,
+        "acc": 0.665,
+        "acc_own": 0.66,
+        "acc_v2": 0.6675
+      }
+    }
+  },
+  "seconds": 5913.5,
+  "peak_gb": 80.66
+}

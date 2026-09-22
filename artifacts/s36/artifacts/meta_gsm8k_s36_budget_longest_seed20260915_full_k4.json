@@ -1,0 +1,252 @@
+{
+  "name": "s36_budget_longest_seed20260915_full",
+  "checkpoint": "s36_budget_longest_seed20260915",
+  "variant": "budget_longest",
+  "task": "gsm8k",
+  "k": 4,
+  "eval_rows": "production",
+  "n_problems": 1319,
+  "n_eval": 1219,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": true,
+  "exemplar_sha256": {
+    "gsm8k": "931391a38fe2cfccb48a624ece3d9949e8034d5d3e75aacc2a361b06b67b8001"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 12,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_budget_longest_seed20260915",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_budget_longest_seed20260915"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [
+    "OOM read none b=21: CUDA out of memory. Tried to allocate 1.05 GiB. GPU 0 has a total capacity of 95.15 GiB of which 14.45 GiB is free. Including non-PyTorch memory, this process has 80.69 GiB memory in use. 80.88 GiB allowed; Of the allocated memory 80.03 GiB is allocated by PyTorch, and 93.44 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "\nBudget: 0 tokens.",
+      "budget_line_tokens": 8,
+      "prompt_tokens_mean": 648.6861258529188,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "\nBudget: 32 tokens.",
+      "budget_line_tokens": 9,
+      "prompt_tokens_mean": 649.6861258529188,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 27.801364670204702,
+      "natural_stop_median": 31,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.49507202426080366
+    },
+    "128": {
+      "budget_line": "\nBudget: 128 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 650.6861258529188,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 101.11144806671722,
+      "natural_stop_median": 107,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.332827899924185
+    },
+    "512": {
+      "budget_line": "\nBudget: 512 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 650.6861258529188,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 120.64821834723276,
+      "natural_stop_median": 110,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.0037907505686125853
+    },
+    "2048": {
+      "budget_line": "\nBudget: 2048 tokens.",
+      "budget_line_tokens": 11,
+      "prompt_tokens_mean": 651.6861258529188,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 125.52994692949204,
+      "natural_stop_median": 110,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.0037907505686125853
+    },
+    "none": {
+      "budget_line": "\nBudget: no limit.",
+      "budget_line_tokens": 7,
+      "prompt_tokens_mean": 647.6861258529188,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 144.78695981804398,
+      "natural_stop_median": 109,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.006823351023502654
+    }
+  },
+  "cells_written": 19785,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_gsm8k_s36_budget_longest_seed20260915_full_k4.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_gsm8k_s36_budget_longest_seed20260915_full_k4.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 1219,
+        "acc": 0.1878589007383101,
+        "acc_own": 0.0,
+        "acc_v2": 0.1878589007383101
+      }
+    },
+    "32": {
+      "32": {
+        "n": 1219,
+        "acc": 0.5734208367514356,
+        "acc_own": 0.3699753896636587,
+        "acc_v2": 0.5512715340442986
+      }
+    },
+    "128": {
+      "128": {
+        "n": 1219,
+        "acc": 0.7227235438884332,
+        "acc_own": 0.5578342904019689,
+        "acc_v2": 0.7178014766201805
+      }
+    },
+    "512": {
+      "512": {
+        "n": 1219,
+        "acc": 0.7850697292863003,
+        "acc_own": 0.7858900738310091,
+        "acc_v2": 0.7858900738310091
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 1219,
+        "acc": 0.7883511074651354,
+        "acc_own": 0.7891714520098442,
+        "acc_v2": 0.7891714520098442
+      }
+    },
+    "none": {
+      "0": {
+        "n": 1219,
+        "acc": 0.18867924528301888,
+        "acc_own": 0.0,
+        "acc_v2": 0.18867924528301888
+      },
+      "16": {
+        "n": 1219,
+        "acc": 0.21821164889253486,
+        "acc_own": 0.0,
+        "acc_v2": 0.21821164889253486
+      },
+      "32": {
+        "n": 1219,
+        "acc": 0.3010664479081214,
+        "acc_own": 0.0,
+        "acc_v2": 0.3010664479081214
+      },
+      "64": {
+        "n": 1219,
+        "acc": 0.49548810500410173,
+        "acc_own": 0.08285479901558655,
+        "acc_v2": 0.4889253486464315
+      },
+      "128": {
+        "n": 1219,
+        "acc": 0.7194421657095981,
+        "acc_own": 0.5356849876948319,
+        "acc_v2": 0.7145200984413453
+      },
+      "256": {
+        "n": 1219,
+        "acc": 0.77850697292863,
+        "acc_own": 0.7768662838392125,
+        "acc_v2": 0.7793273174733388
+      },
+      "512": {
+        "n": 1219,
+        "acc": 0.7817883511074651,
+        "acc_own": 0.782608695652174,
+        "acc_v2": 0.782608695652174
+      },
+      "1024": {
+        "n": 1219,
+        "acc": 0.7817883511074651,
+        "acc_own": 0.782608695652174,
+        "acc_v2": 0.782608695652174
+      },
+      "2048": {
+        "n": 1219,
+        "acc": 0.7817883511074651,
+        "acc_own": 0.782608695652174,
+        "acc_v2": 0.782608695652174
+      },
+      "4096": {
+        "n": 1219,
+        "acc": 0.7817883511074651,
+        "acc_own": 0.782608695652174,
+        "acc_v2": 0.782608695652174
+      }
+    }
+  },
+  "seconds": 5625.1,
+  "peak_gb": 80.696
+}

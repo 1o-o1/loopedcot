@@ -1,0 +1,250 @@
+{
+  "name": "s36_nobudget_full",
+  "checkpoint": "s36_nobudget",
+  "variant": "nobudget",
+  "task": "math500",
+  "k": 2,
+  "eval_rows": "production",
+  "n_problems": 500,
+  "n_eval": 400,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": false,
+  "exemplar_sha256": {
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 32,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_nobudget",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_nobudget"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 31.166,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.922
+    },
+    "128": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 95.132,
+      "natural_stop_median": 128,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.502
+    },
+    "512": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 212.39,
+      "natural_stop_median": 128,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.206
+    },
+    "2048": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 441.534,
+      "natural_stop_median": 128,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.138
+    },
+    "none": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 986.13,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 721.33,
+      "natural_stop_median": 128,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.134
+    }
+  },
+  "cells_written": 7500,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_math500_s36_nobudget_full_k2.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_math500_s36_nobudget_full_k2.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 400,
+        "acc": 0.1875,
+        "acc_own": 0.0,
+        "acc_v2": 0.1875
+      }
+    },
+    "32": {
+      "32": {
+        "n": 400,
+        "acc": 0.235,
+        "acc_own": 0.05,
+        "acc_v2": 0.23
+      }
+    },
+    "128": {
+      "128": {
+        "n": 400,
+        "acc": 0.365,
+        "acc_own": 0.28,
+        "acc_v2": 0.365
+      }
+    },
+    "512": {
+      "512": {
+        "n": 400,
+        "acc": 0.405,
+        "acc_own": 0.3875,
+        "acc_v2": 0.4075
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 400,
+        "acc": 0.415,
+        "acc_own": 0.4075,
+        "acc_v2": 0.4175
+      }
+    },
+    "none": {
+      "0": {
+        "n": 400,
+        "acc": 0.1875,
+        "acc_own": 0.0,
+        "acc_v2": 0.1875
+      },
+      "16": {
+        "n": 400,
+        "acc": 0.205,
+        "acc_own": 0.005,
+        "acc_v2": 0.2
+      },
+      "32": {
+        "n": 400,
+        "acc": 0.235,
+        "acc_own": 0.05,
+        "acc_v2": 0.23
+      },
+      "64": {
+        "n": 400,
+        "acc": 0.2925,
+        "acc_own": 0.15,
+        "acc_v2": 0.285
+      },
+      "128": {
+        "n": 400,
+        "acc": 0.3625,
+        "acc_own": 0.28,
+        "acc_v2": 0.3625
+      },
+      "256": {
+        "n": 400,
+        "acc": 0.395,
+        "acc_own": 0.3375,
+        "acc_v2": 0.395
+      },
+      "512": {
+        "n": 400,
+        "acc": 0.4025,
+        "acc_own": 0.3875,
+        "acc_v2": 0.405
+      },
+      "1024": {
+        "n": 400,
+        "acc": 0.415,
+        "acc_own": 0.405,
+        "acc_v2": 0.4175
+      },
+      "2048": {
+        "n": 400,
+        "acc": 0.4175,
+        "acc_own": 0.4075,
+        "acc_v2": 0.42
+      },
+      "4096": {
+        "n": 400,
+        "acc": 0.415,
+        "acc_own": 0.4075,
+        "acc_v2": 0.4175
+      }
+    }
+  },
+  "seconds": 2713.2,
+  "peak_gb": 71.776
+}

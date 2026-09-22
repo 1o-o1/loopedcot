@@ -1,0 +1,250 @@
+{
+  "name": "s36_nobudget_full",
+  "checkpoint": "s36_nobudget",
+  "variant": "nobudget",
+  "task": "csqa",
+  "k": 4,
+  "eval_rows": "production",
+  "n_problems": 1221,
+  "n_eval": 1121,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": false,
+  "exemplar_sha256": {
+    "csqa": "47fff635592d5b3bb1665fc540f49045f73d26b0d4646f81e9cd0085262e6159"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 8,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_nobudget",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_nobudget"
+  },
+  "suffix_text": "\nSo the answer is",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 30.884520884520885,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.7223587223587223
+    },
+    "128": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 33.55282555282555,
+      "natural_stop_median": 33,
+      "natural_stop_max": 59,
+      "hit_limit_share": 0.0
+    },
+    "512": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 33.55282555282555,
+      "natural_stop_median": 33,
+      "natural_stop_max": 59,
+      "hit_limit_share": 0.0
+    },
+    "2048": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 33.55282555282555,
+      "natural_stop_median": 33,
+      "natural_stop_max": 59,
+      "hit_limit_share": 0.0
+    },
+    "none": {
+      "budget_line": "",
+      "budget_line_tokens": 0,
+      "prompt_tokens_mean": 597.6437346437347,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 33.55282555282555,
+      "natural_stop_median": 33,
+      "natural_stop_max": 59,
+      "hit_limit_share": 0.0
+    }
+  },
+  "cells_written": 18315,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_csqa_s36_nobudget_full_k4.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_csqa_s36_nobudget_full_k4.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 1121,
+        "acc": 0.7707404103479036,
+        "acc_own": 0.0,
+        "acc_v2": 0.7707404103479036
+      }
+    },
+    "32": {
+      "32": {
+        "n": 1121,
+        "acc": 0.7582515611061552,
+        "acc_own": 0.3809099018733274,
+        "acc_v2": 0.7582515611061552
+      }
+    },
+    "128": {
+      "128": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      }
+    },
+    "512": {
+      "512": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      }
+    },
+    "none": {
+      "0": {
+        "n": 1121,
+        "acc": 0.7707404103479036,
+        "acc_own": 0.0,
+        "acc_v2": 0.7707404103479036
+      },
+      "16": {
+        "n": 1121,
+        "acc": 0.7787689562890276,
+        "acc_own": 0.020517395182872437,
+        "acc_v2": 0.7787689562890276
+      },
+      "32": {
+        "n": 1121,
+        "acc": 0.7582515611061552,
+        "acc_own": 0.3809099018733274,
+        "acc_v2": 0.7582515611061552
+      },
+      "64": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "128": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "256": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "512": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "1024": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "2048": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      },
+      "4096": {
+        "n": 1121,
+        "acc": 0.7564674397859055,
+        "acc_own": 0.7564674397859055,
+        "acc_v2": 0.7564674397859055
+      }
+    }
+  },
+  "seconds": 1995.1,
+  "peak_gb": 21.463
+}
