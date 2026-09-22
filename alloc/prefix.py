@@ -122,16 +122,19 @@ def prompt_token_ids(cells, tokenizer, chat_template=False, add_special_tokens=F
 
 
 def shared_prefix(cells, tokenizer, chat_template=False, add_special_tokens=False,
-                  think_tag_is_stop=True):
+                  think_tag_is_stop=True, encoded=None):
     """Return S per question: the shared prefix of the block that question's prompt carries.
 
     Questions sharing an exemplar block share a cache entry, so they share one value; a grid whose
     questions all carry one block gets one value repeated. The result is capped at each prompt's own
     length, which only binds if a block were longer than a prompt that carries it.
+
+    `encoded` is `prompt_token_ids`' own output where the caller already has it -- a caller that
+    also wants the rebuilt token counts then tokenises the grid once rather than twice.
     """
-    enc, keys = prompt_token_ids(cells, tokenizer, chat_template=chat_template,
-                                 add_special_tokens=add_special_tokens,
-                                 think_tag_is_stop=think_tag_is_stop)
+    enc, keys = encoded if encoded is not None else prompt_token_ids(
+        cells, tokenizer, chat_template=chat_template, add_special_tokens=add_special_tokens,
+        think_tag_is_stop=think_tag_is_stop)
     if len(enc) != len(cells.idx):
         raise ValueError("%s/%s: rebuilt %d prompts for %d questions"
                          % (cells.name, cells.task, len(enc), len(cells.idx)))

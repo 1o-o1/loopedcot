@@ -166,12 +166,11 @@ def apply_prefix_cache(cells, cells_dir, checkpoint, task, protocol):
     """
     tok, tinfo = PX.tokenizer_for(checkpoint)
     shape = PX.run_prompt_settings(cells_dir, checkpoint, task, protocol)
-    S = PX.shared_prefix(cells, tok, chat_template=shape["chat_template"],
-                         add_special_tokens=shape["add_special_tokens"],
-                         think_tag_is_stop=shape["think_tag_is_stop"])
-    enc, keys = PX.prompt_token_ids(cells, tok, chat_template=shape["chat_template"],
-                                    add_special_tokens=shape["add_special_tokens"],
-                                    think_tag_is_stop=shape["think_tag_is_stop"])
+    kw = dict(chat_template=shape["chat_template"],
+              add_special_tokens=shape["add_special_tokens"],
+              think_tag_is_stop=shape["think_tag_is_stop"])
+    enc, keys = PX.prompt_token_ids(cells, tok, **kw)
+    S = PX.shared_prefix(cells, tok, encoded=(enc, keys), **kw)
     rebuilt = np.array([len(e) for e in enc], float)
     stored = np.asarray(cells.ptok, float)
     info = {"tokenizer": tinfo, "prompt_settings": shape,
