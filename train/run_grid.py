@@ -179,8 +179,8 @@ def main(argv):
         G.jdump(meta, META)
 
     # The no-limit pass is the grid the base checkpoints ran: one row per (question, cap), the same
-    # fields, the same file-name shape, so alloc loads it beside them (work/production/alloc/cells.py
-    # cell_paths matches cells_<task>_<checkpoint>_k*.jsonl). The budgeted passes are a DIFFERENT
+    # fields, the same file-name shape, so alloc loads it beside them (`alloc/cells.py` cell_paths
+    # matches cells_<task>_<checkpoint>_k*.jsonl). The budgeted passes are a DIFFERENT
     # protocol -- one generation per stated budget -- and would collide with it on (k, cap, row), so
     # they go in their own file, which no alloc pattern matches.
     CP = os.path.join(P["artifacts"], "cells_%s.jsonl" % TAG)

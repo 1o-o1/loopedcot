@@ -1,4 +1,4 @@
-"""Fix 1 (PP3b): chain storage (write_chains/chain_path) and --resume-from-chains's
+"""Chain storage (write_chains/chain_path) and --resume-from-chains's
 prefill-and-continue bookkeeping (seed_from_chain, and the forced-decode positions/cap accounting
 it feeds into).
 

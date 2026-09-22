@@ -1206,13 +1206,13 @@ def normal_at_budget(cells, fit_prices, X, default_kt, fit_pos=None):
     Why the best of three and not one rule: the cap ladder is priced in tokens and scored by the cap
     it buys, so under `expected` accounting -- where every cap past the natural length costs the
     same -- most of the ladder sits off the upper convex hull of (price, cap) and no multiplier can
-    reach it. The old rule read the reference off `policy.avg_picks` at a fitted multiplier and could
-    therefore only ever name a hull cell, and at the hull own slope the tie goes to the cheaper one:
-    on mcleish_llama32_r32/svamp at 1.0x under `expected` that is depth 8 at cap 0, nine points,
-    while the budget affords cap 64 at sixty-seven. The gate then measured a 47-point deviation
-    against a reference the run had no reason to operate at, opened, and the row landed sixteen
-    points BELOW the `default_at_budget` row of the same table. Reading the mean price directly, at
-    the run own accounting, is what removes that.
+    reach it. Reading the reference off `policy.avg_picks` at a fitted multiplier can therefore only
+    ever name a hull cell, and at the hull own slope the tie goes to the cheaper one: on
+    mcleish_llama32_r32/svamp at 1.0x under `expected` that is depth 8 at cap 0, nine points, while
+    the budget affords cap 64 at sixty-seven. A gate that rules against that cell measures a
+    47-point deviation against a reference the run has no reason to operate at, opens, and the row
+    lands sixteen points BELOW the `default_at_budget` row of the same table. The mean price is read
+    directly instead, at the run own accounting.
 
     `affordable_on_average` is False only at a budget no cell of the grid fits on average at all; the
     reference is then the cheapest cell of the shallowest depth (`cheapest_over_budget`), so the gate
@@ -1331,11 +1331,11 @@ def avg_gated_vectors(cells, ev_pos, cal_pos, cost, Xs, score, default_kt,
     The reference is `normal_at_budget`, priced with the SAME `policy.Cost` as the arm: the best on
     the calibration split of the default cell where its mean price fits, the deepest depth at the
     largest cap whose mean price fits, and the per-prompt hard cap Table 1 reports as
-    `default_at_budget`. Before this the reference was the default cell alone, so below its own mean
-    price the gate did not run and the pick stood ungated; and before this the cap was read off a
-    fitted multiplier, which under `expected` accounting could only name a cell on the convex hull
-    of (price, cap) and tie-broke to the cheapest -- a reference the run had no reason to operate at,
-    over which a losing deviation measured a large margin and opened.
+    `default_at_budget`. All three are needed: the default cell alone leaves the pick ungated below
+    that cell own mean price, and a cap read off a fitted multiplier can, under `expected`
+    accounting, only name a cell on the convex hull of (price, cap), tie-breaking to the cheapest --
+    a reference the run has no reason to operate at, over which a losing deviation measures a large
+    margin and opens.
 
     Under `split` (the default) the calibration questions are cut in id order into a SELECTION half
     and a VERIFICATION half. The ranking and the multiplier are fitted on the selection half alone.

@@ -1,16 +1,15 @@
 """Surface tests: rank one, same peak, and the additive fit with its raw contrasts beside it.
 
-Measurement rule 1 (PLAN.md "Framework of record"): fitted a(k), m(k), g(B) are NEVER reported
-without the raw contrasts, so `fit_additive` returns both and `card_fit_block` puts them in one
-record.
+Fitted a(k), m(k), g(B) are NEVER reported without the raw contrasts, so `fit_additive` returns
+both and `card_fit_block` puts them in one record.
 
 Ported: `fit_affine_rank1` from `b1t_v3.py` (the SVD on the row-centred grid, g(0) = 0, max|g| = 1,
 flat tolerance 0.02) and the rank-one energy line of `v4_commitment.py`.
 
-Two facts of record the tests exist to check (LEDGER):
-  * 2026-09-05: a MULTIPLICATIVE law A = a(k) b(B) fails where accuracies are near zero (held-out
-    RMSE 0.17-0.18 against 0.015-0.03 for the additive centred law); the additive law stands.
-  * 2026-09-05: A0(k) + m(k) g(B) predicts that the cap where returns peak is the SAME for every k
+Two facts of record the tests exist to check:
+  * a MULTIPLICATIVE law A = a(k) b(B) fails where accuracies are near zero (held-out RMSE
+    0.17-0.18 against 0.015-0.03 for the additive centred law); the additive law stands.
+  * A0(k) + m(k) g(B) predicts that the cap where returns peak is the SAME for every k
     (dA/dB = m(k) g'(B)); if the peak moves with k the surface is rank two and the theory changes.
     `same_peak` is that test.
 """
@@ -55,15 +54,15 @@ def rank_one_test(A):
 def holdout_rmse(A, ks, Bs, hold_ks=None, hold_Bs=None):
     """Fit the additive law on the complement of the held-out cells and score it on them.
 
-    "The law fitted on a subset and validated on held-out cells" is the ICLR bar of record (LEDGER
-    "ICLR bar of record"). Two kinds of hold-out, because they ask different questions:
+    The bar is "the law fitted on a subset and validated on held-out cells". Two kinds of hold-out,
+    because they ask different questions:
 
       hold_Bs  CAPS held out. The fit sees every depth, so a(k) and m(k) are measured and only
                g(cap) is interpolated at the held-out caps (in log2(1 + cap), the coordinate b1t_v3
-               uses). This is the interpolation claim LEDGER 2026-09-06 says the law supports.
+               uses). This is the interpolation claim the law supports.
       hold_ks  a DEPTH row held out. That row contributes nothing to the fit, so a(k) and m(k) must
                be interpolated from the neighbouring measured depths -- which is exactly the
-               unmeasured-depth question Brief C answered negatively for the cross-task transfer
+               unmeasured-depth question, and it came out negative for the cross-task transfer
                (residual 10 to 36 points). Reported so the same quantity is visible per grid.
     """
     A = np.asarray(A, float)
@@ -118,7 +117,7 @@ def same_peak(A, ks, Bs):
 
 
 def raw_contrasts(A, ks, Bs, k_hi=4, k_lo=2, caps=(64, 128, 256, 512)):
-    """Measurement rule 1's raw contrasts: A(k_hi, T) - A(k_lo, T) at the listed caps, in points."""
+    """The raw contrasts: A(k_hi, T) - A(k_lo, T) at the listed caps, in accuracy points."""
     if k_hi not in ks or k_lo not in ks:
         k_hi, k_lo = ks[-1], ks[max(0, len(ks) - 2)]
     i, j = ks.index(k_hi), ks.index(k_lo)

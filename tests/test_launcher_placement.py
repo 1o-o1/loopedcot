@@ -1,7 +1,7 @@
-"""Memory-aware multi-worker placement, without a GPU (Brief PP3, decision 1).
+"""Memory-aware multi-worker placement, without a GPU.
 
 The claim path, the admission rule and the re-queue semantics are pure file and arithmetic work, so
-they are testable on the laptop; the Spark gate G5 then exercises the same code with real jobs.
+they are testable on the laptop; a separate GPU run exercises the same code with real jobs.
 
   python -m pytest tests/test_launcher_placement.py -q
   python tests/test_launcher_placement.py

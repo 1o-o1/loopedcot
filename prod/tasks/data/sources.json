@@ -6,7 +6,7 @@
     "revision": "705562638fe1d8ca6bb98c66fc8f94d45fda8c83",
     "n_rows": 2290,
     "selection": "ChilleD/StrategyQA splits the 2290 labelled StrategyQA examples into train (1603) and test (687); both splits were concatenated in dataset order, train first, giving exactly the 2290 labelled examples. The qid set was verified identical to voidful/StrategyQA strategyqa_train.json (2290 qids). src_idx is the position in that concatenation.",
-    "prompt_source": "agent-written",
+    "prompt_source": "written for this package (not from a published prompt set)",
     "prompt_files": [
       "prompt_strategyqa.txt"
     ],
@@ -224,7 +224,7 @@
     "revision": "c30699e8356da336a370243923dbaf21066bb9fe",
     "n_rows": 2000,
     "selection": "n_s = largest-remainder apportionment of 2000 proportional to each subject's test-set size over the 14042 test rows, ties on the remainder broken by subject name ascending, then a floor of 5 (the floor bound on no subject: the smallest subject has 100 test rows and an exact quota of 14.24). Within each subject the first n_s entries of numpy.random.default_rng(20260908).permutation(N_s) were taken, with a fresh rng per subject. Rows are emitted in subject-alphabetical order, then in the drawn order. src_idx is the row's index in the 14042-row test split; the permutation runs over subject-local positions.",
-    "prompt_source": "agent-written",
+    "prompt_source": "written for this package (not from a published prompt set)",
     "prompt_files": [
       "prompt_mmlu_stem.txt",
       "prompt_mmlu_humanities.txt",
@@ -237,7 +237,7 @@
       "mmlu_social_sciences": "letter",
       "mmlu_other": "letter"
     },
-    "flan_exemplars": "NOT fetched. google-research/FLAN flan/v2/cot_data/ holds only nine CoT source datasets (aqua, creak, ecqa, esnli, gsm8k, qasc, qed, sensemaking, strategyqa) and no MMLU file; Muennighoff/flan has no file matching 'mmlu' or 'cot'; SirNeural/flan_v2's cot_*.jsonl.gz are the same nine datasets. MMLU is a held-out evaluation benchmark in FLAN, so no FLAN MMLU CoT exemplars exist in those sources. The four prompt files are therefore AGENT-WRITTEN.",
+    "flan_exemplars": "NOT fetched. google-research/FLAN flan/v2/cot_data/ holds only nine CoT source datasets (aqua, creak, ecqa, esnli, gsm8k, qasc, qed, sensemaking, strategyqa) and no MMLU file; Muennighoff/flan has no file matching 'mmlu' or 'cot'; SirNeural/flan_v2's cot_*.jsonl.gz are the same nine datasets. MMLU is a held-out evaluation benchmark in FLAN, so no FLAN MMLU CoT exemplars exist in those sources. The four prompt files are therefore written for this package (not from a published prompt set).",
     "subject_to_subcategory": {
       "abstract_algebra": "math",
       "anatomy": "health",
@@ -385,7 +385,7 @@
     "revision": "218ec52e09a7e7462a5400043bb9a69a41d06b76",
     "n_rows": 2000,
     "selection": "numpy.random.default_rng(20260908).permutation(10042)[:2000], emitted in the drawn order; src_idx is the drawn validation-split index.",
-    "prompt_source": "agent-written",
+    "prompt_source": "written for this package (not from a published prompt set)",
     "prompt_files": [
       "prompt_hellaswag.txt"
     ],

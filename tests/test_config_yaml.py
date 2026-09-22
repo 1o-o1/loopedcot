@@ -1,7 +1,7 @@
-"""prod/config.py is now a YAML loader (PP3b task 1): this pins the numbers it must keep producing.
+"""prod/config.py is a YAML loader: this pins the numbers it must keep producing.
 
-`OLD_DEFAULTS` and `OLD_MODEL_SHAPES` are a frozen copy of what `prod/config.py` returned as literal
-Python before the move to `prod/config.yaml` (Brief PP3, decision 2 and decision 1). If
+`OLD_DEFAULTS` and `OLD_MODEL_SHAPES` are a frozen copy of the protocol of record, held here as
+literal Python so that editing `prod/config.yaml` cannot move them. If
 `prod/config.yaml` ever drifts from the protocol of record, this fails and says exactly which key.
 
   python -m pytest tests/test_config_yaml.py -q
@@ -21,7 +21,7 @@ OLD_DEFAULTS = {
     "forced_horizon": 4096,
     "forced_budgets": [0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
     "forced_block": {
-        "enabled": False,   # the forced block is its own queue (protocol decision Q15)
+        "enabled": False,   # the forced block is its own queue, run separately
         "models": ["ouro_1_4b_base", "ouro_1_4b_think", "ouro_2_6b_base", "ouro_2_6b_think"],
         "tasks": ["gsm8k", "math500"],
         "ks": None,
@@ -55,7 +55,7 @@ OLD_DEFAULTS = {
     "version": "PP3",
 }
 
-#: PP3's static MODEL_SHAPES table, verbatim (decision 1), before it moved into config.yaml's
+#: the static MODEL_SHAPES table, verbatim; config.yaml carries the same shapes in its
 #: `models:` block alongside each model's depths and batch-width overrides.
 OLD_MODEL_SHAPES = {
     "ouro_1_4b_base": {"repo": "ByteDance/Ouro-1.4B", "params": 1434652673, "kv_heads": 16,
@@ -76,7 +76,7 @@ OLD_MODEL_SHAPES = {
                             "core": 6, "coda": 4, "entries": "raven", "dtype_bytes": 2},
 }
 
-#: PP3b ruling Q12: per (model, k) width overrides added on top of the pinned width 16.
+#: per (model, k) width overrides added on top of the pinned width 16.
 EXPECTED_OVERRIDES = {
     "ouro_2_6b_base": {3: 8, 4: 8},
     "ouro_2_6b_think": {3: 8, 4: 8},
@@ -108,14 +108,14 @@ def test_batch_width_overrides_match_ruling_q12():
     for model, by_k in EXPECTED_OVERRIDES.items():
         for k, w in by_k.items():
             assert cfgmod.batch_width_for(model, k, cfg) == w
-    # everything else still gets the pinned width 16 (rulings Q6 iv)
+    # everything else gets the pinned width 16
     assert cfgmod.batch_width_for("ouro_1_4b_base", 4, cfg) == 16
     assert cfgmod.batch_width_for("huginn_0125", 8, cfg) == 16
     assert cfgmod.batch_width_for("ouro_2_6b_base", 2, cfg) == 16
 
 
 def test_config_json_override_still_works():
-    """--config-json (an override path predating this task) still merges before the flags."""
+    """--config-json merges into the defaults before the flags, and an explicit flag wins."""
     import argparse
     import json
     import tempfile

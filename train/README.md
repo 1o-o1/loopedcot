@@ -426,7 +426,7 @@ the stage-2 manifest before the run starts (`supervised_tokens_per_opt_step`, `v
 
 Training is **cheaper**, not dearer, than the 512 recipe on the same four sources: the longer chains
 put more supervised tokens in each visit, and bucketing stops the MATH blocks being padded to 1280.
-The earlier **7.4 h per variant** figure was 590 steps on a GSM8K+MATH-only mixture and is superseded.
+The **7.4 h per variant** figure was 590 steps on a GSM8K+MATH-only mixture and is superseded.
 
 **The grid, per variant, at horizon 4096.** Priced the way the production record is priced: tokens per
 problem over the measured natural-stop rate, at 300 questions per (task, depth).

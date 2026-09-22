@@ -1,10 +1,9 @@
 """Allocation: the calibration cost curve, gain over normal operation, and the bootstraps.
 
-Measurement rule 2 (PLAN.md "Framework of record"): every allocation policy is built on calibration
-questions and scored on disjoint evaluation questions; the test-grid optimum is labelled ORACLE and
-never reported as a policy result. Decision D2 (LEDGER "Agreed 2026-09-09"): the headline comparison
-is the allocator against NORMAL OPERATION (the deepest depth with its largest feasible cap), paired
-per prompt, with the prompt's own token count and answer reserve.
+Every allocation policy is built on calibration questions and scored on disjoint evaluation
+questions; the test-grid optimum is labelled ORACLE and never reported as a policy result. The
+headline comparison is the allocator against NORMAL OPERATION (the deepest depth with its largest
+feasible cap), paired per prompt, with the prompt's own token count and answer reserve.
 
 Ported, with the source named at each function:
   Grid / build_grid / cost_cap / pick / pick_default   b1t.py and b1t_v3.py
@@ -16,8 +15,8 @@ Ported, with the source named at each function:
 Two cost conventions are kept apart on purpose and never mixed in one table:
   CAP cost      (L_fixed + k L) (P_mean + B)  -- b1t / S28's budget axis, one number per (k, B)
   PER-PROMPT    (L_fixed + k L) (P_i + B + R_i)
-                                              -- D2's headline, one number per (k, B, question);
-                `promptfree=True` drops P_i (LEDGER's prompt-inclusive / prompt-free pair)
+                                              -- the headline, one number per (k, B, question);
+                `promptfree=True` drops P_i (the prompt-inclusive / prompt-free pair)
 
 L is the layers INSIDE the loop and L_fixed the layers executed once per token whatever k is, so the
 passes per token are L_fixed + k L. Ouro runs every layer inside the recurrence (L_fixed = 0, the
@@ -26,10 +25,10 @@ raven families do not (Huginn prelude 2 + k * 4 + coda 2, so L = 4 and L_fixed =
 4 + k * 6 + 4, so L = 6 and L_fixed = 8). `cost.model_shapes` is the single source of both numbers
 (`layers_per_loop`, `layers_fixed`) and the callers read them from there.
 
-`default_cost` (Fix 2, PP3b, decision 7) is a third quantity, not a cost FORMULA but a cost
-STATISTIC read off the cells: the mean realised layer-pass cost of the default operating point
-(max measured depth, natural stop, uncapped). `config.yaml`'s `budget_fractions` (0.25/0.5/1.0) are
-fractions of THIS, not of the grid's largest CAP cell (`cmat.max()`, the old and wrong definition).
+`default_cost` is a third quantity, not a cost FORMULA but a cost STATISTIC read off the cells: the
+mean realised layer-pass cost of the default operating point (max measured depth, natural stop,
+uncapped). `config.yaml`'s `budget_fractions` (0.25/0.5/1.0) are fractions of THIS, not of the
+grid's largest CAP cell (`cmat.max()`).
 """
 import numpy as np
 
@@ -90,8 +89,9 @@ class Grid(object):
 
 
 def build_grid(name, rows, L, correct_key="correct_v2"):
-    """b1t.build_grid, verbatim except that the default label is protocol v2 and the reserve and
-    split are carried along for the per-prompt cost of D2."""
+    """The (k, B, question) accuracy grid from scored rows: the default label is protocol v2, and
+    each row's prompt tokens, answer reserve and eval/cal split are carried along for the
+    per-prompt cost."""
     ks = sorted({int(r["k"]) for r in rows})
     Bs = sorted({int(r["B"]) for r in rows})
     idx = sorted({int(r.get("row_idx", r["idx"])) for r in rows})
@@ -210,7 +210,8 @@ def nested_regret(grid, rng, n_cal=50, n_rep=20, n_budgets=N_BUDGETS, arms=None)
 
 # ------------------------------------------------------------------ per-prompt policy (v5)
 def per_prompt_cost(L, promptfree=False, L_fixed=0):
-    """D2's cost: (L_fixed + k L) (P_i + B + R_i), or the same prompt-free (v5_s32_analysis).
+    """The per-prompt cost: (L_fixed + k L) (P_i + B + R_i), or the same prompt-free
+    (v5_s32_analysis).
 
     `L_fixed = 0` is v5's formula verbatim and is right for Ouro; a raven family passes its
     prelude + coda, whose passes per token do not scale with k.
@@ -221,15 +222,15 @@ def per_prompt_cost(L, promptfree=False, L_fixed=0):
 
 
 def default_cost(cells, promptfree=False, k=None, split="eval"):
-    """Fix 2 (PP3b): "budget as a fraction of the default cost" means the MEAN REALISED layer-pass
-    cost of the DEFAULT OPERATING POINT -- the checkpoint's max measured depth ("use the max depth
-    present in the cells": Ouro 4, Huginn 32, McLeish 32 by card, when the full depth set ran) at
-    the NATURAL STOP, UNCAPPED, from the cells themselves (prompt tokens + generated tokens +
-    read-out tokens at the smallest B that did not truncate the natural stop for that problem).
+    """Budget as a fraction of the default cost: the MEAN REALISED layer-pass cost of the DEFAULT
+    OPERATING POINT -- the checkpoint's max measured depth ("use the max depth present in the
+    cells": Ouro 4, Huginn 32, McLeish 32 by card, when the full depth set ran) at the NATURAL
+    STOP, UNCAPPED, from the cells themselves (prompt tokens + generated tokens + read-out tokens
+    at the smallest B that did not truncate the natural stop for that problem).
 
-    This REPLACES the old X = budget_fraction * cmat.max() ("grid max": the cost of the grid's
-    largest CAP cell at the median prompt -- a synthetic k*L*(P+B) number nothing ever actually
-    realises end to end, since B is a cap, not a length any row is guaranteed to reach).
+    Not X = budget_fraction * cmat.max() ("grid max": the cost of the grid's largest CAP cell at
+    the median prompt -- a synthetic k*L*(P+B) number nothing realises end to end, since B is a
+    cap, not a length any row is guaranteed to reach).
 
     `cells` is a score.Cells object (ks, Bs, idx, ncut, nstop, passes, passes_pf, split); `k=None`
     uses the max depth present. Returns {"k", "n", "mean", "promptfree"}; `mean` is None when no
@@ -304,7 +305,7 @@ def policy_vectors(grid, ev_sel, cost, Xs, order):
 
 
 def budget_ranges(grid, cost, Xs, Pm, Rm, L=None, L_fixed=None):
-    """B* and B_low (Brief S32 and its Addendum A1).
+    """B* and B_low, the two budget ranges.
 
     B*    budgets at which BOTH (k=2, T=64) and (k=k_max, T=64) are feasible at the median prompt
     B_low budgets at which (k_max, 64) is NOT feasible but (k=1, 64) is
@@ -328,7 +329,7 @@ def budget_ranges(grid, cost, Xs, Pm, Rm, L=None, L_fixed=None):
 
 def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
                      n_cal_draws=100, seed=7, min_normal_feasible=0.9, L_fixed=None):
-    """D2's headline: the gain of the calibration-chosen policy over normal operation.
+    """The headline: the gain of the calibration-chosen policy over normal operation.
 
     Two bootstraps, both from v3_bootstrap / v5_s32_analysis:
       * paired over evaluation questions (n_boot resamples) -- sampling noise in the SCORE
@@ -340,9 +341,9 @@ def gain_over_normal(grid, promptfree=False, n_budgets=N_BUDGETS, n_boot=2000,
     the policy or normal operation is infeasible for that question at that budget, and are stacked
     without truncation. Column j is therefore the same question at every budget, and the paired
     bootstrap resamples QUESTION INDICES (the same columns at every budget) and takes a nanmean per
-    draw. The earlier version dropped the NaNs per budget and cut every vector to the shortest,
-    which re-indexed the columns: one question infeasible at a low budget moved every later question
-    a place to the left, so the paired bootstrap paired different questions at different budgets.
+    draw. Dropping the NaNs per budget and cutting every vector to the shortest would re-index the
+    columns: one question infeasible at a low budget would move every later question a place to the
+    left, so the paired bootstrap would pair different questions at different budgets.
 
     `L_fixed` defaults to the grid's own (0 for Ouro, prelude + coda for a raven family).
     """

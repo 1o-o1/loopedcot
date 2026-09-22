@@ -33,8 +33,8 @@ from alloc import policy as P                         # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 S33 = os.path.join(ROOT, "s33_anytime", "artifacts")
-# The column of Table 1 at 1.0 of the default cost, located by value: the default fraction set
-# grew a 0.75 point and a fixed index would have silently read the wrong budget.
+# The column of Table 1 at 1.0 of the default cost, located by value: the set of default fractions
+# can change, and a fixed index would silently read the wrong budget.
 ONE = E.BUDGET_FRACTIONS.index(1.0)
 
 
@@ -320,8 +320,8 @@ class TestRealGrids(unittest.TestCase):
     # over or under X is decided by how the prompts either side of the threshold split between the
     # two halves; at 0.25x on MATH500 the two cells in play are 24 and 48 layers per token with a
     # 512-token chain between them, so one prompt crossing moves the mean by about a percent.
-    # `avg_gated_lookup` no longer appears here: at 0.25x its gate now has a reference (normal
-    # operation at that budget) and reverts to it, and that reference is priced UNDER X.
+    # `avg_gated_lookup` does not appear here: at 0.25x its gate has a reference (normal operation
+    # at that budget) and reverts to it, and that reference is priced UNDER X.
     OVER_TWO_PERCENT = {("math500", "avg_equation", 0.25): 2.30}
 
     def test_the_mean_price_holds_within_two_percent_or_is_flagged(self):
@@ -446,8 +446,8 @@ class TestTheGatedArm(unittest.TestCase):
     def test_below_the_default_cell_the_gate_measures_against_normal_operation(self):
         """Below the default cell's own mean price the reference is normal operation AT THAT
         BUDGET: the deepest depth the budget affords on average, at its largest affordable cap
-        (evaluate.normal_at_budget). The gate used to be skipped entirely there, so the pick stood
-        ungated at every budget where its deviation was largest -- the defect this replaces."""
+        (evaluate.normal_at_budget). Skipping the gate there would leave the pick ungated at every
+        budget where its deviation is largest, so every budget has a gated reference instead."""
         row = self._table(10.0)["rows"][P.AVG_GATED]
         for j in range(ONE):
             self.assertIsNotNone(row["gate_margin_pts"][j], j)

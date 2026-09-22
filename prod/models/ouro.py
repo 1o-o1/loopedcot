@@ -3,14 +3,14 @@
 Ported verbatim (source in each comment):
   * load / dtype / attn_implementation   s28_common.load_model
   * the step knob and the EXPLICIT read-out  s9b_common.set_steps
-      `model.model.total_ut_steps = k` and `model.early_exit_step = k - 1`. LEDGER 2026-09-05 S2c:
-      "Ouro-2.6B's default forward path mixes readouts (about 1% of tokens read step 1 under the
-      shipped threshold of 1.0) ... Every 2.6B number must come from exit_at_step=3 or lm_head on
-      the last hidden state." The explicit read-out is set on 1.4B too, where it is a no-op
+      `model.model.total_ut_steps = k` and `model.early_exit_step = k - 1`. Ouro-2.6B's default
+      forward path mixes readouts (about 1% of tokens read step 1 under the shipped threshold of
+      1.0), so every 2.6B number must come from exit_at_step=3 or lm_head on the last hidden
+      state. The explicit read-out is set on 1.4B too, where it is a no-op
       (config.early_exit_threshold is None there), so one code path serves both scales.
   * the get_mask_sizes patch          s3_patch.patch_universal_cache (ByteDance's own fix, shipped
-      in Ouro-1.4B-Thinking's modeling_ouro.py but not in Ouro-1.4B's). LEDGER 2026-09-05 S3:
-      "attach the override, then left-pad freely".
+      in Ouro-1.4B-Thinking's modeling_ouro.py but not in Ouro-1.4B's); attach the override, then
+      left-pad freely.
   * the preallocated UniversalTransformerCache   s28_common.make_static_cache_cls
   * the measured KV batch ceiling               s28_common.row_token_ceiling / batch_for
   * greedy decode over that cache               s28_common.decode
@@ -272,8 +272,8 @@ class OuroAdapter(Adapter):
         if DEV == "cuda":
             torch.cuda.set_per_process_memory_fraction(self.mem_fraction)
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        # PP3 decision 3: load the REVISION that `prod.install_models` pinned, not whatever the
-        # repo's `main` points at today. `revision=None` (no pins file yet) is the old behaviour.
+        # load the REVISION that `prod.install_models` pinned, not whatever the repo's `main`
+        # points at today. `revision=None` (no pins file yet) loads `main`.
         rev = cfgmod.revision_for(self.name)
         tok = AutoTokenizer.from_pretrained(self.repo, trust_remote_code=True, revision=rev)
         if tok.pad_token is None:

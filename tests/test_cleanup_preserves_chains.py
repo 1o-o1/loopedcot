@@ -1,4 +1,4 @@
-"""Fix 1 (PP3b): prod.cleanup must never touch a chains_<model>_<task>_k<k>.jsonl sidecar -- it has
+"""prod.cleanup must never touch a chains_<model>_<task>_k<k>.jsonl sidecar -- it has
 no tag in its name, so it can never be a job's `trace_<tag>_*.jsonl` checkpoint, and it is never a
 `cells_<tag>.jsonl` file either. This is a regression test for that guarantee, not a unit test of
 the (already tag-scoped) globs alone.

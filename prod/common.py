@@ -1,6 +1,6 @@
 """PP2 production package: paths, environment, checkpoint helpers, hashing.
 
-Nothing in this package imports from work/spikes/. Every ported line names its source file in a
+Nothing in this package imports from outside it. Every ported line names its source file in a
 comment so the cluster install is one self-contained directory.
 
 Environment variables honoured (all optional, all also `run.sh` arguments):
@@ -18,9 +18,9 @@ import subprocess
 import sys
 import time
 
-# Caps, horizon, seed, batch width and the forced block now live in ONE place, prod/config.py
-# (Brief PP3, decision 2). The names below are kept as re-exports so every gate written against PP2
-# still imports what it always did; they are NOT a second copy -- change prod/config.py.
+# Caps, horizon, seed, batch width and the forced block live in ONE place, prod/config.py. The
+# names below are kept as re-exports so every gate still imports what it always did; they are NOT
+# a second copy -- change prod/config.py.
 from . import config as _cfg
 
 ROOT = os.environ.get("PROD_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -45,18 +45,16 @@ FORCED_BUDGETS = list(_cfg.FORCED_BUDGETS)
 SPLIT_SEED = _cfg.SPLIT_SEED
 N_CAL = _cfg.N_CAL
 
-# Production batch width, PINNED (PLAN.md rulings on PP2, Q6 clause (iv), 2026-09-12): every
-# production run decodes at width 16 and every row records the width it was produced at, because
-# per-problem labels carry 6-10% bf16 batch-width noise (LEDGER 2026-09-04 S5, 2026-09-05 S9a) and a
-# number is only comparable to another number taken at the same width. `--batch-width=0` restores
-# the pre-pin adaptive width and is for the gates only.
+# Production batch width, PINNED: every production run decodes at width 16 and every row records
+# the width it was produced at, because per-problem labels carry 6-10% bf16 batch-width noise
+# (measured) and a number is only comparable to another number taken at the same width.
+# `--batch-width=0` restores the adaptive width and is for the gates only.
 BATCH_WIDTH = int(os.environ.get("PROD_BATCH_WIDTH", str(_cfg.BATCH_WIDTH)))
 
-# Forced continuation N of record (rulings Q2 option O1): the spike's N, with N an argument. The
-# full-N forced block is priced separately (protocol decision Q15) and switched on in config.yaml (`forced_block.enabled`).
-# PP3 decision 4: the forced block runs at FULL N by default and is a separate, configurable
-# protocol block (prod/config.py FORCED_BLOCK). `FORCED_N` survives only as an explicit override
-# table: empty means "full N", which is the default of record.
+# The forced block runs at FULL N by default and is a separate, configurable protocol block
+# (prod/config.py FORCED_BLOCK), switched on in config.yaml (`forced_block.enabled`) and priced
+# separately. `FORCED_N` survives only as an explicit override table of forced-continuation counts:
+# empty means "full N", which is the default.
 FORCED_N = {}
 
 for _d in (ART, LOGS):
@@ -139,7 +137,7 @@ def load_ckpt(path, keyfn):
                 except Exception:                             # noqa: BLE001
                     continue                                  # truncated last line after a kill
                 if r.get("_header"):
-                    continue     # PP3 decision 2: the effective config, not a cell
+                    continue     # the effective config row, not a cell
                 done[keyfn(r)] = r
     return done
 
@@ -157,7 +155,7 @@ def read_jsonl(path):
                 except Exception:                             # noqa: BLE001
                     continue
                 if isinstance(r, dict) and r.get("_header"):
-                    continue     # PP3 decision 2: the effective config, not a cell
+                    continue     # the effective config row, not a cell
                 out.append(r)
     return out
 
@@ -197,7 +195,7 @@ def load_json(path, default=None):
 
 
 def read_header(path):
-    """The PP3 header row of a cells file (decision 2): the effective config that produced it."""
+    """The header row of a cells file: the effective config that produced it."""
     if not os.path.exists(path):
         return None
     with open(path, encoding="utf-8") as f:
@@ -214,7 +212,7 @@ def read_header(path):
 
 
 def count_cells(path):
-    """Rows in a cells file, header excluded (decision 2)."""
+    """Rows in a cells file, header excluded."""
     n = 0
     with open(path, encoding="utf-8") as f:
         for line in f:

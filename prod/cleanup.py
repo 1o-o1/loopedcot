@@ -1,5 +1,5 @@
-"""Cleanup for a cells directory (PP3b task 4): shrink completed jobs' cells files, drop their
-per-problem trace checkpoints, and gzip stale logs.
+"""Cleanup for a cells directory: shrink completed jobs' cells files, drop their per-problem
+trace checkpoints, and gzip stale logs.
 
   python -m prod.cleanup --cells=DIR                          # dry run: print bytes that would free
   python -m prod.cleanup --cells=DIR --apply                  # do it
@@ -49,7 +49,7 @@ from .common import ART, LOGS, load_json, save_json
 
 #: the only fields a slim pass drops. `chain_tail` (200 characters), `stop_reason` and
 #: `own_answer_span` are NOT among them and must stay: they are the whole text-level diagnosis a
-#: finished job leaves behind, and the artifacts that had none are why they were added.
+#: finished job leaves behind once the long text fields are gone.
 LONG_TEXT_FIELDS = ("answer_text", "trace_text")
 CELLS_RE = re.compile(r"^cells_(?P<tag>.+)\.jsonl$")
 
@@ -124,8 +124,8 @@ def load_manifest_expected(path):
 # ------------------------------------------------------------------ (b) trace checkpoints
 def trace_files_for(cells_dir, tag):
     """Per-problem generation checkpoints for one job. Never a `chains_<model>_<task>_k<k>.jsonl`
-    sidecar (Fix 1, PP3b): those carry no tag in their name and the glob below cannot match one, but
-    the filter is kept anyway as an explicit guarantee that cleanup never deletes a chains file."""
+    sidecar: those carry no tag in their name and the glob below cannot match one, but the filter
+    is kept anyway as an explicit guarantee that cleanup never deletes a chains file."""
     # a job's trace files are trace_<tag>_single.jsonl or trace_<tag>_T<cap>.jsonl; the glob would
     # also match a sharded (<tag>_s0of8), tagged (<tag>_tagK) or only-rows (<tag>_sub20) sibling
     found = sorted(f for f in glob.glob(os.path.join(cells_dir, "trace_%s_*.jsonl" % tag))

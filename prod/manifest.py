@@ -3,18 +3,18 @@
   python -m prod.manifest --write [--out=FILE] [--priority=1,2,3] [--forced-n=300]
   python -m prod.manifest --check --cells=DIR [--manifest=FILE]
 
-The run list of record (Brief PP2):
+The run list of record:
   models   Ouro-1.4B base and Thinking, Ouro-2.6B base and Thinking, Huginn-0125,
            McLeish Recurrent-Llama-3.2
   tasks    GSM8K 1319, MATH500 500, SVAMP 1000, AQuA 254, CSQA 1221, four BBH tasks 250 each,
            ARC-Challenge 1172
   depths   Ouro {1,2,3,4}; Huginn {1,2,4,8,16,32}; McLeish {1,2,4,8} everywhere and {16,32} on GSM8K
   protocol natural stop everywhere, plus forced continuation to 4096 for GSM8K and MATH500 on the
-           four Ouro checkpoints (protocol decision Q2: at the spike's N by default, full N optional)
+           four Ouro checkpoints (at the spike's N by default, full N optional)
 
-Priority order if the window shrinks (Brief PP, carried into PP2): 1 = Ouro-1.4B on the four tasks
-with spikes, 2 = the rest of Ouro-1.4B and all of Ouro-2.6B, 3 = Huginn and McLeish, 4 = forced
-continuation and any LoRA arm.
+Priority order if the window shrinks: 1 = Ouro-1.4B base and Thinking on all ten datasets,
+2 = Ouro-2.6B, 3 = McLeish, 4 = Huginn and any model not listed (a LoRA arm), 5 = forced
+continuation, 6 = chain continuation.
 """
 import argparse
 import glob
@@ -27,10 +27,10 @@ from .common import (CAPS_EXTRA, CAPS_STANDARD, FORCED_BUDGETS, FORCED_N,
 from .models import MODEL_ORDER, depths_for
 from .tasks import FORCED_TASKS, TASK_ORDER, task_cfg
 
-FORCED_N_DEFAULT = dict(FORCED_N)     # PP3: empty = full N
+FORCED_N_DEFAULT = dict(FORCED_N)     # empty = full N
 
-#: Priority order of the queue (PLAN.md rulings on PP3 protocol decisions): Ouro-1.4B base and Thinking on all ten datasets first, then Ouro-2.6B, then McLeish,
-#: then Huginn. Replaces PP2's "priority 1 = Ouro-1.4B on the four tasks with spikes" scheme.
+#: Priority order of the queue: Ouro-1.4B base and Thinking on all ten datasets first, then
+#: Ouro-2.6B, then McLeish, then Huginn.
 PRIORITY_MODELS = {"ouro_1_4b_base": 1, "ouro_1_4b_think": 1,
                    "ouro_2_6b_base": 2, "ouro_2_6b_think": 2,
                    "mcleish_llama32_r32": 3, "huginn_0125": 4}
@@ -54,9 +54,9 @@ def protocol_of_tag(tag):
 
 
 def priority_of(model, task, protocol):
-    """Queue priority. Forced continuation (Q15: its own queue, priced separately) sorts after
-    every natural-stop job regardless of model, and a chain-continuation job after that: it can only
-    run once the natural-stop grid whose chains it reads is finished."""
+    """Queue priority. Forced continuation (its own queue, priced separately) sorts after every
+    natural-stop job regardless of model, and a chain-continuation job after that: it can only run
+    once the natural-stop grid whose chains it reads is finished."""
     if protocol in CONTINUATION_TAGS:
         return 6
     if protocol == "forced":
@@ -67,9 +67,9 @@ def priority_of(model, task, protocol):
 def run_list(forced_n=None, models=None, tasks=None, cfg=None):
     """Every (model, task, depth, protocol) job of record.
 
-    PP3 (decision 4): the natural-stop grids run at horizon `cfg["horizon"]` over `cfg["caps"]`, and
-    the forced-continuation block is a SEPARATE, configurable block -- `cfg["forced_block"]` names
-    its models, tasks, depths and N, and `enabled: false` removes it entirely.
+    The natural-stop grids run at horizon `cfg["horizon"]` over `cfg["caps"]`, and the
+    forced-continuation block is a SEPARATE, configurable block -- `cfg["forced_block"]` names its
+    models, tasks, depths and N, and `enabled: false` removes it entirely.
     """
     cfg = cfg or cfgmod.defaults()
     fb = cfg["forced_block"]
@@ -105,8 +105,8 @@ def run_list(forced_n=None, models=None, tasks=None, cfg=None):
         j["expected_cells"] = j["n"] * len(set(j["caps"]) | set(j["extra_caps"]))
         j["cells_file"] = "cells_%s.jsonl" % j["tag"]
         j["meta_file"] = "meta_%s.json" % j["tag"]
-        # ruling Q12: the per-job width, overridden for (model, k) pairs config.yaml names; stored
-        # per row already, and the launcher's memory estimate reads this same field.
+        # the per-job width, overridden for (model, k) pairs config.yaml names; stored per row
+        # already, and the launcher's memory estimate reads this same field.
         bw = cfgmod.batch_width_for(j["model"], j["k"], cfg)
         j["batch_width"] = bw
         j["command"] = ("python -m prod.generate --model=%s --task=%s --k=%d --protocol=%s"
@@ -141,9 +141,9 @@ def shard_jobs(jobs, shards):
 GPU_HOUR_BLOCKS = {"R1": "natural-stop grids", "R2": "forced-continuation block",
                    "R3": "S33 seeds", "R4": "live allocator check"}
 
-# R3: per seed on the GB10, from the S33 stage-2 log -- training 1.0 h, V7 on 100 problems per task
-# 0.4 h, the seven grids 10.0 h, the R7 forced tail 2.0 h. Seed 20260912 is trained and its grids
-# are running, so two seeds remain (s33/README.md).
+# R3: per seed on the GB10, from the measured stage times -- training 1.0 h, the check on 100
+# problems per task 0.4 h, the seven grids 10.0 h, the forced tail 2.0 h. Seed 20260912 is trained
+# and its grids are running, so two seeds remain.
 R3_SPARK_HOURS_PER_SEED = 13.4
 R3_SEEDS_REMAINING = 2
 # R4: one live-allocator pass over the GSM8K evaluation split at one budget is one generation per
@@ -152,7 +152,7 @@ R4_SPARK_HOURS = 2.0
 
 
 def gpu_hours(jobs, cfg, throughput=None):
-    """Estimated GPU-hours per block (decision 9).
+    """Estimated GPU-hours per block.
 
     Rate basis: the Spark tokens/s already measured per (model, task, depth) and stored in
     `checks.json.throughput_tokens_per_s`; the tokens a job emits are the trace (its natural stop,
@@ -170,7 +170,7 @@ def gpu_hours(jobs, cfg, throughput=None):
         return int(sh["prelude"]) + int(k) * int(sh["core"]) + int(sh["coda"])
 
     def _scaled(keys, model, k):
-        """Throughput scales inversely with layer passes per token; that is the basis PP2 used for
+        """Throughput scales inversely with layer passes per token; that is the basis used for
         every unmeasured (model, depth) and it is what makes a 2.6B estimate a projection rather
         than a guess."""
         vals = []
@@ -204,10 +204,10 @@ def gpu_hours(jobs, cfg, throughput=None):
     # the measured NATURAL-STOP rate, and those are not the same regime. Under natural stop the
     # batch drains as rows hit their stop marker, so the measured aggregate tokens/s is well below
     # the peak; a forced trace never stops, so all 16 rows stay alive for all 4,096 tokens and the
-    # real rate is higher. R2 is therefore an UPPER bound (PP2's 33 h, computed from a
-    # seconds-per-problem fit rather than a token rate, is the corresponding lower one). The first
-    # timed job on the cluster must include ONE FORCED job, and the estimate is refreshed from it
-    # before the queue is released.
+    # real rate is higher. R2 is therefore an UPPER bound; the corresponding lower bound is 33 h,
+    # from a seconds-per-problem fit rather than a token rate. The first timed job on the cluster
+    # must include ONE FORCED job, and the estimate is refreshed from it before the queue is
+    # released.
     NAT_TOKENS, READOUTS, N_ANS = 220.0, 5.0, 12.0
     out = {}
     detail = []
@@ -284,7 +284,7 @@ def check(cells_dir, man):
     for fp in sorted(glob.glob(os.path.join(cells_dir, "cells_*.jsonl"))):
         m = NAME_RE.match(os.path.basename(fp))
         if m:
-            have[m.group("tag")] = count_cells(fp)     # PP3: the header row is not a cell
+            have[m.group("tag")] = count_cells(fp)     # the header row is not a cell
     rows = []
     for j in man["shard_jobs"]:
         got = have.get(j["tag"], 0)

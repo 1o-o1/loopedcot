@@ -11,7 +11,7 @@ Two facts these tests pin down, because they limit what the accounting can deliv
 1. The budget is one scalar and the default cost is a MEAN, so a per-prompt hard cap can only buy
    the default's operating point for the prompts priced below that mean. With prompts of one
    length that is every prompt (the fixture here); with real prompts it is the share whose length
-   is below average -- 0.71 on GSM8K and 0.76 on MATH500, recorded in checks_expected.json, not 1.0.
+   is below average -- 0.71 on GSM8K and 0.76 on MATH500, not 1.0.
 2. The remaining gap at 1.0x is therefore an accounting fact, not a ranking failure: the arms give
    up accuracy exactly on the prompts too dear to run at the mean price.
 """
@@ -34,8 +34,8 @@ from alloc import policy as P                         # noqa: E402
 import synth                                          # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-# The column of Table 1 at 1.0 of the default cost, located by value: the default fraction set
-# grew a 0.75 point and a fixed index would have silently read the wrong budget.
+# The column of Table 1 at 1.0 of the default cost, located by value: the set of default fractions
+# can change, and a fixed index would silently read the wrong budget.
 ONE = E.BUDGET_FRACTIONS.index(1.0)
 
 S33 = os.path.join(ROOT, "s33_anytime", "artifacts")

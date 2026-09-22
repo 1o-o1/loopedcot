@@ -1,13 +1,13 @@
-"""Figures. Every one has compute on the x-axis where a compute axis exists (LEDGER compute rule).
+"""Figures. Every one has compute on the x-axis where a compute axis exists.
 
   python -m prod.analyze.figures --cells=artifacts --model=... --task=... [--out=DIR]
 
-Six figures, matching the ICLR bar of record:
+Six figures:
   fig_heatmap_<model>_<task>.pdf     accuracy over (k, cap), the law's raw surface
   fig_frontier_<model>_<task>.pdf    accuracy against layer-token passes, prompt-inclusive
   fig_frontier_pf_<model>_<task>.pdf the same, prompt-free
-  fig_card_<model>_<task>.pdf        raw contrasts beside the fitted profiles (measurement rule 1)
-  fig_gain_<model>_<task>.pdf        allocator against normal operation per budget (decision D2)
+  fig_card_<model>_<task>.pdf        raw contrasts beside the fitted profiles
+  fig_gain_<model>_<task>.pdf        allocator against normal operation per budget
   fig_arrival_<model>_<task>.pdf     commitment arrival share G(k, cap) with c and l beside it
 
 matplotlib is imported lazily with the Agg backend so this module can be imported on a headless

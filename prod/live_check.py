@@ -26,8 +26,8 @@ is not the thing the paper claims a user would do. This script does the thing it
 
 The difference is reported in points. It should be zero up to bf16 batch-composition noise, because
 step 3 regenerates a row the grid already holds; a non-zero difference is either that noise (the row
-is now decoded in a batch of differently-chosen cells, LEDGER 2026-09-04 S5) or a bug. Both are
-worth knowing before a claim is made, which is why this is a gate and not an analysis.
+is now decoded in a batch of differently-chosen cells) or a bug. Both are worth knowing before a
+claim is made, which is why this is a gate and not an analysis.
 
 The generation reuses `prod.generate`'s own machinery through a subprocess per distinct chosen cell,
 so the live path is byte-for-byte the production path -- there is no second decoder to keep in sync.
@@ -158,8 +158,8 @@ def _call(cmd, cwd=None, tail=TAIL_LINES):
     """Run one command and return (rc, stdout tail, stderr tail, seconds).
 
     Both streams are ECHOED as they arrive, so a long generation still prints as it goes, AND their
-    last `tail` lines are kept: a generation that dies in two seconds used to leave nothing but its
-    rc on the record, which is why 129 of 201 cluster live files could not be diagnosed at all.
+    last `tail` lines are kept: without them a generation that dies in two seconds would leave
+    nothing but its rc on the record, and its cause could not be diagnosed at all.
     """
     t0 = time.time()
     p = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

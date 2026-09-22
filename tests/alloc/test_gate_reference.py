@@ -1,15 +1,15 @@
 """The average-budget gate's reference: NORMAL OPERATION AT THE BUDGET, not only the default cell.
 
-The defect this pins: below the default cell's own mean price the gate did not run at all. The
-reference was "the default cell for every prompt", and where that cell is unaffordable ON AVERAGE
-there was nothing to revert to, so the average-budget pick stood UNGATED at exactly the budgets
-where the deviation is largest. On the cluster that produced five of the seven evaluation losses,
-four of them on BBH.
+The invariant this pins: every budget has a reference for the gate to rule against. With "the
+default cell for every prompt" as the only reference the gate cannot run below that cell's own mean
+price: where the cell is unaffordable ON AVERAGE there is nothing to revert to, so the
+average-budget pick stands UNGATED at exactly the budgets where the deviation is largest -- the
+case behind five of the seven measured evaluation losses, four of them on BBH.
 
-The rule now: the reference at budget X is normal operation at that budget -- the deepest depth at
+The rule: the reference at budget X is normal operation at that budget -- the deepest depth at
 the largest cap per prompt whose mean price fits X, stepping down a depth if even the cheapest cap
 at the deepest depth does not fit. Where the default cell IS affordable on average the same rule
-returns the default cell for every prompt, so nothing about a row that already gated changes.
+returns the default cell for every prompt.
 
 The plant below is the BBH shape: a cheap shallow cell is right on the 70 selection questions and
 wrong on everything after them, so the fitted score buys it and the verification half says so.
@@ -106,8 +106,9 @@ class TestTheFixtureIsTheDefectsShape(unittest.TestCase):
 
 
 class TestTheGateRunsBelowTheDefaultCell(unittest.TestCase):
-    """The fix: at 0.5x the gate has a reference, measures the margin on the verification half,
-    and sends the losing deviation back to normal operation at that budget."""
+    """At 0.5x, below the default cell's own mean price, the gate has a reference, measures the
+    margin on the verification half, and sends the losing deviation back to normal operation at
+    that budget."""
 
     def test_the_gate_measures_a_margin_where_it_used_to_have_none(self):
         row = table()["rows"][P.AVG_GATED]
@@ -150,8 +151,8 @@ class TestTheGateRunsBelowTheDefaultCell(unittest.TestCase):
 
 
 class TestTheDefaultCellReferenceIsUnchanged(unittest.TestCase):
-    """Where the default cell is affordable on average the rule returns it, so a row that gated
-    before the fix gates against the same thing after it."""
+    """Where the default cell is affordable on average the normal-operation rule returns the
+    default cell itself."""
 
     def test_at_one_times_under_expected_accounting_the_reference_is_the_default_cell(self):
         t1 = table(accounting="expected")
@@ -177,14 +178,15 @@ class TestTheDefaultCellReferenceIsUnchanged(unittest.TestCase):
 class TestTheCheaperEvaluationHalf(unittest.TestCase):
     """arc/ouro_2_6b_base at 1.0x: the default cell is over the budget on the CALIBRATION mean price
     and under it on the evaluation mean, because the calibration questions are the dearer ones. The
-    affordability test reads the calibration mean, so the gate was skipped and the row stood ungated
-    and lost 1.81 points. The reference must exist whatever that test says, and both mean prices
-    must be on the row."""
+    affordability test reads the calibration mean, so it alone would skip the gate and leave the row
+    ungated, which on this grid costs 1.81 points. The reference must exist whatever that test says,
+    and both mean prices must be on the row."""
 
     @staticmethod
     def rows():
         """The same plant with the calibration questions 10 percent dearer than the evaluation
-        ones, which is the only difference that produced the arc loss."""
+        ones, the only difference that makes the default cell affordable on evaluation but not on
+        calibration."""
         out = []
         for r in plant_rows():
             r = dict(r)

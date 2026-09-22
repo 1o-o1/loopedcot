@@ -166,8 +166,8 @@ def table_for(cells_dir, model, task, protocol, label, fractions, promptfree, tr
     order = rank_from_cal(grid, cal, cost, Pm, Rm)
     kmax_i, bmax_i = len(grid.ks) - 1, len(grid.Bs) - 1
     unc = grid.acc[kmax_i, bmax_i, ev]
-    # F1 guard: the cell at the horizon cap and the default's own uncapped cell are the same read-out
-    # for every question (one read-out per distinct cut), so their labels must agree question by question
+    # the cell at the horizon cap and the default's own uncapped cell are the same read-out for every
+    # question (one read-out per distinct cut), so their labels must agree question by question
     unc_j = np.array([grid.acc[kmax_i, j, n] for j, n in zip(jdef, ev)], float)
     if not np.array_equal(np.nan_to_num(unc, nan=-1), np.nan_to_num(unc_j, nan=-1)):
         raise SystemExit("%s/%s: the horizon-cap labels and the uncapped-cell labels differ on %d "

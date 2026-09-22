@@ -31,12 +31,12 @@ C1_MODELS="ouro_1_4b_think ouro_2_6b_think"
 TASKS="gsm8k math500 svamp aqua csqa arc strategyqa bbh mmlu hellaswag"
 # The horizon-extension set (model:task:depth): the deepest depths of the two tasks whose chains run into the
 # 4096 horizon most (MATH500, AQuA) on the Thinking checkpoints, and McLeish's deepest depth on MATH500 and
-# StrategyQA. The full >= 5% horizon-hit list is 83 jobs and was cut to these ten on 2026-09-17.
+# StrategyQA. These ten are a subset of the full >= 5% horizon-hit list, which is 83 jobs.
 HITLIST="${HITLIST:-ouro_1_4b_think:math500:4 ouro_1_4b_think:math500:3 ouro_1_4b_think:aqua:4 ouro_1_4b_think:aqua:3 ouro_2_6b_think:math500:4 ouro_2_6b_think:math500:3 ouro_2_6b_think:aqua:4 ouro_2_6b_think:aqua:3 mcleish_llama32_r32:math500:8 mcleish_llama32_r32:strategyqa:8}"
 HITLIST_MORE="ouro_1_4b_think:math500:2 ouro_1_4b_think:aqua:2 ouro_2_6b_think:math500:2 ouro_2_6b_think:aqua:2"
 # Every remaining (model, task, depth) whose 4096-horizon chains hit the horizon on 2 percent or more of
-# the questions (counted on the natural2 grids for the Thinking models and the natural grids for McLeish,
-# 2026-09-20), heaviest first: the shallow depths, where the Thinking models run long. 73 jobs.
+# the questions (counted on the natural2 grids for the Thinking models and the natural grids for
+# McLeish), heaviest first: the shallow depths, where the Thinking models run long. 73 jobs.
 HITLIST_ALL="ouro_1_4b_think:aqua:1 ouro_1_4b_think:strategyqa:1 ouro_1_4b_think:bbh:1 ouro_1_4b_think:math500:1 ouro_1_4b_think:csqa:1 mcleish_llama32_r32:strategyqa:1 mcleish_llama32_r32:hellaswag:1 ouro_2_6b_think:math500:1 ouro_1_4b_think:hellaswag:1 ouro_2_6b_think:bbh:1 mcleish_llama32_r32:math500:1 ouro_2_6b_think:aqua:1 ouro_1_4b_think:gsm8k:1 mcleish_llama32_r32:mmlu:1 ouro_2_6b_think:strategyqa:1 ouro_1_4b_think:arc:1 ouro_1_4b_think:svamp:1 mcleish_llama32_r32:aqua:1 ouro_1_4b_think:aqua:2 ouro_1_4b_think:math500:2 mcleish_llama32_r32:bbh:1 ouro_1_4b_think:mmlu:1 mcleish_llama32_r32:math500:2 ouro_1_4b_think:bbh:2 ouro_2_6b_think:math500:2 ouro_2_6b_think:hellaswag:1 ouro_2_6b_think:csqa:1 mcleish_llama32_r32:strategyqa:2 ouro_2_6b_think:svamp:1 ouro_2_6b_think:mmlu:1 mcleish_llama32_r32:gsm8k:1 ouro_2_6b_think:gsm8k:1 ouro_2_6b_think:aqua:2 mcleish_llama32_r32:hellaswag:2 mcleish_llama32_r32:strategyqa:4 mcleish_llama32_r32:bbh:2 mcleish_llama32_r32:math500:4 ouro_1_4b_think:mmlu:2 ouro_1_4b_think:hellaswag:2 ouro_1_4b_think:csqa:2 ouro_1_4b_think:strategyqa:2 ouro_2_6b_think:bbh:2 mcleish_llama32_r32:aqua:2 mcleish_llama32_r32:mmlu:2 ouro_1_4b_think:svamp:2 ouro_1_4b_think:gsm8k:2 ouro_2_6b_think:arc:1 ouro_2_6b_think:svamp:2 mcleish_llama32_r32:svamp:1 ouro_2_6b_think:hellaswag:2 mcleish_llama32_r32:gsm8k:2 ouro_1_4b_think:arc:2 ouro_2_6b_think:mmlu:2 ouro_2_6b_think:csqa:2 ouro_2_6b_think:strategyqa:2 ouro_2_6b_think:bbh:3 ouro_1_4b_think:gsm8k:3 mcleish_llama32_r32:aqua:4 ouro_2_6b_think:mmlu:4 ouro_2_6b_think:hellaswag:3 ouro_2_6b_think:csqa:3 ouro_2_6b_think:bbh:4 ouro_1_4b_think:gsm8k:4 ouro_2_6b_think:mmlu:3 ouro_2_6b_think:hellaswag:4 mcleish_llama32_r32:hellaswag:4 ouro_2_6b_think:gsm8k:2 ouro_2_6b_think:csqa:4 mcleish_llama32_r32:aqua:8 ouro_1_4b_think:arc:3 ouro_2_6b_think:strategyqa:4 ouro_1_4b_think:arc:4 ouro_2_6b_think:strategyqa:3"
 
 width_for() {  # the batch width for 8192-token sequences: half the width the 4096 grid used for this model/depth
@@ -50,7 +50,7 @@ width_for() {  # the batch width for 8192-token sequences: half the width the 40
 ok_log()   { [ -f "logs/$1.out" ] && grep -q "^RC=0" "logs/$1.out"; }
 
 # Nodes to avoid: every node whose probe failed, plus every node where a c1/c2 job died at CUDA start
-# (the two signatures seen on 2026-09-17). Kept in logs/bad_nodes.txt; submit() excludes them.
+# (matched by two known error signatures). Kept in logs/bad_nodes.txt; submit() excludes them.
 collect_bad_nodes() {
   { [ -f logs/bad_nodes.txt ] && cat logs/bad_nodes.txt
     for f in logs/probe_*.out; do [ -f "$f" ] || continue; grep -q "^RC=" "$f" && ! grep -q "^RC=0" "$f" && { n=${f#logs/probe_}; echo "${n%.out}"; }; done

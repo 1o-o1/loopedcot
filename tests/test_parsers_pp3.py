@@ -1,4 +1,4 @@
-"""Parser unit cases for the four PP3 evaluation sets (Brief PP3, decision 5).
+"""Parser unit cases for the four PP3 evaluation sets.
 
 Twenty cases each for StrategyQA, pooled BBH, MMLU and HellaSwag, over the forced read-out parse
 (`parse_forced`), the own-answer parse inside a cut trace (`parse_own`) and the equality rule

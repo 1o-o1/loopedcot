@@ -1,7 +1,7 @@
-"""checks.py: completeness, parse rates, and the PP2 checks JSON.
+"""checks.py: completeness, parse rates, and the gate checks JSON.
 
   python -m prod.checks --cells=DIR [--manifest=FILE] [--out=FILE]      # per-run completeness
-  python -m prod.checks --pp2 [--out=../checks.json]                    # the brief's checks fields
+  python -m prod.checks --pp2 [--out=../checks.json]                    # the gate checks fields
 
 Per-run checks (the thing every full-N job must satisfy before its numbers are used):
   * every (problem, cap) present for every depth, against the manifest's expected row count
@@ -11,7 +11,7 @@ Per-run checks (the thing every full-N job must satisfy before its numbers are u
   * split labels present and the calibration set exactly 100 questions per task (or 100 of 254 for
     AQuA), which is the split of record
 
-The PP2 checks JSON collects the gate outputs the brief names:
+The gate checks JSON collects these gate outputs:
   G0_batched_equals_batch1, G1_paths_validated, G1_mismatches, G2_parse_rate_min,
   G3_reproduction_max_dev, G4_flops_reproduction, G5_dry_run_complete, throughput_tokens_per_s,
   run_list_size, estimated_gpu_hours, review_pack_written, ready_for_full_N
@@ -34,11 +34,11 @@ def parse_cells_name(fn):
     puts the boundary in the wrong place (it read "ouro" / "1_4b_base_gsm8k").
 
     The protocol tag is whatever `manifest.protocol_of_tag` recognises, which is the one list of
-    tags in the package (`manifest.PROTOCOL_TAGS`). This function used to know only "natural" and
-    "forced", so a continuation grid (`natural2`, `natural2h`) parsed as no file at all and was
-    dropped from the run silently -- unchecked rather than failed. A continuation grid is now
-    checked by exactly the rules its natural-stop parent is checked by, under its own key, because
-    it is its own grid and never a shard of that parent.
+    tags in the package (`manifest.PROTOCOL_TAGS`). A narrower tag list here would let a
+    continuation grid (`natural2`, `natural2h`) parse as no file at all and be dropped from the run
+    silently -- unchecked rather than failed. A continuation grid is checked by exactly the rules
+    its natural-stop parent is checked by, under its own key, because it is its own grid and never
+    a shard of that parent.
     """
     if not (fn.startswith("cells_") and fn.endswith(".jsonl")):
         return None
@@ -120,8 +120,8 @@ def run_checks(cells_dir, min_parse=0.9):
 CLUSTER_FACTOR = 4.0
 
 
-# Brief PP2 asks for `estimated_gpu_hours` "from measurements, not from the 4070": a laptop 8 GB
-# 4070 smoke is in the artifacts tree and must not enter the projection.
+# `estimated_gpu_hours` is projected from measurements only: a laptop 8 GB 4070 smoke is in the
+# artifacts tree and must not enter the projection.
 EXCLUDE_DEVICES = ("4070",)
 
 
@@ -170,7 +170,7 @@ def gpu_hour_estimate(cells_dir, man=None, cluster_factor=CLUSTER_FACTOR,
                "device": (m.get("env") or {}).get("device"),
                "batch_width": m.get("batch_width_pinned"), "peak_gb": m.get("peak_gb")}
         key = (m["model"], m.get("task"), m.get("k"), m.get("protocol", "natural"))
-        # when the same cell was measured at more than one width (gate G0 ran width 8 and width 16),
+        # when the same cell was measured at more than one width (the width sweep ran 8 and 16),
         # the projection must use the PINNED production width, not whichever file globbed last
         prev = obs.get(key)
         if prev is not None and prev.get("batch_width") == BATCH_WIDTH                 and rec.get("batch_width") != BATCH_WIDTH:
@@ -338,9 +338,9 @@ def pp2_checks(root=None, cells_dir=None):
     review = os.path.join(root, "dev", "REVIEW.md")
     G1_OK = ("PASS", "MATCHED EXCEPT THE STRIP RULE")
     out = {
-        # The criterion of record is the REVISED one (PLAN.md rulings Q6): batch-1 equality is no
-        # longer a criterion, so `G0_batched_equals_batch1` keeps the batch-1 measurements as context
-        # and `G0_revised` carries the verdict.
+        # The criterion of record is the REVISED one: batch-1 equality is not a criterion, so
+        # `G0_batched_equals_batch1` keeps the batch-1 measurements as context and `G0_revised`
+        # carries the verdict.
         "G0_batched_equals_batch1": g0,
         "G0_revised": {"pass": bool(g0r.get("pass")),
                        "criterion": g0r.get("criterion"),
@@ -400,8 +400,8 @@ def pp2_checks(root=None, cells_dir=None):
                   "package_hashes": package_hashes(),
                   "tasks": {t: task_cfg(t)["n_full"] for t in TASK_ORDER},
                   "gpu_hour_estimate_detail": est}}
-    # G0 is judged by the revised criterion; G1 counts the strip-rule paths as validated, which the
-    # rulings (Q8) explicitly waive, and requires every path in its table to have been compared.
+    # G0 is judged by the revised criterion; G1 counts the strip-rule paths as validated (that one
+    # difference is waived) and requires every path in its table to have been compared.
     g1_full = bool(g1.get("pass")) and not (g1.get("coverage") or {}).get("paths_not_run", 1)
     gates_ok = [bool(g3.get("pass")), bool(g4.get("pass")), bool(g2.get("pass")),
                 g1_full, bool(g5.get("pass")), bool(g0r.get("pass"))]
@@ -416,7 +416,7 @@ def main(argv=None):
     p.add_argument("--cells", default=ART)
     p.add_argument("--manifest", default=None)
     p.add_argument("--pp2", "--pp3", dest="pp2", action="store_true",
-                   help="the brief's checks fields. --pp3 is an alias: the PP2 gate fields are "
+                   help="the protocol's checks fields. --pp3 is an alias: the PP2 gate fields are "
                         "unchanged by PP3 and the PP3 fields are written by the PP3 build "
                         "(checks.json['PP3']), so one collector serves both.")
     p.add_argument("--min-parse", dest="min_parse", type=float, default=0.9)

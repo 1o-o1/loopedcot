@@ -53,7 +53,7 @@ from ..common import BATCH_CAP, MEM_FRACTION, RESERVE_GB
 from .base import Adapter
 
 DEV = os.environ.get("PROD_DEV", "cuda")
-SEED_MULT = 1000003          # S4 F6's per-example init seed rule, used by S9c and S9f
+SEED_MULT = 1000003          # per-example init seed for the latent draw: SEED_MULT * the row index
 HUGINN_PAD_ID = 65509        # s9c_common.PAD_ID
 HUGINN_STOP_IDS = [65504, 65505, 65508]   # s9c_common.STOP_IDS: begin_text, end_text, end_turn
 
@@ -276,8 +276,8 @@ class RavenAdapter(Adapter):
         if DEV == "cuda":
             torch.cuda.set_per_process_memory_fraction(self.mem_fraction)
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        # PP3 decision 3: load the REVISION that `prod.install_models` pinned, not whatever the
-        # repo's `main` points at today. `revision=None` (no pins file yet) is the old behaviour.
+        # load the REVISION that `prod.install_models` pinned, not whatever the repo's `main`
+        # points at today. `revision=None` (no pins file yet) loads `main`.
         rev = cfgmod.revision_for(self.name)
         tok = AutoTokenizer.from_pretrained(self.repo, revision=rev)
         m = AutoModelForCausalLM.from_pretrained(

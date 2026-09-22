@@ -4,8 +4,7 @@ Two gain statistics are pinned separately because they answer different question
 headline, the equal-weight mean over the qualifying budgets; POOLED_* is the mean over every
 feasible (prompt, budget) pair, which weights a budget by how many prompts can afford it.
 
-Provenance: the pooled values and the contrasts were frozen before this review and are unchanged;
-the headline values were measured when the equal-budget mean became the headline."""
+Both sets, and the checkpoint contrasts, are pinned regression values."""
 import os
 import sys
 import unittest

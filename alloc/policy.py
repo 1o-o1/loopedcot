@@ -34,19 +34,19 @@ DEFAULT_GATE_MODE = "split"
 
 # How many FOLDS of the split the gate must be cleared on.
 #   1  one direction: fit on the selection half, verify on the verification half. The comparison
-#      setting now, and the only count the `whole` gate can have.
-#   2  the FROZEN default (2026-09-18). Both directions: fit on the selection half and verify on the
-#      verification half, then fit on the verification half and verify on the selection half, and
-#      deviate only when BOTH verified margins clear c_gate * sd. A one-fold verification of 30
-#      questions can read a large margin that the evaluation half does not repay -- StrategyQA's F0
-#      deviation verified +13.3 +/- 5.5 and then lost 2.7 points over 1,990 evaluation questions --
-#      and a deviation that is real has to show in both halves. Nothing about one fold moves: the
-#      arm that RUNS is always the fold-1 policy, and the extra fold can only withhold a deviation.
+#      setting, and the only count the `whole` gate can have.
+#   2  the FROZEN default. Both directions: fit on the selection half and verify on the verification
+#      half, then fit on the verification half and verify on the selection half, and deviate only
+#      when BOTH verified margins clear c_gate * sd. A one-fold verification of 30 questions can
+#      read a large margin that the evaluation half does not repay -- StrategyQA's F0 deviation
+#      verified +13.3 +/- 5.5 and then lost 2.7 points over 1,990 evaluation questions -- and a
+#      deviation that is real has to show in both halves. Nothing about one fold moves: the arm that
+#      RUNS is always the fold-1 policy, and the extra fold can only withhold a deviation.
 #
-# Frozen on the 60-pair run of work/analysis_2026-09-18: equation_v6 (one fold) against
-# equation_v6_folds2 (two), expected accounting, 1.0x of the default cost. The second fold removed
-# every FALSE deviation -- one whose paired evaluation interval sits wholly below its own
-# fallback -- for both gated arms, and the deviations it kept are worth more per point of compute:
+# Measured on a 60-pair run of one fold against two, expected accounting, 1.0x of the default cost.
+# The second fold removed every FALSE deviation -- one whose paired evaluation interval sits wholly
+# below its own fallback -- for both gated arms, and the deviations it kept are worth more per point
+# of compute:
 #
 #   arm                          deviations   false at two folds   gain@1.0x      saving@1.0x
 #   avg_gated_lookup             31 -> 22     0                    1.22 -> 1.45   42% -> 35%
@@ -530,13 +530,12 @@ AVG_RANKINGS = ("avg_lookup", "avg_equation", "avg_gated_lookup")
 # The resolved-identity average-budget arms, kept in their own tuple so the frozen v5 set above
 # still names exactly the three arms it named. `AVG_ARMS` is what a table reports.
 AVG_RANKINGS_RESOLVED = ("avg_equation_resolved", "avg_gated_equation_resolved")
-# Ruling of record (2026-09-18): the RANKING OF RECORD is the settle-time-resolved commitment
-# identity. Over the 60 pairs of work/analysis_2026-09-18/equation_v6 it is statistically
-# indistinguishable from the lookup on 58 of them, and it is the one the mechanism justifies: the
-# lookup is a table of measured cell means with no account of WHEN a question commits, so it can only
-# repeat what the calibration labels happened to say. The lookup stays as the LABEL-ONLY BASELINE
-# the resolved arm is read against, so those two lead every report, in that order, and every other
-# arm is still available.
+# The RANKING OF RECORD is the settle-time-resolved commitment identity. Over the 60 measured pairs
+# it is statistically indistinguishable from the lookup on 58 of them, and it is the one the
+# mechanism justifies: the lookup is a table of measured cell means with no account of WHEN a
+# question commits, so it can only repeat what the calibration labels happened to say. The lookup
+# stays as the LABEL-ONLY BASELINE the resolved arm is read against, so those two lead every report,
+# in that order, and every other arm is still available.
 RANKING_OF_RECORD = "equation_resolved"
 AVG_ARM_OF_RECORD = "avg_gated_equation_resolved"
 AVG_ARM_BASELINE = "avg_gated_lookup"

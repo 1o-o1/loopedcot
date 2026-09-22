@@ -39,9 +39,9 @@ EARLY_SHARE = 0.6                    # questions that settle at cap 0 and stay r
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 ARTIFACTS = os.path.join(REPO, "artifacts")
 
-# compute.py's own numbers for ouro_1_4b_base / hellaswag, from
-# work/analysis_2026-09-18/equation/resolved_fit.csv. Read at the raw 100-question calibration split
-# that compute.py uses, no promotion, expected-cost geometry 24 layers per loop and no fixed layers.
+# compute.py's own numbers for ouro_1_4b_base / hellaswag, read at the raw 100-question calibration
+# split that compute.py uses, no promotion, expected-cost geometry 24 layers per loop and no fixed
+# layers.
 REPRO_GRID = ("hellaswag", "ouro_1_4b_base")
 REPRO_RMSE_EVAL = {30: 11.544194, 100: 5.641460}          # resolved
 REPRO_RMSE_EVAL_POOLED = {30: 11.459727, 100: 6.544860}
@@ -470,9 +470,8 @@ class TestTheTwoFoldGate(unittest.TestCase):
 
 
 class TestTheFrozenDefaults(unittest.TestCase):
-    """The 2026-09-18 freeze: two-fold verification, and the resolved arm at the head of the list.
-
-    Both rulings came off the 60-pair run under work/analysis_2026-09-18 (see alloc/README.md).
+    """The frozen defaults: two-fold verification, and the resolved arm at the head of the arm
+    list (see alloc/README.md).
     """
 
     def test_two_folds_are_the_default(self):
@@ -600,9 +599,9 @@ def repro_available():
 class TestReproducesComputeDotPy(unittest.TestCase):
     """The resolved surface on a production grid must be compute.py's, to 0.05 of a point.
 
-    The reference is work/analysis_2026-09-18/equation/resolved_fit.csv, which loads the grid with no
-    calibration promotion, so this test loads it the same way: the first 100 questions calibrate and
-    `c` and `l` come from the first `n_labels` of them in id order.
+    The reference fit loads the grid with no calibration promotion, so this test loads it the same
+    way: the first 100 questions calibrate and `c` and `l` come from the first `n_labels` of them in
+    id order.
     """
 
     @classmethod

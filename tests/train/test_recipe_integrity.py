@@ -384,7 +384,7 @@ def test_padding_is_outside_every_count(cfg, tok):
     assert all(m["supervised"] <= content for m in sched)
 
 
-# ================================================================= F1: the GPU wait policy
+# ================================================================= the GPU wait policy
 WAIT_CASES = [([], {}, False),                                  # unknown box: do not block
               (["--wait"], {}, True),                           # asked for explicitly
               ([], {"CLUSTER": "0"}, True),                     # the shared unmanaged box
@@ -416,7 +416,7 @@ def test_v4_preflight_takes_its_wait_from_the_flags(tmp_path, monkeypatch):
     assert seen["wait"] is True
 
 
-# ================================================================= F2: the share caps
+# ================================================================= the share caps
 def test_share_caps_are_inactive_only_when_no_mixture_could_satisfy_them(cfg):
     """One source can never hold a third of the tokens, so that cap is reported, not enforced."""
     one = G.share_caps(cfg, ["gsm8k"])
@@ -485,7 +485,7 @@ def test_a_single_source_run_is_not_starved_by_an_unsatisfiable_cap(tmp_path, cf
     assert man["supervised_tokens_drawn"] >= 3000
 
 
-# ================================================================= F3: the pool is pinned
+# ================================================================= the pool is pinned
 def test_the_pool_file_is_pinned_by_sha256(tmp_path, cfg):
     """An edited pool must stop stage 2 and the gates, not silently retrain on other questions."""
     pool = tmp_path / "pool.jsonl"
@@ -510,7 +510,7 @@ def test_the_config_pins_the_shipped_pool(cfg):
     assert G.file_sha256(str(pool)) == cfg["pool_sha256"]
 
 
-# ================================================================= F4: --root is required
+# ================================================================= --root is required
 ROOT_STAGES = [("chains", "chains.py", ["gsm8k"]),
                ("targets", "targets.py", []),
                ("gates", "gates.py", []),
@@ -546,7 +546,7 @@ def test_the_readme_commands_pass_the_root():
     assert stage0 and all("--root=" not in line for line in stage0), stage0
 
 
-# ================================================================= F5: the measured memory claim
+# ================================================================= the measured memory claim
 def readme_text():
     """Return the package README, the only place the cost estimates are written down."""
     return Path(G.__file__).resolve().parent.joinpath("README.md").read_text(encoding="utf-8")
@@ -561,7 +561,7 @@ def test_the_readme_states_the_measured_micro4_memory():
 
 
 def test_the_readme_costs_are_the_ones_the_new_buckets_imply(cfg):
-    """The estimates are recomputed for the bucket set, and the superseded per-variant figure is named."""
+    """The estimates match the bucket set, and the superseded per-variant figure is named."""
     text = readme_text()
     assert "7.4 h per variant** figure was 590 steps" in text      # superseded, and said to be
     for claim in ("9.1 h", "about 800 steps", "14.8 h", "5.9 h", "about 26 h",
@@ -574,7 +574,7 @@ def test_the_readme_costs_are_the_ones_the_new_buckets_imply(cfg):
 
 
 def test_the_readme_states_the_variant_order_of_record():
-    """Item 6: the four variants stay, but the plan of record runs two of them."""
+    """The README lists all four variants, but the plan of record runs two of them."""
     text = readme_text()
     head = text[text.index("## Ablations"):text.index("## Files")]
     assert "plan of record" in head
@@ -803,7 +803,7 @@ def run_analysis(tmp_path, cfg, monkeypatch, ref_caps):
 
 
 def test_f3_tests_non_inferiority_at_2048_and_at_no_limit_cut_there(tmp_path, cfg, monkeypatch):
-    """Item 5: the top cell of F3 is the grid's largest budget, 2048, and the no-limit run cut at it."""
+    """The top cell of F3 is the grid's largest budget, 2048, and the no-limit run cut at it."""
     res = run_analysis(tmp_path, cfg, monkeypatch,
                        ref_caps=[int(c) for c in cfg["eval_standard_caps"]])
     f3 = res["F3"]

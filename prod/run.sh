@@ -12,11 +12,12 @@
 #   --k=INT             loop count
 # Protocol
 #   --protocol=natural|forced       default natural
-#   --caps=LIST                     default 0,16,32,64,128,256,512,1024,2048,4096 (PP3)
-#   --extra-caps=LIST               PP3: EMPTY. The extra caps {48,96,192,384} are dropped
-#                                   (decision 4); the `extra` row field survives and is always false
-#   --horizon=INT                   PP3 default 4096 for BOTH protocols (decision 4)
-#   --no-eos-cut                    use the older S9a cut rule (gate G1 on the S9c/S9f paths)
+#   --caps=LIST                     default 0,16,32,64,128,256,512,1024,2048,4096
+#   --extra-caps=LIST               EMPTY by default. The extra caps {48,96,192,384} are dropped;
+#                                   the `extra` row field survives and is always false
+#   --horizon=INT                   default 4096 for BOTH protocols
+#   --no-eos-cut                    use the alternate cut rule, needed to reproduce two earlier
+#                                   runs exactly
 # Sharding and size
 #   --shard=INT --shards=INT        default 0 / 1
 #   --n=INT                         first N problems of the shard (smoke and forced runs)
@@ -24,7 +25,7 @@
 #   --gpu=INT                       CUDA_VISIBLE_DEVICES, default unset (all)
 #   --mem-fraction=FLOAT            default 0.85 (the Spark rule)
 #   --batch-cap=INT                 default 32
-#   --batch-width=INT               force an exact batch width (G1 reproduces a spike's width)
+#   --batch-width=INT               force an exact batch width (to match an earlier run's width)
 #   --no-mask                       raven families only: skip the padding mask (batch-1 control)
 #   --adapter=DIR                   LoRA adapter directory (S32 tag convention)
 #   --tag-loops / --tag-tokens      S32 control line

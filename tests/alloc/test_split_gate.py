@@ -1,11 +1,11 @@
 """Split-calibration verification: the gate may not measure its margin on the data that chose the cell.
 
-The old gate picked the best of many cells on one set of calibration labels and then measured that
-cell's margin over the default cell on the SAME labels. The maximum of many noisy estimates sits
-above the truth by roughly the noise spread times how many cells were in the running, so the margin
-the gate read was not the margin the policy had, and `c_gate = 0.5` sd did not cover the gap. That
-is the winner's curse, and on the cluster tables it opened the gate on cells that then lost 2 to 5
-points while saving 30 to 55 percent of the cost.
+Picking the best of many cells on one set of calibration labels and then measuring that cell's
+margin over the default cell on the SAME labels does not work. The maximum of many noisy estimates
+sits above the truth by roughly the noise spread times how many cells were in the running, so the
+margin read is not the margin the policy has, and `c_gate = 0.5` sd does not cover the gap. That
+is the winner's curse, and it opens the gate on cells that then lose 2 to 5 points while saving 30
+to 55 percent of the cost.
 
 The repair cuts the calibration questions in ID ORDER into the first `n_select`, which fit the
 ranking and the multiplier, and the next `n_verify`, which measure the margin of what was fitted and
@@ -363,7 +363,7 @@ class TestTheRealGrids(unittest.TestCase):
 
     Under the frozen 70/30 the gate reverts eight of these ten grids at 1.0x; MATH500 s33 and CSQA
     s33 are the two whose deviation the verification half backs, and both are budgets the default
-    cell cannot buy on average, where the gate ruled nothing at all before it had a reference there.
+    cell cannot buy on average, so the gate rules against normal operation at that budget instead.
     MATH500 A0 is where a reversion costs something real: the whole-set gate keeps its depth-3 deviation on a +8.0 point
     margin in its own score units, and the verification ids 70-99 measure the same policy at -10.0
     points and close it. The same policy read on ids 50-79 measured +16.7, which is how far thirty
@@ -416,16 +416,16 @@ class TestTheRealGrids(unittest.TestCase):
                                      t1["rows"]["default_cell"]["cell"][0], (task, ckpt))
 
     def test_a_budget_the_default_cell_cannot_buy_is_gated_against_normal_operation(self):
-        """Below the default cell's own mean price the gate used to be skipped and the Lagrangian
-        policy stood UNGATED. GSM8K s33 at 1.0x is that case: the default cell does not fit the
-        budget on average on either half, and the row is now measured against normal operation at
-        that budget -- the deepest depth with the cap stepped down -- and reverts to it.
+        """Below the default cell's own mean price the Lagrangian policy is gated all the same.
+        GSM8K s33 at 1.0x is that case: the default cell does not fit the budget on average on
+        either half, so the row is measured against normal operation at that budget -- the deepest
+        depth with the cap stepped down -- and reverts to it.
         """
         t1 = self._table("gsm8k", "s33", "split")
         row = t1["rows"][P.AVG_GATED]
         self.assertFalse(t1["rows"]["default_cell"]["affordable_on_average"][ONE])
         self.assertFalse(row["default_cell_affordable_on_cal"][ONE])
-        self.assertIsNotNone(row["gate_margin_pts"][ONE])          # it used to be None
+        self.assertIsNotNone(row["gate_margin_pts"][ONE])          # never None, at any budget
         self.assertEqual(row["reference_rule"][ONE], "deepest_depth_capped")
         self.assertEqual(row["reference_k"][ONE], t1["rows"]["default_cell"]["cell"][0])
         self.assertTrue(row["gate_reverted"][ONE])
@@ -448,7 +448,7 @@ class TestTheRealGrids(unittest.TestCase):
             self.assertFalse(row["gate_split_truncated"])
 
     def test_the_frozen_split_is_seventy_and_thirty(self):
-        """Re-swept under the MEASURED rule over {50/50, 50/30, 70/30} x c_gate {0.5, 1.0} on
+        """Swept under the MEASURED rule over {50/50, 50/30, 70/30} x c_gate {0.5, 1.0} on
         twenty grids -- the ten Ouro-1.4B base production grids and these ten -- for both gated
         arms. 50/30 is the only setting with a deviation that loses beyond its paired evaluation
         interval (HellaSwag, -5.7 points on a +6.7 point margin read off 30 questions), and of the
@@ -459,10 +459,10 @@ class TestTheRealGrids(unittest.TestCase):
             self.assertEqual(len(C.load(S33, task, "A0", L=24, L_fixed=0).select("cal")), 100)
 
     def test_the_math500_deviation_does_not_survive_the_frozen_split(self):
-        """50/30 kept MATH500 A0's depth-3 deviation on a +16.7 point margin measured over ids
-        50-79; the frozen ids 70-99 measure -10.0 on it and the gate reverts, as 50/50 does.
-        Keeping that one deviation was the whole reason 50/30 beat 50/50 in the old sweep, so the
-        re-freeze rests on the twenty-grid objective instead."""
+        """50/30 keeps MATH500 A0's depth-3 deviation on a +16.7 point margin measured over ids
+        50-79; the frozen ids 70-99 measure -10.0 on it and the gate reverts, as 50/50 does. That
+        one deviation is the whole difference between 50/30 and 50/50, so the choice of split
+        rests on the twenty-grid objective instead."""
         cs = C.load(S33, "math500", "A0", L=24, L_fixed=0)
         for ns, nv in ((70, 30), (50, 50)):
             t1 = E.table1(cs, accounting="expected", avg_budget=True, n_labels_grid=(30,),
@@ -574,7 +574,8 @@ class TestTheGateMayNotTakeItsMarginFromTheEquation(unittest.TestCase):
         self.assertAlmostEqual(g["gain_mean_pts"], -10.0, places=6)
 
     def test_the_old_whole_set_rule_still_opens_on_it(self):
-        """`whole` keeps the predicted margin, so it is still fooled: this is what was repaired."""
+        """`whole` reads the predicted margin, so a wrong-signed surface fools it; `split` measures
+        the margin on held-out labels and does not."""
         g = E.gain_over_normal(self.cs, ranking="equation", c_gate=0.5, n_boot=5, n_cal_draws=2,
                                gate_draws=5, gate_mode="whole")
         self.assertIsNone(g["gate_decisions"])

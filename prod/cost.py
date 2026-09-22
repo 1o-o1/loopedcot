@@ -1,4 +1,4 @@
-"""Cost accounting, four ways (the compute reporting rule of record, 2026-09-05).
+"""Cost accounting, four ways.
 
   python -m prod.cost --models=all [--P=800 --T=512] [--old] [--out=FILE]
   python -m prod.cost --cells=DIR --model=... --task=...     # per-cell, from the stored rows
@@ -8,16 +8,16 @@
      raven   (prelude + k * core + coda) * (P + T + R)
    prompt-inclusive and prompt-free, both stored per row by generate.py.
 
-2. FLOPs by the T5 formula (PLAN.md line 952, verbatim):
+2. FLOPs by the T5 formula:
      FLOPs per question = 2 * N_nonembed * k * (P + T + R)
                         + k * [attention quadratic term over FULL-ATTENTION layers only]
                         + 2 * V * d * (T + R)                  (output head once per generated token)
    with the quadratic term the MEAN OVER PROBLEMS of (P + T)^2, not the square of the mean; suffix
    and answer tokens counted as generated; prefill and decode stored separately (prefill carries the
    P^2 part of the quadratic term, decode the rest: the total is the same either way).
-   The four defects this corrects, from KB09-09 section 1 (S27): attention not multiplied by k for a
-   looped model, dense attention assumed for hybrid models, the square of the mean length, suffix
-   tokens excluded. `--old` also prints S27's original formula so G4 can show the old-vs-new table.
+   The four defects this corrects: attention not multiplied by k for a looped model, dense attention
+   assumed for hybrid models, the square of the mean length, suffix tokens excluded. `--old` also
+   prints S27's original formula for the old-vs-new table.
 
 3. WALL CLOCK on one fixed GPU for one fixed cell per model: `generate.py` records
    `generate_seconds` and `tokens_per_s` per pass; `wall_clock_table` collects them.
@@ -118,7 +118,7 @@ def kv_bytes_per_token(sh, k, itemsize=2):
 
 # ------------------------------------------------------------------ FLOPs, T5
 def flops_t5(sh, k, P, T, R=0.0, sq_lengths=None, attn_layers=None, split=False):
-    """PLAN.md T5, verbatim.
+    """The T5 FLOPs formula.
 
     P  prompt tokens, T generated trace tokens, R suffix + answer tokens (counted as generated).
     sq_lengths: the MEAN OVER PROBLEMS of (P + T)^2. When None it falls back to (P + T)^2, which is
@@ -151,8 +151,8 @@ def flops_t5(sh, k, P, T, R=0.0, sq_lengths=None, attn_layers=None, split=False)
         # The quadratic term splits with the lengths, not entirely onto prefill: prefill attends over
         # the prompt alone (P^2), decode attends over the prompt AND what has been generated so far,
         # which is the rest of the mean squared length. Charging the whole quadratic term to prefill
-        # put every generated token's attention in the prefill column, which on these grids is the
-        # larger half. The TOTAL is untouched: decode is still total minus prefill.
+        # would put every generated token's attention in the prefill column, which on these grids is
+        # the larger half. The TOTAL is unaffected: decode is total minus prefill.
         sq_prefill = min(float(P) ** 2, sq)
         attn_prefill = (attn_loop + attn_fixed) * (sq_prefill / sq) if sq > 0 else 0.0
         out["flops_prefill"] = (2.0 * (sh.get("n_nonembed_fixed", 0)
@@ -166,7 +166,7 @@ def flops_t5(sh, k, P, T, R=0.0, sq_lengths=None, attn_layers=None, split=False)
 
 def flops_s27_old(n_nonembed, n_layers, d_model, P, T, k=1, attn_layers=None,
                   attn_scaled_by_k=False):
-    """s27_common.flops_per_problem, VERBATIM, kept only so G4 can print the old-vs-new table.
+    """The prior FLOPs formula, reproduced unchanged, kept only to print the old-vs-new table.
 
         2 * N_nonembed * k * S + 4 * L * d_model * S^2 / 2,  S = P + T
     """

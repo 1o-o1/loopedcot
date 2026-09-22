@@ -35,9 +35,9 @@ def get(name, adapter_dir=None, **kw):
 
 
 def depths_for(name, task, cfg=None):
-    """The depth set of record (Brief PP3, decision 6): Ouro {1,2,3,4}; McLeish {1,2,4,8} plus
-    {16,32} on GSM8K; Huginn {1,2,4,8,16,32}, natural stop only (the forced block is restricted to
-    the Ouro checkpoints by config.FORCED_BLOCK).
+    """The depth set of record: Ouro {1,2,3,4}; McLeish {1,2,4,8} plus {16,32} on GSM8K; Huginn
+    {1,2,4,8,16,32}, natural stop only (the forced block is restricted to the Ouro checkpoints by
+    config.FORCED_BLOCK).
 
     The sets live in `prod/config.py` so the command line can override them; the per-family
     constants below stay as the adapters' own record of what the checkpoint supports and are what a

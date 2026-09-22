@@ -358,8 +358,8 @@ def ans_eq(pred, gold, task):
 
 
 def score_v2(row):
-    """Protocol v2 (D1): the model's own answer if it parses inside the cut, else the forced
-    read-out. Computed from stored fields only."""
+    """Protocol v2: the model's own answer if it parses inside the cut, else the forced read-out.
+    Computed from stored fields only."""
     if row.get("trace_answer") is not None:
         return bool(row["trace_correct"])
     return bool(row["correct"])

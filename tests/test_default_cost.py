@@ -1,6 +1,5 @@
-"""Fix 2 (PP3b, decision 7): "budget as a fraction of the default cost" is the MEAN REALISED
-layer-pass cost of the default operating point (max measured depth, natural stop, uncapped) -- not
-the grid's largest CAP cell (the old `X = budget_fraction * cmat.max()`).
+"""Budget as a fraction of the default cost: the MEAN REALISED layer-pass cost of the default
+operating point (max measured depth, natural stop, uncapped), not the grid's largest CAP cell.
 
   python -m pytest tests/test_default_cost.py -q
   python tests/test_default_cost.py

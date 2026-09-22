@@ -1,11 +1,11 @@
-"""`prod.checks.parse_cells_name` reads every protocol tag the package has, not two of them.
+"""`prod.checks.parse_cells_name` reads every protocol tag the package has, not just `natural` and
+`forced`.
 
-The defect: the function knew only "natural" and "forced", so a continuation grid
-(`cells_<model>_<task>_natural2_k<k>.jsonl`, and `natural2h` for the horizon mode) parsed as
-nothing at all. `run_checks` skips a name it cannot parse, so those grids were dropped from the run
-silently -- never completeness-checked, never parse-rate-checked, and absent from the checks JSON
-rather than failing in it. The tags now come from `manifest.protocol_of_tag`, the one list in the
-package, so a continuation grid is checked by its natural-stop parent's rules under its own key.
+The tags come from `manifest.protocol_of_tag`, the one list in the package, so a continuation grid
+(`cells_<model>_<task>_natural2_k<k>.jsonl`, and `natural2h` for the horizon mode) is checked under
+its own key by its natural-stop parent's rules. A name the function cannot parse is a silent loss:
+`run_checks` skips it, so the grid never reaches the run -- never completeness-checked, never
+parse-rate-checked, and absent from the checks JSON rather than failing in it.
 
   python -m pytest tests/test_checks_protocol_tags.py -q
   python tests/test_checks_protocol_tags.py

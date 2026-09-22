@@ -7,17 +7,16 @@ Facts of record:
     `_prep_generate_args` would have used 4 + 4*num_steps, which is wrong for a 6-layer core).
     raven.py sizes the cache from `passes_per_token`, which reads the config, so it is right for
     both checkpoints.
-  * depth set {1, 2, 4, 8} on every task plus {16, 32} on GSM8K (Brief PP2). S9f F2: "the loop axis
-    saturates at k=4 despite training at recurrence 32 ... Eight times the recurrent compute buys
-    one point", which is why the extra depths are GSM8K-only.
+  * depth set {1, 2, 4, 8} on every task plus {16, 32} on GSM8K: the loop axis saturates at k=4
+    despite training at recurrence 32 (eight times the recurrent compute buys one point), which is
+    why the extra depths are GSM8K-only.
   * prompts use `add_special_tokens=True`, following the model card's own usage example
     (`tokenizer.encode(..., add_special_tokens=True)`), which prepends <|begin_of_text|>
     (s9f_common.build_prompts). This is the one tokenisation difference from the Ouro path and it is
     recorded in every run meta as `add_special_tokens`.
   * no padding mask on the stock forward, so batched decoding needs raven.py's attention patch;
-    `s9f/artifacts/batch_identity.json` measured that even an UNPADDED equal-length batch of 2 is
-    not token-identical to batch 1 at k=4 (2 of 8 rows diverge), which is the bf16 batch-width
-    effect of LEDGER 2026-09-04 S5, not a mask problem.
+    even an UNPADDED equal-length batch of 2 is measured as not token-identical to batch 1 at k=4
+    (2 of 8 rows diverge), which is a bf16 batch-width effect, not a mask problem.
 """
 from .raven import RavenAdapter
 

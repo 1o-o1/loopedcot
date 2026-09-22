@@ -11,7 +11,7 @@
 Protocol (natural stop), ported from s32_run.py and s28_common:
   generate once at the horizon with the model's own stop rule, then cut(B) = trace[:min(B, natural
   stop)] and run ONE forced read-out per DISTINCT cut length, serving every budget that shares it.
-  Both parses are stored per cap, and protocol v2 is computed from the stored fields (decision D1).
+  Both parses are stored per cap, and protocol v2 is computed from the stored fields.
 
 Protocol (continuation of a stored chain), `--continue-chains=<mode>` on the natural protocol:
   the chains sidecar of a finished natural-stop job is replayed as the prefix (prefill, exactly as
@@ -27,16 +27,15 @@ Protocol (forced continuation), ported from s13_common.decode(stopper=...) / mak
   no row ever stops; a token that would stop is replaced by the "Wait," tokens, so every row emits
   exactly `horizon` tokens. GSM8K and MATH500 on the Ouro checkpoints only.
 
-Pinned by the rulings on PP2 protocol decisions (PLAN.md, 2026-09-12):
-  * batch width 16 in every production run (Q6 clause iv), stored per row as `batch_width` with the
+Pinned protocol rules:
+  * batch width 16 in every production run, stored per row as `batch_width` with the
     actual group size of the generation and of the read-out beside it. `--batch-width=0` restores the
     adaptive KV-ceiling width and exists for the gates, which reproduce spikes that ran that way.
-  * the forced read-out is truncated at its eos, KEEPING the eos token, in every family (Q8 option
-    O1: the rule of S13, S26, S32 and of every analysis of record). Where the strip removed text, the
-    row also carries `nostrip` = what the answer would have been without it, so gate G1 can attribute
-    a mismatch against the S9a-family spikes to the strip rule with no second generation.
-  * forced continuation defaults to the spike's N (GSM8K 300, MATH500 500; Q2 option O1) and `--n`
-    overrides it. The full-N forced block is priced separately (protocol decision Q15).
+  * the forced read-out is truncated at its eos, KEEPING the eos token, in every family. Where the
+    strip removed text, the row also carries `nostrip` = what the answer would have been without it,
+    so a mismatch can be attributed to the strip rule with no second generation.
+  * forced continuation defaults to a fixed N per task (GSM8K 300, MATH500 500) and `--n`
+    overrides it. The full-N forced block is priced separately.
 
 Every hyperparameter above is an argument; nothing is hard-coded in a driver.
 Resumable at (problem, cut) granularity: traces and cells are append-only jsonl, re-read on start.
@@ -61,7 +60,7 @@ from .tasks import (ans_eq, build_prompts, data_hashes, make_find_cut, parse_for
                     row_kind, row_n_answer, rows as task_rows_of, split_labels, task_cfg)
 
 
-# ------------------------------------------------------------------ protocol v2 (decision D1)
+# ------------------------------------------------------------------ protocol v2
 def score_v2(row):
     """s32_common.score_v2, verbatim: the model's own answer if it parses inside the cut, else the
     forced read-out. Computed from stored fields only."""
@@ -89,7 +88,7 @@ def build_parser():
     p.add_argument("--no-extra-caps", dest="extra_caps", action="store_const", const="")
     p.add_argument("--mem-fraction", dest="mem_fraction", type=float, default=None)
     # every protocol default (caps, horizon, batch width, seed, forced block, depths, datasets)
-    # comes from prod/config.py and is overridable here (PP3 decision 2)
+    # comes from prod/config.py and is overridable here
     cfgmod.add_args(p)
     p.add_argument("--no-mask", dest="no_mask", action="store_true",
                    help="raven families only: never install the padding mask (batch-1 control)")
@@ -102,7 +101,7 @@ def build_parser():
     p.add_argument("--wall-clock", dest="wall_clock", action="store_true",
                    help="also write a wall-clock row for cost.py")
     p.add_argument("--resume-from-chains", dest="resume_from_chains", action="store_true",
-                   help="forced protocol only (Fix 1, PP3b): when chains_<model>_<task>_k<k>.jsonl "
+                   help="forced protocol only: when chains_<model>_<task>_k<k>.jsonl "
                         "(written by a prior natural-stop job on the same model/task/k) exists, "
                         "re-prefill prompt + its stored chain_ids instead of regenerating that span, "
                         "then apply the existing Wait injection and continue to the horizon; falls "
@@ -150,7 +149,7 @@ def tag_line(k, T=None, loops=False, tokens=False):
     return ""
 
 
-# ------------------------------------------------------------------ chains (Fix 1, PP3b)
+# ------------------------------------------------------------------ chains
 # A sidecar per (model, task, k) -- not per tag, so every shard of a run resumes the SAME file and
 # rows are keyed by the task-global problem id (`idx`), which is stable across shards; a shard's
 # local row number is not. Written once by a natural-stop job; read by a later forced job's
@@ -429,7 +428,7 @@ def fill_shared_cuts(ap, caps, rows_by_cap, is_extra):
     # a continuation (natural2) carries the OLD stop on the caps it copied from below the old
     # boundary and the final stop on the caps it regenerated above it, so the lowest cap's
     # natural_stop can name a cut no row has, and every cap above the old horizon would be
-    # left unwritten (the 2026-09-18 INCOMPLETE c2 jobs, one missing cell per copied row).
+    # left unwritten.
     top = max(rows_by_cap) if rows_by_cap else None
     stop = rows_by_cap[top].get("natural_stop") if top is not None else None
     out = []
@@ -491,8 +490,8 @@ def copy_old_rows(old_path, ap, idx_of, done, copy_all, copy_upto, extra_of):
 
 
 # ------------------------------------------------------------------ per-row text diagnostics
-# Added to every row generate.py writes (the artifacts of record stored no chain text at all, so a
-# text-level diagnosis of a wrong label was impossible without regenerating the job).
+# Written on every row generate.py produces, so a wrong label can be diagnosed at text level
+# without regenerating the job.
 def stop_reason_of(marker, n_trace, horizon, stops=None, think_text=None, think_id=None,
                    eos_texts=None, eos_ids=None, forced=False):
     """Why the trace stopped, as one of eos / stop_string:<which> / think_tag / horizon.
@@ -609,11 +608,10 @@ def main(argv=None):
     caps = sorted(set(cfg["forced_budgets"] if forced else cfg["caps"]))
     extra = [] if forced else sorted({int(x) for x in (a.extra_caps or "").split(",")
                                       if x.strip() != ""})
-    # The pinned production width (rulings Q6 (iv)). 0 means "adaptive", the pre-pin behaviour.
-    # Ruling Q12: when the caller did not pass an explicit --batch-width, the per-(model, k) table
-    # in config.yaml applies (a.batch_width is the RAW cli value, None when the flag was omitted, so
-    # an explicit --batch-width=N -- including the queue's own, which the launcher always sets from
-    # this same table -- still wins).
+    # The pinned production width. 0 means "adaptive". When the caller did not pass an explicit
+    # --batch-width, the per-(model, k) table in config.yaml applies (a.batch_width is the RAW cli
+    # value, None when the flag was omitted, so an explicit --batch-width=N -- including the queue's
+    # own, which the launcher always sets from this same table -- still wins).
     bw = int(cfg["batch_width"]) if a.batch_width is not None \
         else cfgmod.batch_width_for(a.model, a.k, cfg)
     bw = None if bw <= 0 else bw
@@ -623,7 +621,7 @@ def main(argv=None):
             a.n = int(fn[a.task])
         elif a.n is None and isinstance(fn, int):
             a.n = int(fn)
-        # PP3 decision 4: fn None means FULL N, which is the default of record.
+        # fn None means FULL N, which is the default.
     all_caps = sorted(set(caps) | set(extra))
     horizon = int(cfg["forced_horizon"] if forced else cfg["horizon"])
     # Is the closing think tag a natural stop (config `think_tag_is_stop`, default True)? With it
@@ -658,8 +656,8 @@ def main(argv=None):
         kw["mem_fraction"] = a.mem_fraction
     ad = get(a.model, adapter_dir=a.adapter, **kw)
     if forced and ad.family != "ouro":
-        raise SystemExit("forced continuation is of record for the Ouro checkpoints only "
-                         "(Brief PP2); %s is %s" % (a.model, ad.family))
+        raise SystemExit("forced continuation is of record for the Ouro checkpoints only; "
+                         "%s is %s" % (a.model, ad.family))
 
     # ---- rows, split, shard
     all_rows = task_rows_of(a.task)
@@ -687,7 +685,7 @@ def main(argv=None):
     print("[%s] N=%d caps=%s horizon=%d | %s | %s"
           % (tag, N, all_caps, horizon, nvsmi(), gpu_procs()), flush=True)
 
-    from .models.ouro import strip_tail    # s9a_common.strip_tail, family-agnostic (Q8)
+    from .models.ouro import strip_tail    # the eos-keeping strip rule, family-agnostic
     gen_widths, ro_widths = {}, {}
     _t_load = time.time()
     ad.load()
@@ -695,7 +693,7 @@ def main(argv=None):
     dinfo = ad.set_depth(a.k)
     load_seconds = round(time.time() - _t_load, 1)
     ast = bool(getattr(ad, "add_special_tokens", False))
-    # PP3: pooled BBH mixes answer kinds, and word_sorting writes a list, so the forced read-out
+    # Pooled BBH mixes answer kinds, and word_sorting writes a list, so the forced read-out
     # length is a PER-ROW quantity. A read-out group decodes max(n_answer) new tokens; the extra
     # tokens on a short-answer row are truncated at its eos and never enter the accounting, which
     # stores len(o[j]) after the strip.
@@ -805,8 +803,8 @@ def main(argv=None):
     fresh = not os.path.exists(cells_path)
     apc = Appender(cells_path)
     if fresh:
-        # PP3 decision 2: the effective config is the FIRST LINE of every cells file. Every reader
-        # in the package skips a row with `_header` (common.read_jsonl / load_ckpt / count_cells).
+        # The effective config is the FIRST LINE of every cells file. Every reader in the package
+        # skips a row with `_header` (common.read_jsonl / load_ckpt / count_cells).
         hx = {"model": a.model, "task": a.task, "k": a.k,
               "protocol": ptag, "protocol_base": a.protocol, "n_problems": N,
               "horizon": horizon, "caps": all_caps, "data_hashes": data_hashes()}
@@ -921,7 +919,7 @@ def main(argv=None):
             stopper = make_stopper(ad.chat_template, pieces, eos_ids, a.task)
             wait = ad.wait_ids()
             meta["passes"][key].update({"wait_ids": wait, "wait_text": tok.decode(wait)})
-            # ---- Fix 1 (PP3b): resume from a stored natural-stop chain instead of regenerating it.
+            # ---- resume from a stored natural-stop chain instead of regenerating it.
             # A row whose OWN trace checkpoint already has ids (a resumed/incomplete forced job) is
             # left alone -- the chain is only for a row this forced job has not touched yet.
             chains_loaded, cpath = 0, chain_path(out_dir, a.model, a.task, a.k)
@@ -999,7 +997,7 @@ def main(argv=None):
                                 if "fstate" not in cur[i]:
                                     cur[i]["fstate"] = new_forced_states(1)[0]
                                     cur[i]["fstate"]["off"] = len(cur[i]["ids"])
-                                    # Fix 1: a row resumed from a stored chain seeds the tail deque
+                                    # A row resumed from a stored chain seeds the tail deque
                                     # with the chain's own trailing pieces, so the stopper sees a
                                     # pattern straddling the chain/continuation boundary whole.
                                     seed = cur[i].pop("_tail_seed", None)
@@ -1034,11 +1032,11 @@ def main(argv=None):
                         b = max(1, b // 2)
                         continue
                     gen_seconds += dt
-                    # Q8 (rulings, option O1): strip at the eos, KEEPING the eos token, in EVERY
-                    # family. Both decoders already stop a row at its eos, so this is belt and
-                    # braces rather than a second rule; it makes the rule explicit and uniform
-                    # instead of Ouro-only. A forced trace is never stripped: it has no eos to stop
-                    # at, by construction (s13_common suppresses every stop).
+                    # Strip at the eos, KEEPING the eos token, in EVERY family. Both decoders
+                    # already stop a row at its eos, so this is belt and braces rather than a
+                    # second rule; it makes the rule explicit and uniform instead of Ouro-only. A
+                    # forced trace is never stripped: it has no eos to stop at, by construction
+                    # (the forced stopper suppresses every stop).
                     gen_widths.setdefault(len(grp), 0)
                     gen_widths[len(grp)] += 1
                     if not forced:
@@ -1157,12 +1155,12 @@ def main(argv=None):
             # (a letter row 8, word_sorting 48), so the parse and the token accounting see exactly
             # the read-out the protocol defines for that row
             o = [list(oj)[:nans_row[i]] for oj, (i, _c, _x) in zip(o, grp)]
-            raw = [list(x) for x in o]          # before the eos strip, for G1 cause attribution
-            o = strip_tail(o, eos_ids)          # Q8 option O1, every family
+            raw = [list(x) for x in o]          # before the eos strip, for cause attribution
+            o = strip_tail(o, eos_ids)          # the eos-keeping strip, every family
             ro_widths.setdefault(len(grp), 0)
             ro_widths[len(grp)] += 1
             for j, (i, c, bs) in enumerate(grp):
-                # the eos token is KEPT in o[j] for the token accounting (Q8) but must not reach
+                # the eos token is KEPT in o[j] for the token accounting but must not reach
                 # the parsed text: "42<|endoftext|>" is not "42" for the math and free-form parsers
                 atxt = tok.decode([t for t in o[j] if t not in eos_ids],
                                   clean_up_tokenization_spaces=False)
@@ -1172,9 +1170,9 @@ def main(argv=None):
                 kind = row_kind(a.task, rws[i])
                 pred = parse_forced(atxt, a.task, opts, kind)
                 own = parse_own(ctxt, a.task, opts, kind, think_tag_is_stop=think_stop)
-                # Q8: what the answer would have been WITHOUT the eos strip, stored only when the
-                # strip actually removed something. Gate G1 needs it to prove that the strip rule is
-                # the whole difference from the S9a-family spikes without a second generation.
+                # what the answer would have been WITHOUT the eos strip, stored only when the strip
+                # actually removed something, so a mismatch can be attributed to the strip rule
+                # without a second generation.
                 nostrip = None
                 if len(raw[j]) != len(o[j]):
                     rtxt = tok.decode([t for t in raw[j] if t not in eos_ids],
@@ -1184,10 +1182,9 @@ def main(argv=None):
                     nostrip["correct"] = bool(ans_eq(nostrip["pred"], gold, a.task, kind))
                 ngen = c + len(o[j])
                 ppt = ad.passes_per_token(a.k)
-                # the artifacts of record stored no chain text, so a wrong label could not be
-                # diagnosed without regenerating the job: every row now says why the chain stopped,
-                # what its last 200 characters before the cut were, and where in the cut text the
-                # own answer was parsed from.
+                # every row says why the chain stopped, what its last 200 characters before the cut
+                # were, and where in the cut text the own answer was parsed from, so a wrong label
+                # can be diagnosed without regenerating the job.
                 sreason = stop_reason_of(st[i][1], len(cur[i]["ids"]), p_hor, stops=p_stops,
                                          think_text=p_think_txt, think_id=p_think,
                                          eos_texts=eos_txt, eos_ids=eos_ids, forced=forced)
@@ -1211,16 +1208,14 @@ def main(argv=None):
                            "n_trace": len(cur[i]["ids"]), "n_generated": ngen,
                            "n_prompt_tokens": plen[i], "n_answer_tokens": len(o[j]),
                            "n_suffix_tokens": len(suf),
-                           # the budget of record is k L (P + T + R) with R = suffix + answer
-                           # tokens (LEDGER compute reporting rule); n_generated counts the cut and
-                           # the answer, the suffix is added here
+                           # the budget is k L (P + T + R) with R = suffix + answer tokens;
+                           # n_generated counts the cut and the answer, the suffix is added here
                            "layer_passes": ppt * (plen[i] + ngen + len(suf)),
                            "layer_passes_promptfree": ppt * (ngen + len(suf)),
                            "cost_fields": "prompt+cut+suffix+answer",
                            "answer_text": atxt,
-                           # rulings Q6 (iv): the width is pinned and STORED PER ROW, because a
-                           # per-problem label is only comparable to another taken at the same width
-                           # (LEDGER 2026-09-04 S5).
+                           # the width is pinned and STORED PER ROW, because a per-problem label is
+                           # only comparable to another taken at the same width
                            "batch_width": bw or 0,
                            "batch_width_readout": len(grp),
                            "batch_width_gen": cur[i].get("width"),
@@ -1284,8 +1279,8 @@ def main(argv=None):
     else:
         enc, cur, plen, st, suf, eos_ids, _fc = gen_pass(None, horizon, "single")
         if not forced and not cont:
-            # Fix 1 (PP3b): the natural-stop pass's own trace is the chain a later forced job on
-            # the same (model, task, k) can resume from instead of regenerating it.
+            # The natural-stop pass's own trace is the chain a later forced job on the same
+            # (model, task, k) can resume from instead of regenerating it.
             n_chain, chain_p = write_chains(out_dir, a.model, a.task, a.k, rws, enc, cur, st, bw)
             meta["chains_written"] = meta.get("chains_written", 0) + n_chain
             meta["chains_path"] = chain_p

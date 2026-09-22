@@ -1,21 +1,21 @@
-"""The card per checkpoint, to the operational definition of PLAN.md "Framework of record" rule 1.
+"""The card per checkpoint: what the checkpoint supports and what it measures.
 
   python -m prod.analyze.cards --cells=artifacts --model=ouro_1_4b_base [--tasks=gsm8k,math500]
                                [--label=v2] [--out=FILE]
 
-Rule 1, field by field (the brief's own list, in order):
+The fields, in order:
   supported depths           what the code accepts (the adapter's `depths`)
   trained depth k_t          from the card or the paper (the adapter's `trained_depth`)
   measured saturation depth  the smallest k whose T=512 accuracy is within the paired CI of the
                              maximum over k
   raw contrasts              A(k=4) - A(k=2) at T in {64, 128, 256, 512}
-  oracle frontier V(X)       at the 16 budgets on the TEST grid, labelled oracle (rule 2)
-  dip cells                  T in {16, 32, 64} against T=0, per k (LEDGER 2026-09-05 S9a: "a short
-                             chain of thought is worse than none ... accuracy drops from 17% at zero
-                             tokens to 12% at 8 tokens")
+  oracle frontier V(X)       at the 16 budgets on the TEST grid, labelled oracle
+  dip cells                  T in {16, 32, 64} against T=0, per k (a short chain of thought can be
+                             worse than none: one measured case drops from 17% at zero tokens to
+                             12% at 8 tokens)
   natural-stop distribution  per k
   cost model                 layer passes, FLOPs, KV bytes per token, wall clock
-  G / c / l                  with the COMMITMENT definition (LEDGER "Agreed 2026-09-11")
+  G / c / l                  with the COMMITMENT definition
   fitted a / m / g           LAST, with fit quality, never without the raw contrasts
 """
 import argparse
@@ -88,8 +88,8 @@ def natural_stop_distribution(cells, sel, cap=512):
 
 
 def oracle_frontier(grid, promptfree=False, n_budgets=16):
-    """V(X) on the TEST grid at 16 log-spaced budgets. Labelled ORACLE (measurement rule 2): this is
-    the ceiling, never a policy result.
+    """V(X) on the TEST grid at 16 log-spaced budgets. Labelled ORACLE: this is the ceiling, never
+    a policy result.
 
     Priced with the grid's own passes per token, L_fixed + k L, so a raven frontier is not read off
     an Ouro cost axis."""
@@ -139,8 +139,8 @@ def card(cells_dir, model, task, protocol="natural", label="v2", shapes=None):
         "raw_contrasts": card_fit_block(A, cells.ks, cells.Bs)["raw_contrasts"],
         "oracle_frontier": oracle_frontier(grid),
         "oracle_frontier_promptfree": oracle_frontier(grid, promptfree=True),
-        # Fix 2 (PP3b, decision 7): the mean realised cost of the default operating point --
-        # `budget_fractions` (config.yaml) are fractions of THIS, not of the grid's largest CAP cell.
+        # the mean realised cost of the default operating point -- `budget_fractions` (config.yaml)
+        # are fractions of THIS, not of the grid's largest CAP cell.
         "default_cost": default_cost(cells, promptfree=False),
         "default_cost_promptfree": default_cost(cells, promptfree=True),
         "dip_cells": dip_cells(cells, sel_ev),
@@ -183,7 +183,7 @@ def main(argv=None):
                  c["raw_contrasts"]["k_hi"], c["raw_contrasts"]["k_lo"],
                  {k: round(v, 1) for k, v in c["raw_contrasts"]["contrast_pp"].items()}))
         dc, dcp = c["default_cost"], c["default_cost_promptfree"]
-        print("  default cost (decision 7): k=%s n=%d mean=%s | promptfree mean=%s"
+        print("  default cost: k=%s n=%d mean=%s | promptfree mean=%s"
               % (dc["k"], dc["n"], dc["mean"], dcp["mean"]))
     dest = a.out or os.path.join(a.cells, "card_%s.json" % a.model.replace("+", "-"))
     save_json(dest, out)

@@ -3,14 +3,13 @@
   python -m prod.score --cells=artifacts --model=ouro_1_4b_base --task=gsm8k [--protocol=natural]
                        [--label=v2|forced|own] [--split=eval|cal|all] [--out=FILE]
 
-Decisions of record:
-  * protocol v2 (D1, LEDGER "Agreed 2026-09-09"): the model's own answer if it parses inside the cut,
-    else the forced read-out. Computed from stored fields only, never by re-parsing text.
-  * the answer-arrival event is COMMITMENT (LEDGER "Agreed 2026-09-11"): a question has arrived at
-    cap T_j if the forced read-out at every cap >= T_j equals the read-out at the largest cap, after
-    the task's own normalisation; no gold label, no answer-string search in the chain. Ported from
-    `work/spikes/v1_v2_checks/v4_commitment.py` (`norm`, `arrival`).
-  * the allocator never uses the arrival event (same ledger line).
+Definitions:
+  * protocol v2: the model's own answer if it parses inside the cut, else the forced read-out.
+    Computed from stored fields only, never by re-parsing text.
+  * the answer-arrival event is COMMITMENT: a question has arrived at cap T_j if the forced
+    read-out at every cap >= T_j equals the read-out at the largest cap, after the task's own
+    normalisation; no gold label, no answer-string search in the chain.
+  * the allocator never uses the arrival event.
 """
 import argparse
 import glob
@@ -292,7 +291,7 @@ class Cells(object):
                 w = np.where(AR[a, :, ii])[0]
                 if len(w):
                     first[a, ii] = caps[int(w[0])]
-        # full precision: gate G3 part D compares these against the frozen V5 tables
+        # kept at full precision, for comparison against a fixed reference table
         return {"caps": caps, "ks": self.ks, "n": int(len(sel)),
                 "G": G.tolist(), "c": c.tolist(), "l": l.tolist(), "acc": A.tolist(),
                 "rmse_commitment": rmse, "noise_floor": noise,

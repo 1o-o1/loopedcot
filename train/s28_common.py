@@ -1,15 +1,13 @@
-"""S28 shared helpers. Built from work/spikes/s26_bbh/scripts/s26_common.py (the harness the brief
-tells us to extend) and work/spikes/s9_grid/s9a/scripts/s9a_common.py (the 4-shot GSM8K prompt and
-the numeric parse), both read-only. Nothing in S26 / S9a / S13 / S3 is edited.
+"""S28 shared helpers, built on an earlier BBH evaluation harness, plus the 4-shot GSM8K prompt and
+the numeric parse from a separate GSM8K harness.
 
-Differences from s26_common.py, and only these:
+Differences from the BBH harness, and only these:
   - Spark paths, BATCH_CAP 32 and RESERVE_GB 2.0 (121 GB unified memory instead of an 8 GB laptop)
   - a per-task configuration table (prompt file, question layout, forced suffix, stop strings,
     own-answer marker, answer kind) in place of the BBH-only constants
-  - the numeric parse (svamp) is s9a_common's, verbatim; the letter parse is s26_common's with the
-    character class widened to lowercase (the Wei et al. exemplars write "(a)") and the yes/no
-    branch dropped
-  - `first_pos`, the decode-and-bisect used for the two new reach fields
+  - the numeric parse (svamp) is the GSM8K harness's, verbatim; the letter parse has its character
+    class widened to lowercase (the Wei et al. exemplars write "(a)") and carries no yes/no branch
+  - `first_pos`, the decode-and-bisect used for the two reach fields
 The model loading, the static cache, the batch sizing, the natural stop (`make_find_cut`), the
 decode loop and the checkpoint helpers are copied unchanged.
 """

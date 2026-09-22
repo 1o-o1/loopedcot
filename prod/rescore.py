@@ -2,10 +2,10 @@
 
   python -m prod.rescore --cells=artifacts [--apply]
 
-Why it exists: rows written before the eos fix carried the eos marker string (e.g. "<|endoftext|>")
-inside `pred` for the math and free-form parsers, so "42<|endoftext|>" scored as wrong. Every row
+Why it exists: a row whose `pred` carries the eos marker string (e.g. "<|endoftext|>") scores as
+wrong for the math and free-form parsers, because "42<|endoftext|>" is not "42". Every row
 stores the decoded read-out in `answer_text`, so the label can be rebuilt without regenerating.
-The own-answer fields (`trace_answer`, `trace_correct`) are untouched: they were parsed from the cut
+The own-answer fields (`trace_answer`, `trace_correct`) are untouched: they are parsed from the cut
 chain, which never contains the eos.
 
 Dry run by default: prints, per file, how many rows would change. `--apply` rewrites each file
@@ -51,8 +51,8 @@ def rescore_file(path, apply=False):
             r["pred"], r["correct"], r["correct_v2"] = pred, correct, v2
             r["rescored"] = True
         if r.get("cost_fields") != "prompt+cut+suffix+answer":
-            # rows written before the suffix tokens entered the cost fields: layer_passes was
-            # ppt * (prompt + cut + answer); recover ppt exactly and add the suffix
+            # a row whose cost fields exclude the suffix has layer_passes = ppt * (prompt + cut
+            # + answer); recover ppt exactly and add the suffix
             plen, ngen = int(r["n_prompt_tokens"]), int(r.get("n_generated") or 0)
             nsuf = int(r.get("n_suffix_tokens") or 0)
             base = plen + ngen

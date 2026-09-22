@@ -1,22 +1,22 @@
 """The average-budget gate's reference must be priced with the RUN'S OWN ACCOUNTING.
 
-The defect this pins. The reference -- "normal operation at this budget, the deepest depth at the
-largest cap it affords" -- was read off `policy.avg_picks` at a multiplier fitted to the budget. A
-Lagrangian pick can only ever name a cell on the UPPER CONVEX HULL of (price, cap), and at the hull's
-own slope `avg_picks` breaks the tie to the cheaper cell. Under `cap` accounting the cap ladder is
-geometric and every cap sits on that hull, so the rule read the largest affordable cap and nothing
-was wrong. Under `expected` accounting every cap past the mean natural length costs the SAME, so the
-middle of the ladder falls off the hull and the rule returned the cheapest cap of the depth -- the
-worst-case-cap answer, whatever the run was priced under.
+The invariant this pins. The reference -- "normal operation at this budget, the deepest depth at
+the largest cap it affords" -- must not be read off `policy.avg_picks` at a multiplier fitted to the
+budget. A Lagrangian pick can only ever name a cell on the UPPER CONVEX HULL of (price, cap), and at
+the hull's own slope `avg_picks` breaks the tie to the cheaper cell. Under `cap` accounting the cap
+ladder is geometric and every cap sits on that hull, so such a pick reads the largest affordable cap
+and agrees. Under `expected` accounting every cap past the mean natural length costs the SAME, so
+the middle of the ladder falls off the hull and the pick returns the cheapest cap of the depth --
+the worst-case-cap answer, whatever the run is priced under.
 
-On mcleish_llama32_r32/svamp at 1.0x, expected accounting, that reference was depth 8 at cap 0: nine
-points, where the same budget affords cap 64 at 67.5. The gated arms measured a verified +47 against
-it, opened, and landed at 51.5 -- sixteen points BELOW the `default_at_budget` row of their own
+On mcleish_llama32_r32/svamp at 1.0x, expected accounting, that reference is depth 8 at cap 0: nine
+points, where the same budget affords cap 64 at 67.5. The gated arms then measure a verified +47
+against it, open, and land at 51.5 -- sixteen points BELOW the `default_at_budget` row of their own
 table, and 17.5 below the uncapped default. Same cause on ouro_1_4b_base/bbh at 0.5x (49.6 against
 60.9), ouro_1_4b_base/svamp at 0.5x (44.5 against 53.0) and ouro_2_6b_base/bbh at 1.0x (78.4 against
 81.7).
 
-The rule now (evaluate.normal_at_budget): three candidates, each priced with the same `policy.Cost`
+The rule (evaluate.normal_at_budget): three candidates, each priced with the same `policy.Cost`
 as the arm, the best of them on the calibration split, and `reference_rule` records which -- the
 default cell where its mean price fits, the deepest depth at the largest cap whose MEAN PRICE fits,
 and the per-prompt hard cap Table 1 reports as `default_at_budget`. The last of the three is what
@@ -49,7 +49,7 @@ ONE = E.BUDGET_FRACTIONS.index(1.0)
 # the mean natural length of 200 tokens -- the only cells on the upper convex hull of (price, cap)
 # are cap 0 and the natural-stop cap. The natural-stop cap is over the budget at 1.0x because the
 # CALIBRATION questions run 200 tokens and the EVALUATION questions, which set the default cost, run
-# 150; so the hull leaves cap 0, and that is what the old rule returned at three of the four budgets.
+# 150; so the hull leaves cap 0, which a multiplier pick returns at three of the four budgets.
 KS = [1, 2, 4]
 CAPS = [0, 64, 128, 256, 512, 1024, 2048, 4096]
 TASK = "gsm8k"
@@ -187,8 +187,8 @@ class TestTheReferenceIsPricedWithTheRunsAccounting(unittest.TestCase):
             self.assertIsNotNone(row["reference_cells"][j], j)
 
     def test_the_losing_deviation_no_longer_opens(self):
-        """The arm's cell is 20 points behind the reference on the verification half now, where
-        against cap 0 it measured +40 and opened."""
+        """The arm's cell is 20 points behind the properly priced reference on the verification
+        half, so the gate reverts; against cap 0 the same cell would measure +40 and open."""
         t1 = table("expected")
         for name in P.AVG_GATED_ARMS:
             row = t1["rows"][name]
@@ -196,7 +196,7 @@ class TestTheReferenceIsPricedWithTheRunsAccounting(unittest.TestCase):
             self.assertIsNone(row["deviation_family"][ONE], name)
             self.assertLess(row["gate_margin_pts"][ONE], 0.0, name)
             self.assertAlmostEqual(row["acc_pts"][ONE], 70.0, places=6, msg=name)
-        # the ungated arm is what the gate used to let through
+        # the ungated arm: what stands where nothing checks the pick
         self.assertAlmostEqual(t1["rows"]["avg_lookup"]["acc_pts"][ONE], 50.0, places=6)
 
 
@@ -231,9 +231,9 @@ def svamp_available():
 
 @unittest.skipUnless(svamp_available(), "the production cell files are not on this machine")
 class TestTheGridTheDefectWasFoundOn(unittest.TestCase):
-    """mcleish_llama32_r32/svamp at 1.0x under `expected` accounting: the reference was depth 8 at
-    cap 0, nine points, and both gated arms opened against it and landed at 51.5. The budget affords
-    cap 64, and both the reference and the arms must read at least 67 on evaluation."""
+    """mcleish_llama32_r32/svamp at 1.0x under `expected` accounting: a hull pick names depth 8 at
+    cap 0, nine points, and both gated arms then open against it and land at 51.5. The budget
+    affords cap 64, and both the reference and the arms must read at least 67 on evaluation."""
 
     FLOOR = 67.0
 
@@ -264,7 +264,7 @@ class TestTheGridTheDefectWasFoundOn(unittest.TestCase):
                                   fit_pos=sel)
         a, b, rec = E.reference_record(cs, info, ev, P.price_tensor(cs, ev, cost))
         self.assertEqual(rec["reference_k"], 8)
-        self.assertNotEqual(rec["reference_cells"], {"k8_T0": len(ev)})   # what it used to be
+        self.assertNotEqual(rec["reference_cells"], {"k8_T0": len(ev)})   # the low-accuracy cell
         self.assertGreaterEqual(100 * float(np.nanmean(cs.acc[a, b, ev])), self.FLOOR)
         for name in P.AVG_GATED_ARMS:
             self.assertEqual(self.t1["rows"][name]["reference_cells"][ONE],

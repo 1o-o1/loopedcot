@@ -1,4 +1,4 @@
-"""Fetch the six checkpoints from the Hugging Face Hub and pin their revisions (Brief PP3, dec. 3).
+"""Fetch the six checkpoints from the Hugging Face Hub and pin their revisions.
 
   python -m prod.install_models                 # resolve, download, pin, write model_revisions.json
   python -m prod.install_models --resolve-only  # resolve and write the pins, download nothing
@@ -50,7 +50,7 @@ IGNORE = ["*.pt", "*.bin", "*.msgpack", "*.h5", "*.onnx", "optimizer*", "*.pth"]
 
 
 def _no_token_env():
-    """Clear every token variable for this process (the brief: no token, all repos public)."""
+    """Clear every token variable for this process: all six repos are public, no token is used."""
     for v in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACEHUB_API_TOKEN"):
         os.environ.pop(v, None)
     os.environ["HF_HUB_OFFLINE"] = "0"          # the install is the ONE online step
@@ -94,8 +94,8 @@ def download(entry, name):
     # snapshot_download(revision=<sha>) does NOT write refs/main, and `from_pretrained(repo)` under
     # HF_HUB_OFFLINE=1 resolves the revision "main" through exactly that file -- so a pinned-only
     # install downloads 2.7 GB and then fails to load offline ("couldn't connect ... and couldn't
-    # find them in the cached files"). Found on the laptop, 2026-09-13. Pointing refs/main at the
-    # pin is the honest local meaning of a pinned install: on this machine, main IS the pin.
+    # find them in the cached files"). Pointing refs/main at the pin is the honest local meaning of
+    # a pinned install: on this machine, main IS the pin.
     refs = os.path.join(os.path.dirname(os.path.dirname(d)), "refs")
     try:
         os.makedirs(refs, exist_ok=True)

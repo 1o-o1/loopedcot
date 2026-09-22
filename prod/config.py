@@ -1,9 +1,9 @@
-"""The ONE configuration file (Brief PP3, decision 2), now loaded from YAML (PP3b task 1).
+"""The ONE configuration file, loaded from YAML.
 
-Loop counts per model, caps, horizon, datasets, batch width (and its per-job overrides, ruling Q12),
+Loop counts per model, caps, horizon, datasets, batch width (and its per-job overrides),
 forced-N and the calibration seed live in `prod/config.yaml`; this module is the LOADER. Every
-default here is still overridable on the command line of `prod.generate`, `prod.manifest` and
-`prod.launcher`, in the same order: the YAML, then `--config-json`, then the explicit flags. The
+default here is overridable on the command line of `prod.generate`, `prod.manifest` and
+`prod.launcher`, in this order: the YAML, then `--config-json`, then the explicit flags. The
 effective config is printed into every cells file's header row and into the manifest, so a number
 read months later says which protocol produced it.
 
@@ -35,11 +35,11 @@ def _read_yaml(path=None):
 
 _RAW = _read_yaml()
 
-# ------------------------------------------------------------------ protocol (decision 4)
-#: caps of record. The extra caps {48, 96, 192, 384} of PP2 are DROPPED (decision 4).
+# ------------------------------------------------------------------ protocol
+#: caps of record. The extra caps {48, 96, 192, 384} are not run.
 CAPS = list(_RAW["caps"])
 CAPS_EXTRA = list(_RAW["caps_extra"])
-#: natural-stop horizon. PP2 ran at 512; PP3 runs the natural stop out to 4096 (decision 4).
+#: natural-stop horizon: generation stops naturally, or at 4096 tokens.
 HORIZON = int(_RAW["horizon"])
 #: the forced-continuation protocol's own horizon ("Wait" injection, S13)
 FORCED_HORIZON = int(_RAW["forced_horizon"])
@@ -50,20 +50,20 @@ FORCED_BUDGETS = list(_RAW["forced_budgets"])
 #: stop strings or the eos token (see config.yaml and prod/tasks/build_prompts).
 THINK_TAG_IS_STOP = bool(_RAW.get("think_tag_is_stop", True))
 
-#: the forced-continuation block (decision 4): a SEPARATE protocol block, limited by default to
+#: the forced-continuation block: a SEPARATE protocol block, limited by default to
 #: GSM8K and MATH500 on the four Ouro checkpoints at full N, switchable by config.
 FORCED_BLOCK = json.loads(json.dumps(_RAW["forced_block"]))
 
-#: production batch width, PINNED (PLAN.md rulings on PP2, Q6 clause (iv)); stored per row.
+#: production batch width, PINNED; stored per row.
 BATCH_WIDTH = int(_RAW["batch_width"])
 #: hard cap on the decode batch when the width is adaptive (`--batch-width=0`)
 BATCH_CAP = int(_RAW["batch_cap"])
 
-# ------------------------------------------------------------------ splits (decision 5)
+# ------------------------------------------------------------------ splits
 SPLIT_SEED = int(_RAW["split_seed"])
 N_CAL = int(_RAW["n_cal"])
 
-# ------------------------------------------------------------------ datasets (decision 5)
+# ------------------------------------------------------------------ datasets
 #: the ten evaluation sets of record, with the N of record each.
 DATASETS = dict(_RAW["datasets"])
 TASK_ORDER = list(DATASETS.keys())
@@ -71,9 +71,8 @@ TASK_ORDER = list(DATASETS.keys())
 #: the ten BBH subtasks pooled into the `bbh` slot, in file order.
 BBH_SUBTASKS = list(_RAW["bbh_subtasks"])
 
-# ------------------------------------------------------------------ models: shapes, depths (decision
-# 1 and 6) and per-job batch-width overrides (ruling Q12), all read from the SAME `models:` block so
-# they cannot drift apart.
+# ------------------------------------------------------------------ models: shapes, depths and
+# per-job batch-width overrides, all read from the SAME `models:` block so they cannot drift apart.
 MODEL_ORDER = list(_RAW["model_order"])
 MODEL_SHAPES = {}
 DEPTHS = {}
@@ -94,11 +93,11 @@ MEM_UTIL = float(_RAW["mem_util"])
 #: prompt tokens the KV estimate allows on top of the horizon (mean prompt + suffix + answer)
 PROMPT_ALLOWANCE = int(_RAW["prompt_allowance"])
 PLACEMENT_HORIZON = _RAW.get("placement_horizon")      # None = the run horizon (worst case)
-#: workers per GPU (decision 1). 1 reproduces PP2's one-job-per-GPU behaviour exactly.
+#: workers per GPU. 1 runs exactly one job per GPU.
 WORKERS_PER_GPU = int(_RAW["workers_per_gpu"])
 #: assumed cluster/GB10 throughput factor until the first timed job on the cluster
 CLUSTER_FACTOR = float(_RAW["cluster_factor"])
-#: fractions of the default cost `prod.live_check --budget-fraction` accepts (decision 7)
+#: fractions of the default cost `prod.live_check --budget-fraction` accepts
 BUDGET_FRACTIONS = [float(x) for x in _RAW["budget_fractions"]]
 VERSION = str(_RAW.get("version", "PP3"))
 
@@ -115,7 +114,7 @@ def defaults():
         "forced_block": json.loads(json.dumps(FORCED_BLOCK)),
         "batch_width": BATCH_WIDTH,
         "batch_cap": BATCH_CAP,
-        # ruling Q12: per (model, k) overrides of `batch_width`; keys are ints once loaded.
+        # per (model, k) overrides of `batch_width`; keys are ints once loaded.
         "batch_width_overrides": {m: dict(d) for m, d in BATCH_WIDTH_OVERRIDES.items()},
         "split_seed": SPLIT_SEED,
         "n_cal": N_CAL,
@@ -146,7 +145,7 @@ def _strs(s):
 
 
 def add_args(p):
-    """The SAME override flags on prod.generate, prod.manifest and prod.launcher (decision 2)."""
+    """The SAME override flags on prod.generate, prod.manifest and prod.launcher."""
     g = p.add_argument_group("config (prod/config.py; every default is overridable here)")
     g.add_argument("--caps", default=None, help="e.g. 0,16,64,512,4096")
     g.add_argument("--horizon", type=int, default=None)
@@ -165,8 +164,8 @@ def add_args(p):
                    help="0 = adaptive KV-ceiling width (gates only); default %d" % BATCH_WIDTH)
     g.add_argument("--batch-cap", dest="batch_cap", type=int, default=None)
     g.add_argument("--batch-width-overrides", dest="batch_width_overrides", default=None,
-                   help="model:k=width,k=width;model2:k=width  merges into the config.yaml table "
-                        "(ruling Q12), e.g. huginn_0125:16=8,32=4")
+                   help="model:k=width,k=width;model2:k=width  merges into the config.yaml table, "
+                        "e.g. huginn_0125:16=8,32=4")
     g.add_argument("--split-seed", dest="split_seed", type=int, default=None)
     g.add_argument("--n-cal", dest="n_cal", type=int, default=None)
     g.add_argument("--datasets", default=None,
@@ -289,7 +288,7 @@ def digest(cfg):
 
 
 def header_row(cfg, tag, extra=None):
-    """The first line of every cells file (decision 2)."""
+    """The first line of every cells file."""
     import time
     row = {"_header": True, "version": cfg.get("version", "PP3"), "tag": tag,
            "config": cfg, "config_sha256": digest(cfg), "written_at": time.strftime("%FT%T")}
@@ -306,9 +305,9 @@ def depths_for(model, task, cfg=None):
     return tuple(sorted(set(ks)))
 
 
-# ------------------------------------------------------------------ batch width of record (ruling
-# Q12): the pinned width, replaced per (model, k) where the config.yaml table (or --batch-width-
-# overrides) names one.
+# ------------------------------------------------------------------ batch width of record: the
+# pinned width, replaced per (model, k) where the config.yaml table (or --batch-width-overrides)
+# names one.
 def batch_width_for(model, k, cfg=None):
     cfg = cfg or defaults()
     ov = (cfg.get("batch_width_overrides") or {}).get(model) or {}
@@ -316,7 +315,7 @@ def batch_width_for(model, k, cfg=None):
     return int(ov.get(int(k), cfg["batch_width"]))
 
 
-# ------------------------------------------------------------------ memory estimate (decision 1)
+# ------------------------------------------------------------------ memory estimate
 def _shapes_file():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "tasks", "data",
                         "model_revisions.json")
@@ -343,7 +342,7 @@ def revision_for(model):
     """The pinned Hub revision of a checkpoint, or None before `prod.install_models` has run.
 
     Every adapter passes this to `from_pretrained`, so a run loads the revision that was installed
-    and not whatever `main` points at today (decision 3).
+    and not whatever `main` points at today.
     """
     p = _shapes_file()
     if not os.path.exists(p):
@@ -377,7 +376,7 @@ def weight_bytes(model):
 
 
 def job_bytes(model, k, batch_width, horizon, prompt_allowance=None, cfg=None):
-    """The per-job memory estimate of decision 1:
+    """The per-job memory estimate:
 
         weights (bf16 bytes from the parameter count)
       + batch_width x horizon x KV bytes per token

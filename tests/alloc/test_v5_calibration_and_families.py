@@ -221,13 +221,13 @@ class TestTheFamiliesKeepATrueCapZeroOptimum(unittest.TestCase):
     """The plant where cap 0 really is 15 points better than the default cell."""
 
     def test_F0_opens_on_the_true_surface_in_one_direction(self):
-        """One fold, the old default: F0 clears the bar on the verification half at +12.0 +/- 8.7."""
+        """One fold: F0 clears the bar on the verification half at +12.0 +/- 8.7."""
         for arm in (P.AVG_GATED, "gated_equation"):
             row = t1("true", True, folds=1)["rows"][arm]
             self.assertEqual(row["deviation_family"][ONE], "F0", arm)
 
     def test_two_folds_take_the_cap_zero_family_that_BOTH_halves_earn(self):
-        """The frozen default. F0's mirror half measures 0.0 on these fifty questions, so F0 is
+        """Two folds, the default. F0's mirror half measures 0.0 on these fifty questions, so F0 is
         withheld, and F2 -- one depth shallower, still at cap 0, +20.0 on one half and +16.0 on the
         other -- is what runs. Cap 0 survives the second fold; the deepest depth does not."""
         for arm in (P.AVG_GATED, "gated_equation"):
@@ -262,7 +262,8 @@ class TestTheFamiliesStillRefuseANoiseWinner(unittest.TestCase):
     three families in sequence clear it oftener than one. That is the price of naming the families
     in advance rather than searching for them, and on a NULL surface it costs nothing, because a
     tied cell is tied: what must not happen is a family opening on a deviation that LOSES. The
-    twenty-grid sweep is where the false-deviation count is counted; here the plant fixes the truth.
+    twenty-grid sweep (alloc/README.md) is where the false-deviation count is counted; here the
+    plant fixes the truth.
     """
 
     def test_the_free_set_never_opens_on_the_null_surface(self):
@@ -423,9 +424,9 @@ class TestEveryGatedRowIsReadAgainstItsOwnFallback(unittest.TestCase):
 
 # ---------------------------------------------------------------- what v5 freezes
 class TestTheFrozenV5Defaults(unittest.TestCase):
-    """What the sweep licensed. The setting of record is the ten Ouro-1.4B base production grids
-    at horizon 4096 and full N; the ten S33 spike grids run a 512 horizon and are not, so the
-    freeze condition -- no false deviation and a rising mean gain at 1.0x -- is read on production.
+    """What the defaults below rest on. The setting of record is the ten Ouro-1.4B base production
+    grids at horizon 4096 and full N; the ten S33 spike grids run a 512 horizon and are not, so the
+    condition -- no false deviation and a rising mean gain at 1.0x -- is read on production.
 
     The calibration-size rule and the 70/30 proportion of it: at N = 400 the rule returns the 100
     v4 used, so nothing moves by freezing it, and the emulation at 150 and 200 is where it pays.
@@ -447,7 +448,7 @@ class TestTheFrozenV5Defaults(unittest.TestCase):
         self.assertEqual((P.DEFAULT_N_SELECT, P.DEFAULT_N_VERIFY), (70, 30))
 
     def test_the_families_are_frozen_on(self):
-        # ruling 2026-09-18: production grids are the setting of record; families won there
+        # the production grids are the setting of record, and families win there
         self.assertTrue(E.DEFAULT_FAMILIES)
 
     def test_the_gate_bar_and_mode_are_untouched(self):

@@ -3,10 +3,10 @@
 Pick, per question and per compute budget, how many loop passes to run and how many tokens of chain
 to allow before forcing the answer out. CPU, numpy only, no imports from any other directory.
 
-## Frozen defaults (2026-09-18)
+## Frozen defaults
 
-Both rulings come off the 60-pair run under `work/analysis_2026-09-18`: `equation_v6` (one fold)
-against `equation_v6_folds2` (two folds), expected accounting, 1.0x of the default cost.
+Both defaults come off a 60-pair run of one fold against two folds, expected accounting, 1.0x of
+the default cost.
 
 **1. Two folds are the default** (`policy.GATE_FOLDS = 2`). A deviation has to be earned in both
 directions of the calibration split: fit on half A and verify on half B, then fit on B and verify on
@@ -252,8 +252,8 @@ verdict. A larger verification half costs selection questions, which is the trad
 
 ### Two folds
 
-Two folds are the DEFAULT (`policy.GATE_FOLDS`, frozen 2026-09-18; see Frozen defaults above for
-what the second fold bought). The deviation has to be earned in BOTH directions of the split: fit the
+Two folds are the DEFAULT (`policy.GATE_FOLDS`; see Frozen defaults above for what the second fold
+bought). The deviation has to be earned in BOTH directions of the split: fit the
 ranking, the multiplier and the reference on the selection half and verify on the verification half,
 then fit on the verification half and verify on the selection half, and take the deviation only when
 both verified margins clear `c_gate * sd`. **Nothing about one fold moves:** the arm that RUNS is
@@ -320,7 +320,7 @@ points ahead against a 7.0-point SD, so the policy stands and keeps the 59.7 it 
 `--gate-mode whole` the same two rows read +8.0 and -0.0 against calibration SDs of 4.6 and 1.3,
 which is the biased reading the split replaces.
 
-**What the gate rules against** (`evaluate.normal_at_budget`, 2026-09-18). Three candidates, each
+**What the gate rules against** (`evaluate.normal_at_budget`). Three candidates, each
 priced with the SAME `policy.Cost` as the arm, the best of them on the calibration split, and
 `reference_rule` on the row says which: `default_cell`, the deepest depth at natural stop where its
 mean price fits; `deepest_depth_capped` / `shallower_depth`, the deepest depth at the largest cap
@@ -328,15 +328,15 @@ whose MEAN PRICE fits, one depth down where not even the cheapest cap fits; and 
 the per-prompt hard cap Table 1 reports under that name. The third is what keeps a gated row from
 landing below its own table's `default_at_budget` row.
 
-The cap the reference takes used to be read off `policy.avg_picks` at a fitted multiplier, which can
-only name a cell on the upper convex hull of (price, cap) and breaks the tie at the hull's own slope
-to the cheaper one. Under `cap` accounting the geometric ladder is its own hull and nothing was
-wrong; under `expected`, where every cap past the mean natural length costs the same, the middle of
-the ladder falls off it and the rule returned the cheapest cap of the depth whatever the run was
-priced under. On mcleish_llama32_r32/svamp at 1.0x that reference was depth 8 at cap 0, nine points,
-where the budget affords cap 64 at 67.5; both gated arms measured a verified +47 against it, opened,
-and landed at 51.5 -- sixteen points below `default_at_budget`. Reading the mean price directly, at
-the run's own accounting, is what removes it (`tests/alloc/test_reference_pricing.py`).
+The cap the reference takes is read off the mean price directly, at the run's own accounting, and
+not off `policy.avg_picks` at a fitted multiplier, which can only name a cell on the upper convex
+hull of (price, cap) and breaks the tie at the hull's own slope to the cheaper one. Under `cap`
+accounting the geometric ladder is its own hull and the two agree; under `expected`, where every cap
+past the mean natural length costs the same, the middle of the ladder falls off it and a multiplier
+pick returns the cheapest cap of the depth whatever the run is priced under. On
+mcleish_llama32_r32/svamp at 1.0x such a pick names depth 8 at cap 0, nine points, where the budget
+affords cap 64 at 67.5; both gated arms then measure a verified +47 against it, open, and land at
+51.5 -- sixteen points below `default_at_budget` (`tests/alloc/test_reference_pricing.py`).
 
 **Underspending is the claim, not a defect.** Where the multiplier reaches 0 the budget never
 binds: the arm buys its best-scoring cell outright and spends less than it was given. Each row
@@ -372,7 +372,7 @@ pays, promoting evaluation ids in seeded order to n_cal 150 and 200 (the evaluat
 to 250 and 200). Over the ten production grids the mean gain at 1.0x runs +0.07, +0.41, +0.25 under
 v4's gate and +0.12, +0.73, +0.77 under v5's, with no false deviation at any size, and HellaSwag's
 genuine cap-0 optimum -- worth +5.6 and +7.5 points, and the one grid where the gap closes to zero
--- is recovered only at 150 and 200. The families **are frozen on** (ruling 2026-09-18: the production grids at horizon 4096 are the setting of record, and there they win at every calibration size; `--no-families` restores the free set). They carry no false
+-- is recovered only at 150 and 200. The families **are frozen on** (the production grids at horizon 4096 are the setting of record, and there they win at every calibration size; `--no-families` restores the free set). They carry no false
 deviation either, but over the twenty grids at n_cal 100 the mean gain at 1.0x falls +0.67 to +0.62
 and the oracle gap rises 2.03 to 2.08, and the condition was that the gain rise. The split is not
 even: on the ten production grids they win at every size and cut the gap (2.11 to 2.06, 2.32 to
@@ -406,8 +406,8 @@ row with a bootstrap interval over questions.
 
 ## Running it
 
-    cd work/spikes/s35_allocator
-    python -m unittest discover -s tests -t tests            # 280 tests, CPU, a minute
+    # from the repository root
+    python -m pytest tests/alloc -q                          # CPU, under a minute
 
     python -m alloc.cli --cells DIR --task gsm8k --checkpoint NAME \
                         --model-config PATH | --layers-per-loop N [--fixed-layers M] \

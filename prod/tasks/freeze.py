@@ -15,7 +15,8 @@
   prompt_svamp.txt     s28_transfer_tasks/prompts/svamp.txt
   prompt_aqua.txt      s28_transfer_tasks/prompts/aqua.txt        (+ S28's "\\n\\n" separator rule)
   prompt_csqa.txt      s28_transfer_tasks/prompts/csqa.txt
-  prompt_arc.txt       s28_transfer_tasks/prompts/arc.txt         (agent-written exemplars)
+  prompt_arc.txt       s28_transfer_tasks/prompts/arc.txt         (exemplars written for this
+                       package, not from a published prompt set)
   prompt_bbh_*.txt     s26_bbh/prompts/*.txt with the canary line and "-----" dropped, which is
                        what s26_common.task_prompt does and what the BIG-Bench-Hard repo does
   rows_bbh_*.jsonl     s26_bbh/artifacts/bbh_*.jsonl (250 rows each: the full BBH task)
@@ -253,7 +254,7 @@ def do_extend():
             r["idx"] = i
             r["src_idx"] = i
         # the prefix reference is the frozen copy in data/ (written by --copy from the spike file),
-        # so --extend needs no access to work/spikes and runs on the GPU host as well
+        # so --extend needs nothing outside this package and runs on the GPU host as well
         ref = os.path.join(DATA, "rows_%s.jsonl" % t)
         if not os.path.exists(ref):
             ref = os.path.join(S28, "artifacts", "data_%s.jsonl" % t)
@@ -288,8 +289,8 @@ def do_extend():
 
 
 def sources():
-    """data/sources.json: the Hub repo, config, split and revision each PP3 row file was built
-    from, plus the exemplar provenance of each prompt file (decision 3)."""
+    """data/sources.json: the Hub repo, config, split and revision each row file was built from,
+    plus the exemplar provenance of each prompt file."""
     return load_json(os.path.join(DATA, "sources.json"), {})
 
 
@@ -310,8 +311,8 @@ def write_hashes(rep=None):
                 h[fn]["rows"] = sum(1 for _ in open(p, encoding="utf-8"))
             src = SOURCES.get(fn) or SOURCES.get(fn.replace("rows_", "").replace(".jsonl", ""))
             if src:
-                # PP3 decision 3: the Hub repo and REVISION each row file was built from travel
-                # with the hash, so a frozen file can be rebuilt from its source exactly.
+                # the Hub repo and REVISION each row file was built from travel with the hash,
+                # so a frozen file can be rebuilt from its source exactly.
                 h[fn]["hub"] = {k: src.get(k) for k in ("repo", "config", "split", "revision")}
     save_json(os.path.join(DATA, "hashes.json"), h)
     if rep is not None:
@@ -333,7 +334,7 @@ def do_verify():
         if not os.path.exists(os.path.join(DATA, task_cfg(t)["rows_file"])):
             missing_tasks.append(t)
             continue
-        # PP3: pooled BBH and MMLU name an exemplar file PER ROW (`prefix_key`); a task with
+        # pooled BBH and MMLU name an exemplar file PER ROW (`prefix_key`); a task with
         # per_row_prefix has no single prompt_file and every key its rows name must exist.
         for key in prefix_keys(t):
             if key is None:
@@ -369,7 +370,7 @@ copied from the spike that measured it, and `hashes.json` records the sha256 of 
 | prompt_svamp.txt | same file | S28 uses the GSM8K prefix for SVAMP by design |
 | prompt_math500.txt | s13_box_grid/artifacts/math500_prompt.json ("prefix_text") | frozen because S13's math_shots() reads EleutherAI/hendrycks_math (config algebra), which is not cached on either machine and would silently fall back to a different source |
 | prompt_aqua.txt, prompt_csqa.txt | s28_transfer_tasks/prompts/*.txt | Wei et al. 2022 CoT exemplars |
-| prompt_arc.txt | s28_transfer_tasks/prompts/arc.txt | THREE AGENT-WRITTEN exemplars in the BBH style (not from a published prompt set); labelled as such wherever ARC numbers appear |
+| prompt_arc.txt | s28_transfer_tasks/prompts/arc.txt | three exemplars in the BBH style, written for this package (not from a published prompt set); labelled as such wherever ARC numbers appear |
 | prompt_bbh_*.txt | s26_bbh/prompts/*.txt | the official BIG-Bench-Hard cot prompt with the canary line and the "-----" separator dropped, which is what the BBH repo's own evaluation does |
 | rows_bbh_*.jsonl | s26_bbh/artifacts/bbh_*.jsonl | 250 rows = the whole BBH task |
 | rows_aqua.jsonl | s28_transfer_tasks/artifacts/data_aqua.jsonl | 254 rows = the whole test split |

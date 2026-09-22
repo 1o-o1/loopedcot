@@ -228,8 +228,8 @@ def main(argv=None):
     res = {"task": a.task, "checkpoint": a.checkpoint, "protocol": a.protocol, "reference": a.reference,
            "promptfree": bool(a.promptfree), "c_gate": a.c_gate, "avg_budget": bool(a.avg_budget),
            "gate_mode": a.gate_mode, "one_se": bool(a.one_se),
-           # The two frozen rulings of 2026-09-18, in the header so every artifact carries them:
-           # the ranking of record and how many directions of the split a deviation was earned in.
+           # In the header so every artifact carries them: the ranking of record, and how many
+           # directions of the split a deviation was earned in.
            "ranking_of_record": P.RANKING_OF_RECORD,
            "gate_folds": int(gate_folds),
            "n_select": a.n_select, "n_verify": a.n_verify,

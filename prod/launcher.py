@@ -2,7 +2,7 @@
 
   python -m prod.launcher --plan --gpus=8 --shards=8            # write the queue, run nothing
   python -m prod.launcher --run --gpus=8 --shards=8 [--priority=1,2] [--dry-run-n=20]
-  python -m prod.launcher --run --gpus=8 --workers-per-gpu=2    # PP3 decision 1
+  python -m prod.launcher --run --gpus=8 --workers-per-gpu=2
   python -m prod.launcher --status
 
 `--workers-per-gpu N` (default 1) gives each GPU N slots. Workers on the same GPU are SEPARATE
@@ -19,28 +19,28 @@ under `--util` x the device memory (0.85 by default, the Spark rule; the device 
 ceiling on its own can never be placed: those are listed in `launcher_plan.json["unplaceable"]`,
 printed, and left in the queue rather than run into an OOM.
 
-With `--workers-per-gpu=1` this is exactly PP2's behaviour plus a printed estimate. Each worker pulls the next job off a FILE-BASED queue (an atomic rename of a
+With `--workers-per-gpu=1` this is the plain single-slot queue plus a printed estimate. Each worker pulls the next job off a FILE-BASED queue (an atomic rename of a
 claim file), sets CUDA_VISIBLE_DEVICES to its own GPU, and runs `prod.generate` in a subprocess so an
 OOM or a crash cannot take the queue down with it. Per-problem checkpoints mean a killed worker's job
 is simply re-claimed and resumed; no row is generated twice because the cells file is re-read on
 start and a (problem, cap) already present is skipped.
 
-The Spark is single-tenant for GPU work (LEDGER 2026-09-04 S1: "two heavy jobs overlapping killed
-both processes silently and froze ssh" on the GB10's unified memory), so `--gpus=1` is the only
-setting used there and the eight-way queue is for the cluster node.
+The Spark is single-tenant for GPU work (two heavy jobs overlapping on the GB10's unified memory
+kill both processes silently and freeze ssh), so `--gpus=1` is the only setting used there and the
+eight-way queue is for the cluster node.
 
 Nothing here launches a cluster job. `--run` executes locally on the host it is invoked on, and
-`--dry-run-n` caps every job at N problems, which is what gate G5 uses.
+`--dry-run-n` caps every job at N problems.
 
-Three behaviours gate G5 fixed (2026-09-12):
+Three behaviours the queue relies on:
   * a killed worker's claim is re-queued on the next `--run` (`requeue_claimed`). Without it the job
-    sat in `claimed/` forever and the run list could never complete.
-  * `--only=SUBSTR[,SUBSTR]` restricts the plan to the named jobs, so G5's queue is exactly the two
-    paths the brief asks for instead of a whole priority class.
-  * `--run` no longer re-plans an existing queue. It did, and since a bare `--run` carries none of
-    the planning filters, G5's restart step silently replaced a two-job N=20 queue with the whole
-    294-job FULL-N run list and started a 1319-problem job on the Spark. Planning now happens on
-    `--plan`, or on a `--run` that finds no queue.
+    sits in `claimed/` forever and the run list can never complete.
+  * `--only=SUBSTR[,SUBSTR]` restricts the plan to the named jobs, so a restricted queue holds
+    exactly those paths instead of a whole priority class.
+  * `--run` never re-plans an existing queue. A bare `--run` carries none of the planning filters,
+    so re-planning on it would silently replace a small N=20 queue with the whole FULL-N run list
+    and start a full-size job in its place. Planning happens on `--plan`, or on a `--run` that
+    finds no queue.
 """
 import argparse
 import json
@@ -84,11 +84,11 @@ def device_bytes(n_gpus, device_gb=None):
 
 
 def estimate(rec, cfg):
-    """The per-job memory estimate of decision 1, in bytes.
+    """The per-job memory estimate, in bytes.
 
-    Ruling Q12: the width is the job's own `batch_width` field when the manifest set one (it always
-    does, from `cfgmod.batch_width_for`), and the per-(model, k) override table otherwise -- so the
-    estimate is correct even for a job record built without going through `prod.manifest`.
+    The width is the job's own `batch_width` field when the manifest set one (it always does, from
+    `cfgmod.batch_width_for`), and the per-(model, k) override table otherwise -- so the estimate is
+    correct even for a job record built without going through `prod.manifest`.
     """
     bw = rec.get("batch_width") or cfgmod.batch_width_for(rec["model"], rec["k"], cfg)
     return cfgmod.job_bytes(rec["model"], rec["k"], bw,
@@ -120,7 +120,7 @@ def plan(gpus, shards, priorities=None, forced_n=None, dry_run_n=None, root=None
         cmd = ["python", "-m", "prod.generate", "--model=%s" % j["model"],
                "--task=%s" % j["task"], "--k=%d" % j["k"], "--protocol=%s" % j["protocol"],
                # the pin is generate.py's default too; the queue states it so that a job record
-               # read months later says at which width its rows were produced (rulings Q6 iv)
+               # read months later says at which width its rows were produced
                "--batch-width=%d" % j.get("batch_width", BATCH_WIDTH)]
         if j.get("shards", 1) > 1:
             cmd += ["--shard=%d" % j["shard"], "--shards=%d" % j["shards"]]
@@ -130,8 +130,8 @@ def plan(gpus, shards, priorities=None, forced_n=None, dry_run_n=None, root=None
             cmd += ["--n=%d" % j["n"]]
         if j["protocol"] == "forced":
             cmd += ["--n=%d" % (dry_run_n or j["n"])]
-            # a forced job continues from the chain its natural-stop twin stored (PP3b Fix 1); rows
-            # without a stored chain, or whose prompt hash differs, fall back to full generation
+            # a forced job continues from the chain its natural-stop twin stored; rows without a
+            # stored chain, or whose prompt hash differs, fall back to full generation
             cmd += ["--resume-from-chains"]
         cmd += list(extra_args or [])
         rec = {"order": n, "tag": j["tag"], "priority": j["priority"], "model": j["model"],
@@ -182,10 +182,9 @@ def requeue_claimed(q, older_than=0.0):
     """Move stale claims back to `todo`.
 
     A worker that is killed (or a node that dies) leaves its claim file in `claimed/`, and `claim()`
-    only ever takes from `todo`, so without this the job is never run again -- the failure gate G5
-    exists to catch. Re-running a claimed job is always safe: `prod.generate` re-reads its cells file
-    on start and skips every (problem, cap) already written, so a resumed job adds the missing rows
-    and no duplicates.
+    only ever takes from `todo`, so without this the job is never run again. Re-running a claimed
+    job is always safe: `prod.generate` re-reads its cells file on start and skips every (problem,
+    cap) already written, so a resumed job adds the missing rows and no duplicates.
 
     `older_than` guards the case of a SECOND launcher process starting while the first is still
     working: pass a value larger than the longest expected job, or --no-requeue.
@@ -215,7 +214,7 @@ def requeue_claimed(q, older_than=0.0):
 
 
 class GpuBudget(object):
-    """Admission control for the slots of one node (PP3 decision 1).
+    """Admission control for the slots of one node.
 
     A GPU has `budget` bytes (`mem_util` x its device memory) and `workers_per_gpu` slots. A slot
     may claim a job only while the GPU's RUNNING SUM -- the estimates of the jobs its slots hold at
@@ -223,7 +222,7 @@ class GpuBudget(object):
     supervises every slot on the node; the jobs themselves are separate processes.
 
     `budget=None` disables admission control entirely, which is what `--workers-per-gpu=1` with no
-    measurable device gives, and is exactly PP2's behaviour.
+    measurable device gives.
     """
 
     def __init__(self, budgets):
@@ -266,7 +265,7 @@ def claim(q, worker, gpu=0, budget=None):
     """Atomically take the first todo file that FITS. os.rename is atomic on one filesystem, so two
     workers cannot claim the same job.
 
-    Without a budget this is PP2's "lowest-numbered todo file", unchanged. With one, a job whose
+    Without a budget this takes the lowest-numbered todo file. With one, a job whose
     estimate does not fit in the GPU's remaining budget is skipped and left in `todo` for whoever
     frees memory next; a job that does not fit even on an IDLE gpu is unplaceable and is reported
     (it is never silently run into an OOM, and never silently dropped).
@@ -386,7 +385,7 @@ def main(argv=None):
     p.add_argument("--gpus", type=int, default=1)
     p.add_argument("--gpu-ids", dest="gpu_ids", default=None)
     p.add_argument("--workers-per-gpu", dest="workers_per_gpu", type=int, default=None,
-                   help="slots per GPU (PP3 decision 1; default %d). Workers on one GPU are "
+                   help="slots per GPU (default %d). Workers on one GPU are "
                         "separate processes with the same CUDA_VISIBLE_DEVICES and are admitted "
                         "only while the GPU's running memory estimate stays under --util x the "
                         "device memory." % cfgmod.WORKERS_PER_GPU)
@@ -431,11 +430,10 @@ def main(argv=None):
     q = queue_dir(a.root)
     existing = sum(len(os.listdir(os.path.join(q, sub)))
                    for sub in ("todo", "claimed", "done", "failed"))
-    # `--run` on its own must NEVER re-plan a queue that already exists. It used to, and because a
-    # bare `--run` carries none of the `--plan` filters (--only, --priority, --dry-run-n) it silently
-    # replaced a two-job N=20 queue with the whole 294-job FULL-N run list -- which is exactly what
-    # gate G5 caught on 2026-09-12 when its restart step began a 1319-problem job. A queue is planned
-    # when --plan is given, or when --run finds no queue at all.
+    # `--run` on its own must NEVER re-plan a queue that already exists: a bare `--run` carries none
+    # of the `--plan` filters (--only, --priority, --dry-run-n), so re-planning on it would silently
+    # replace a small N=20 queue with the whole FULL-N run list and start a full-size job in its
+    # place. A queue is planned when --plan is given, or when --run finds no queue at all.
     if a.plan or (a.run and existing == 0):
         if a.run and existing == 0 and not a.plan:
             print("[launcher] no queue under %s; planning one from these arguments" % q)

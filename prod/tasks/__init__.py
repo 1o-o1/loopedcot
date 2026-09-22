@@ -15,8 +15,9 @@ spike that measured it. Sources, per task:
             measured in S28's smoke: forced parse 0.70 against 1.00)
   aqua      s28_transfer_tasks (Wei et al. layout, suffix "\\nThe answer is")
   csqa      s28_transfer_tasks (Wei et al. layout, suffix "\\nSo the answer is")
-  arc       s28_transfer_tasks taskpack (three agent-written exemplars in the BBH style, labelled
-            as agent-written in data/README_prompts.md; suffix "\\nSo the answer is")
+  arc       s28_transfer_tasks taskpack (three exemplars in the BBH style, written for this package
+            and not from a published prompt set, as data/README_prompts.md records; suffix
+            "\\nSo the answer is")
   bbh_*     s26_bbh/scripts/s26_common.py (official BBH cot prompt with the canary line and the
             "-----" separator dropped; "\\n\\nQ: ... \\nA: Let's think step by step.";
             suffix "\\nSo the answer is"; stops ["\\n\\nQ:", "\\nQ:"]; letter A-F or yes/no)
@@ -35,8 +36,7 @@ from ..common import DATA, N_CAL, SPLIT_SEED, load_json
 
 LETTERS = "ABCDE"
 
-# PP3 (decision 5). Ten evaluation sets. Two structural changes the pooled sets force, both used by
-# BBH and by MMLU:
+# Ten evaluation sets. Two structural changes the pooled sets force, both used by BBH and by MMLU:
 #   * PER-ROW PROMPT PREFIX. A row may carry `prefix_key`; its exemplar block is
 #     `data/prompt_<prefix_key>.txt`. BBH is ONE task slot of 2,500 rows over ten subtasks, each
 #     with its own official 3-shot CoT prompt; MMLU is 2,000 rows over 57 subjects grouped into four
@@ -53,7 +53,7 @@ LETTERS = "ABCDE"
 # suffix / suffix_think : the forced read-out suffix for a base / chat-template checkpoint
 # stops     : base-model stop strings
 # own_marker: the string after which the model's own answer is read inside the cut trace
-# n_full    : the full-split N of record (Brief PP2)
+# n_full    : the full-split N of record
 TASKS = {
     "gsm8k": {
         "kind": "numeric", "n_answer": 12, "n_full": cfgmod.DATASETS["gsm8k"],
@@ -72,9 +72,9 @@ TASKS = {
         "chance": 0.0, "forced": True,
     },
     "svamp": {
-        # Brief PP2 writes "SVAMP (test 1000)". ChilleD/SVAMP's TEST split is 300 rows; the 1000 is
-        # the whole dataset (700 train + 300 test). N of record = the full test split, 300, which is
-        # exactly what S28 measured and what gate G1 validates. See protocol decision Q7.
+        # SVAMP is sometimes quoted as "test 1000". ChilleD/SVAMP's TEST split is 300 rows; the
+        # 1000 is the whole dataset (700 train + 300 test). N of record = the full test split, 300,
+        # which is exactly what S28 measured and what gate G1 validates.
         "kind": "numeric", "n_answer": 8, "n_full": cfgmod.DATASETS["svamp"],
         "prompt_file": "prompt_svamp.txt", "rows_file": "rows_svamp.jsonl",
         "sep": "", "q_prefix": "Question: ", "a_prefix": "\nAnswer:",
@@ -108,7 +108,7 @@ TASKS = {
     },
 }
 
-# ---------------------------------------------------------------- PP3: the four new slots
+# ---------------------------------------------------------------- the four remaining slots
 #: the ten BBH subtasks pooled into ONE slot, with the answer kind and the chance rate of each.
 BBH_SUBTASK_KIND = {
     "date_understanding": ("letter", 0.1720),
@@ -139,10 +139,10 @@ TASKS["bbh"] = dict(_COT_LAYOUT, **{
     "prompt_file": None, "rows_file": "rows_bbh.jsonl",
     "per_row_prefix": True, "per_row_kind": True,
     "chance": 0.28,        # the mean of the ten subtasks' chance rates, for the cards only
-    # PP3b ruling Q16: a flat 100-row draw over the pooled file spreads the calibration set at
-    # about 10 rows per subtask by luck of the permutation; `stratify_cal_by` makes it exactly 10
-    # per subtask by seed, so the allocator's per-cell calibration accuracy is not starved on any
-    # one subtask. Nothing else about the split (still cal/eval, still n_cal=100) changes.
+    # a flat 100-row draw over the pooled file spreads the calibration set at about 10 rows per
+    # subtask by luck of the permutation; `stratify_cal_by` makes it exactly 10 per subtask by
+    # seed, so the allocator's per-cell calibration accuracy is not starved on any one subtask.
+    # Nothing else about the split (still cal/eval, still n_cal=100) changes.
     "stratify_cal_by": "subtask",
 })
 
@@ -200,8 +200,8 @@ _PREFIX_CACHE = {}
 def prompt_prefix(task, row=None):
     """The exemplar block, exactly as it enters the prompt (trailing separator included).
 
-    PP3: a row may name its own exemplar file through `prefix_key` (pooled BBH, MMLU). The task's
-    `prompt_file` is the fallback and is the only path the six PP2 tasks ever take.
+    A row may name its own exemplar file through `prefix_key` (pooled BBH, MMLU). The task's
+    `prompt_file` is the fallback and is the only path the six original tasks ever take.
     """
     c = task_cfg(task)
     key = (row or {}).get("prefix_key") if c.get("per_row_prefix") else None
@@ -250,14 +250,13 @@ def data_hashes():
 def split_labels(task, n=None, seed=None, n_cal=None):
     """['eval'|'cal'] per row index, from `numpy.random.default_rng(20260908)`.
 
-    Brief PP2: "calibration = a fixed 100 questions per task by seed 20260908 (AQuA 100 of 254),
-    evaluation = the rest". The draw algorithm is protocol decision Q1 option O1: a permutation of the
-    row indices, the first 100 are calibration.
+    Calibration is a fixed 100 questions per task by seed 20260908 (AQuA 100 of 254), evaluation is
+    the rest. The draw: a permutation of the row indices, the first 100 are calibration.
 
-    PP3b ruling Q16: a task whose config names `stratify_cal_by` (pooled BBH, by `subtask`) draws
-    its calibration rows stratified over that field instead -- 10 per BBH subtask at n_cal=100 -- so
-    the pooled task is not spread thin by the luck of one flat permutation. The split field is not
-    stored in `prod/tasks/data/`; it is computed here, same as every other task's.
+    A task whose config names `stratify_cal_by` (pooled BBH, by `subtask`) draws its calibration
+    rows stratified over that field instead -- 10 per BBH subtask at n_cal=100 -- so the pooled
+    task is not spread thin by the luck of one flat permutation. The split field is not stored in
+    `prod/tasks/data/`; it is computed here, same as every other task's.
     """
     n = len(rows(task)) if n is None else int(n)
     seed = SPLIT_SEED if seed is None else seed
@@ -312,7 +311,7 @@ def build_prompts(tok, task, task_rows, chat_template=False, suffix_text=None,
     block is how the read-out is asked for.
     """
     c = task_cfg(task)
-    # PP3: the exemplar block can differ per row (pooled BBH, MMLU), so the head is built per row.
+    # the exemplar block can differ per row (pooled BBH, MMLU), so the head is built per row.
     heads = [prompt_prefix(task, r) + c["sep"] + c["q_prefix"] for r in task_rows]
     prefix = prompt_prefix(task, task_rows[0] if task_rows else None)
     head = prefix + c["sep"] + c["q_prefix"]
@@ -352,8 +351,8 @@ def make_find_cut(tok, stop_strings, eos_ids, chat_template=False, eos_cut=True,
     Returns f(ids) -> (cut_length, marker_or_None): decode once, find the earliest stop string,
     bisect on the decoded length; an eos before that wins.
 
-    `eos_cut=False` drops the eos branch, which is the OLDER S9a variant that S9f (McLeish) and S9c
-    (Huginn) copied: there, a trace that ends at eos with no stop string is cut at `len(ids)`, eos
+    `eos_cut=False` drops the eos branch, an older cut rule that the S9f (McLeish) and S9c (Huginn)
+    paths follow: there, a trace that ends at eos with no stop string is cut at `len(ids)`, eos
     token included. Gate G1 uses `eos_cut=False` on those two paths to show that this is the only
     difference from the S26/S28/S32 rule the production package uses everywhere.
 
@@ -530,7 +529,7 @@ def math_verify_available():
     return _MV["fn"] is not None
 
 
-# PP3: two new answer kinds the pooled BBH slot brings in.
+# two answer kinds the pooled BBH slot brings in.
 RE_BOOL = re.compile(r"\b(True|False)\b", re.IGNORECASE)
 
 
