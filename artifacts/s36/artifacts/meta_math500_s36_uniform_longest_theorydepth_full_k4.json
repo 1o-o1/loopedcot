@@ -1,0 +1,253 @@
+{
+  "name": "s36_uniform_longest_theorydepth_full",
+  "checkpoint": "s36_uniform_longest_theorydepth",
+  "variant": "uniform_longest_theorydepth",
+  "task": "math500",
+  "k": 4,
+  "eval_rows": "production",
+  "n_problems": 500,
+  "n_eval": 400,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": true,
+  "exemplar_sha256": {
+    "math500": "702e6bfb46509d68fe30f15370cd9eb1e7c2a5605eccb9f97ce52ef6eafd2ae7"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 32,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_uniform_longest_theorydepth",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_uniform_longest_theorydepth"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [
+    "OOM gen none b=20 T=2048->4096: CUDA out of memory. Tried to allocate 654.00 MiB. GPU 0 has a total capacity of 95.15 GiB of which 14.22 GiB is free. Including non-PyTorch memory, this process has 80.92 GiB memory in use. 80.88 GiB allowed; Of the allocated memory 80.28 GiB is allocated by PyTorch, and 75.22 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+    "OOM read none b=32: CUDA out of memory. Tried to allocate 1.04 GiB. GPU 0 has a total capacity of 95.15 GiB of which 14.51 GiB is free. Including non-PyTorch memory, this process has 80.63 GiB memory in use. 80.88 GiB allowed; Of the allocated memory 80.02 GiB is allocated by PyTorch, and 46.24 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "\nBudget: 0 tokens.",
+      "budget_line_tokens": 8,
+      "prompt_tokens_mean": 994.13,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "\nBudget: 32 tokens.",
+      "budget_line_tokens": 9,
+      "prompt_tokens_mean": 995.13,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 27.916,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.75
+    },
+    "128": {
+      "budget_line": "\nBudget: 128 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 996.13,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 99.246,
+      "natural_stop_median": 128,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.526
+    },
+    "512": {
+      "budget_line": "\nBudget: 512 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 996.13,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 359.312,
+      "natural_stop_median": 416,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.414
+    },
+    "2048": {
+      "budget_line": "\nBudget: 2048 tokens.",
+      "budget_line_tokens": 11,
+      "prompt_tokens_mean": 997.13,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 580.768,
+      "natural_stop_median": 415,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.074
+    },
+    "none": {
+      "budget_line": "\nBudget: no limit.",
+      "budget_line_tokens": 7,
+      "prompt_tokens_mean": 993.13,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 738.294,
+      "natural_stop_median": 388,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.082
+    }
+  },
+  "cells_written": 7500,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_math500_s36_uniform_longest_theorydepth_full_k4.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_math500_s36_uniform_longest_theorydepth_full_k4.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 400,
+        "acc": 0.205,
+        "acc_own": 0.0,
+        "acc_v2": 0.205
+      }
+    },
+    "32": {
+      "32": {
+        "n": 400,
+        "acc": 0.29,
+        "acc_own": 0.1125,
+        "acc_v2": 0.2775
+      }
+    },
+    "128": {
+      "128": {
+        "n": 400,
+        "acc": 0.455,
+        "acc_own": 0.3125,
+        "acc_v2": 0.455
+      }
+    },
+    "512": {
+      "512": {
+        "n": 400,
+        "acc": 0.58,
+        "acc_own": 0.4725,
+        "acc_v2": 0.58
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 400,
+        "acc": 0.67,
+        "acc_own": 0.655,
+        "acc_v2": 0.6725
+      }
+    },
+    "none": {
+      "0": {
+        "n": 400,
+        "acc": 0.2025,
+        "acc_own": 0.0,
+        "acc_v2": 0.2025
+      },
+      "16": {
+        "n": 400,
+        "acc": 0.215,
+        "acc_own": 0.0025,
+        "acc_v2": 0.215
+      },
+      "32": {
+        "n": 400,
+        "acc": 0.2325,
+        "acc_own": 0.0075,
+        "acc_v2": 0.2275
+      },
+      "64": {
+        "n": 400,
+        "acc": 0.31,
+        "acc_own": 0.0575,
+        "acc_v2": 0.3075
+      },
+      "128": {
+        "n": 400,
+        "acc": 0.3575,
+        "acc_own": 0.1525,
+        "acc_v2": 0.3575
+      },
+      "256": {
+        "n": 400,
+        "acc": 0.47,
+        "acc_own": 0.2825,
+        "acc_v2": 0.47
+      },
+      "512": {
+        "n": 400,
+        "acc": 0.575,
+        "acc_own": 0.485,
+        "acc_v2": 0.5775
+      },
+      "1024": {
+        "n": 400,
+        "acc": 0.6575,
+        "acc_own": 0.6275,
+        "acc_v2": 0.66
+      },
+      "2048": {
+        "n": 400,
+        "acc": 0.6575,
+        "acc_own": 0.65,
+        "acc_v2": 0.66
+      },
+      "4096": {
+        "n": 400,
+        "acc": 0.655,
+        "acc_own": 0.65,
+        "acc_v2": 0.6575
+      }
+    }
+  },
+  "seconds": 6704.7,
+  "peak_gb": 80.688
+}

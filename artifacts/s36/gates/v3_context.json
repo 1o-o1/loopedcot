@@ -1,22 +1,22 @@
 {
   "real": {
-    "n_spans": 29462,
-    "n_supervised_tokens": 1200007,
+    "n_spans": 29643,
+    "n_supervised_tokens": 1200045,
     "n_failing_spans": 0,
     "failures_by_reason": {},
     "ok": true,
     "detail": []
   },
   "legacy_control": {
-    "n_spans": 146,
-    "n_supervised_tokens": 1661,
-    "n_failing_spans": 146,
+    "n_spans": 149,
+    "n_supervised_tokens": 2265,
+    "n_failing_spans": 149,
     "failures_by_reason": {
       "block_span_count": 63,
-      "visit_span_count": 63,
-      "visit_split": 1741,
-      "prompt_split_or_absent": 1677,
-      "prompt_not_before_token": 1661,
+      "visit_span_count": 64,
+      "visit_split": 2348,
+      "prompt_split_or_absent": 2284,
+      "prompt_not_before_token": 2265,
       "cross_visit_context": 63
     },
     "ok": false,
@@ -27,7 +27,7 @@
         "visit": 0,
         "v_start": 0,
         "start": 0,
-        "prompt_len": 606,
+        "prompt_len": 600,
         "first_supervised": 512,
         "reasons": [
           "visit_split"
@@ -39,8 +39,8 @@
         "visit": 0,
         "v_start": 512,
         "start": 0,
-        "prompt_len": 606,
-        "first_supervised": 94,
+        "prompt_len": 600,
+        "first_supervised": 88,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -52,8 +52,8 @@
         "L": 512,
         "visit": 1,
         "v_start": 0,
-        "start": 114,
-        "prompt_len": 617,
+        "start": 102,
+        "prompt_len": 947,
         "first_supervised": 512,
         "reasons": [
           "cross_visit_context",
@@ -64,37 +64,23 @@
         "block": 2,
         "L": 512,
         "visit": 1,
-        "v_start": 398,
+        "v_start": 410,
         "start": 0,
-        "prompt_len": 617,
-        "first_supervised": 219,
-        "reasons": [
-          "prompt_split_or_absent",
-          "prompt_not_before_token",
-          "visit_split"
-        ]
-      },
-      {
-        "block": 2,
-        "L": 512,
-        "visit": 2,
-        "v_start": 0,
-        "start": 249,
-        "prompt_len": 609,
+        "prompt_len": 947,
         "first_supervised": 512,
         "reasons": [
-          "cross_visit_context",
+          "prompt_split_or_absent",
           "visit_split"
         ]
       },
       {
         "block": 3,
         "L": 512,
-        "visit": 2,
-        "v_start": 263,
+        "visit": 1,
+        "v_start": 922,
         "start": 0,
-        "prompt_len": 609,
-        "first_supervised": 350,
+        "prompt_len": 947,
+        "first_supervised": 25,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -104,10 +90,10 @@
       {
         "block": 3,
         "L": 512,
-        "visit": 3,
+        "visit": 2,
         "v_start": 0,
-        "start": 354,
-        "prompt_len": 609,
+        "start": 101,
+        "prompt_len": 601,
         "first_supervised": 512,
         "reasons": [
           "cross_visit_context",
@@ -117,11 +103,11 @@
       {
         "block": 4,
         "L": 512,
-        "visit": 3,
-        "v_start": 158,
+        "visit": 2,
+        "v_start": 411,
         "start": 0,
-        "prompt_len": 609,
-        "first_supervised": 487,
+        "prompt_len": 601,
+        "first_supervised": 195,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -131,10 +117,10 @@
       {
         "block": 4,
         "L": 512,
-        "visit": 4,
+        "visit": 3,
         "v_start": 0,
-        "start": 491,
-        "prompt_len": 632,
+        "start": 199,
+        "prompt_len": 627,
         "first_supervised": 512,
         "reasons": [
           "cross_visit_context",
@@ -144,13 +130,27 @@
       {
         "block": 5,
         "L": 512,
-        "visit": 4,
-        "v_start": 21,
+        "visit": 3,
+        "v_start": 313,
         "start": 0,
-        "prompt_len": 632,
-        "first_supervised": 512,
+        "prompt_len": 627,
+        "first_supervised": 350,
         "reasons": [
           "prompt_split_or_absent",
+          "prompt_not_before_token",
+          "visit_split"
+        ]
+      },
+      {
+        "block": 5,
+        "L": 512,
+        "visit": 4,
+        "v_start": 0,
+        "start": 354,
+        "prompt_len": 606,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
           "visit_split"
         ]
       },
@@ -158,10 +158,10 @@
         "block": 6,
         "L": 512,
         "visit": 4,
-        "v_start": 533,
+        "v_start": 158,
         "start": 0,
-        "prompt_len": 632,
-        "first_supervised": 103,
+        "prompt_len": 606,
+        "first_supervised": 448,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -173,8 +173,8 @@
         "L": 512,
         "visit": 5,
         "v_start": 0,
-        "start": 107,
-        "prompt_len": 622,
+        "start": 484,
+        "prompt_len": 603,
         "first_supervised": 512,
         "reasons": [
           "cross_visit_context",
@@ -185,37 +185,23 @@
         "block": 7,
         "L": 512,
         "visit": 5,
-        "v_start": 405,
+        "v_start": 28,
         "start": 0,
-        "prompt_len": 622,
-        "first_supervised": 217,
-        "reasons": [
-          "prompt_split_or_absent",
-          "prompt_not_before_token",
-          "visit_split"
-        ]
-      },
-      {
-        "block": 7,
-        "L": 512,
-        "visit": 6,
-        "v_start": 0,
-        "start": 242,
-        "prompt_len": 602,
+        "prompt_len": 603,
         "first_supervised": 512,
         "reasons": [
-          "cross_visit_context",
+          "prompt_split_or_absent",
           "visit_split"
         ]
       },
       {
         "block": 8,
         "L": 512,
-        "visit": 6,
-        "v_start": 270,
+        "visit": 5,
+        "v_start": 540,
         "start": 0,
-        "prompt_len": 602,
-        "first_supervised": 337,
+        "prompt_len": 603,
+        "first_supervised": 63,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -225,9 +211,9 @@
       {
         "block": 8,
         "L": 512,
-        "visit": 7,
+        "visit": 6,
         "v_start": 0,
-        "start": 341,
+        "start": 125,
         "prompt_len": 642,
         "first_supervised": 512,
         "reasons": [
@@ -238,11 +224,11 @@
       {
         "block": 9,
         "L": 512,
-        "visit": 7,
-        "v_start": 171,
+        "visit": 6,
+        "v_start": 387,
         "start": 0,
         "prompt_len": 642,
-        "first_supervised": 471,
+        "first_supervised": 255,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -250,13 +236,26 @@
         ]
       },
       {
+        "block": 9,
+        "L": 512,
+        "visit": 7,
+        "v_start": 0,
+        "start": 320,
+        "prompt_len": 622,
+        "first_supervised": 512,
+        "reasons": [
+          "cross_visit_context",
+          "visit_split"
+        ]
+      },
+      {
         "block": 10,
         "L": 512,
         "visit": 7,
-        "v_start": 683,
+        "v_start": 192,
         "start": 0,
-        "prompt_len": 642,
-        "first_supervised": 0,
+        "prompt_len": 622,
+        "first_supervised": 450,
         "reasons": [
           "prompt_split_or_absent",
           "prompt_not_before_token",
@@ -268,8 +267,8 @@
         "L": 512,
         "visit": 8,
         "v_start": 0,
-        "start": 44,
-        "prompt_len": 600,
+        "start": 454,
+        "prompt_len": 615,
         "first_supervised": 512,
         "reasons": [
           "cross_visit_context",
@@ -280,13 +279,12 @@
         "block": 11,
         "L": 512,
         "visit": 8,
-        "v_start": 468,
+        "v_start": 58,
         "start": 0,
-        "prompt_len": 600,
-        "first_supervised": 168,
+        "prompt_len": 615,
+        "first_supervised": 512,
         "reasons": [
           "prompt_split_or_absent",
-          "prompt_not_before_token",
           "visit_split"
         ]
       }

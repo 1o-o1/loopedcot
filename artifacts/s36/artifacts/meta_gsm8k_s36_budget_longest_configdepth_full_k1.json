@@ -1,0 +1,250 @@
+{
+  "name": "s36_budget_longest_configdepth_full",
+  "checkpoint": "s36_budget_longest_configdepth",
+  "variant": "budget_longest_configdepth",
+  "task": "gsm8k",
+  "k": 1,
+  "eval_rows": "production",
+  "n_problems": 1319,
+  "n_eval": 1219,
+  "n_cal": 100,
+  "grid_budgets": [
+    "0",
+    "32",
+    "128",
+    "512",
+    "2048",
+    "None"
+  ],
+  "standard_caps": [
+    0,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "horizon": 4096,
+  "harness_default_horizon": 512,
+  "budget_line": true,
+  "exemplar_sha256": {
+    "gsm8k": "931391a38fe2cfccb48a624ece3d9949e8034d5d3e75aacc2a361b06b67b8001"
+  },
+  "protocol": "v2",
+  "stopping": "natural stop or hard stop at T, then a forced read-out",
+  "n_answer_tokens": 12,
+  "mem_fraction": 0.85,
+  "batch_cap": 32,
+  "model_info": {
+    "name": "s36_budget_longest_configdepth",
+    "merged": true,
+    "adapter": "/home/mzaoad/loopedcot/artifacts/s36/adapters/s36_budget_longest_configdepth"
+  },
+  "suffix_text": "\nFinal Answer:",
+  "cache_patched_now": true,
+  "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
+  "oom_events": [],
+  "errors": {},
+  "passes": {
+    "0": {
+      "budget_line": "\nBudget: 0 tokens.",
+      "budget_line_tokens": 8,
+      "prompt_tokens_mean": 648.6861258529188,
+      "generation_limit": 0,
+      "caps_scored": [
+        0
+      ],
+      "natural_stop_mean": 0.0,
+      "natural_stop_median": 0,
+      "natural_stop_max": 0,
+      "hit_limit_share": 1.0
+    },
+    "32": {
+      "budget_line": "\nBudget: 32 tokens.",
+      "budget_line_tokens": 9,
+      "prompt_tokens_mean": 649.6861258529188,
+      "generation_limit": 32,
+      "caps_scored": [
+        32
+      ],
+      "natural_stop_mean": 28.055344958301745,
+      "natural_stop_median": 32,
+      "natural_stop_max": 32,
+      "hit_limit_share": 0.5208491281273692
+    },
+    "128": {
+      "budget_line": "\nBudget: 128 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 650.6861258529188,
+      "generation_limit": 128,
+      "caps_scored": [
+        128
+      ],
+      "natural_stop_mean": 92.97952994692949,
+      "natural_stop_median": 100,
+      "natural_stop_max": 128,
+      "hit_limit_share": 0.3206974981046247
+    },
+    "512": {
+      "budget_line": "\nBudget: 512 tokens.",
+      "budget_line_tokens": 10,
+      "prompt_tokens_mean": 650.6861258529188,
+      "generation_limit": 512,
+      "caps_scored": [
+        512
+      ],
+      "natural_stop_mean": 129.92570128885518,
+      "natural_stop_median": 104,
+      "natural_stop_max": 512,
+      "hit_limit_share": 0.052312357846853674
+    },
+    "2048": {
+      "budget_line": "\nBudget: 2048 tokens.",
+      "budget_line_tokens": 11,
+      "prompt_tokens_mean": 651.6861258529188,
+      "generation_limit": 2048,
+      "caps_scored": [
+        2048
+      ],
+      "natural_stop_mean": 214.15087187263077,
+      "natural_stop_median": 107,
+      "natural_stop_max": 2048,
+      "hit_limit_share": 0.05307050796057619
+    },
+    "none": {
+      "budget_line": "\nBudget: no limit.",
+      "budget_line_tokens": 7,
+      "prompt_tokens_mean": 647.6861258529188,
+      "generation_limit": 4096,
+      "caps_scored": [
+        0,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "natural_stop_mean": 358.937073540561,
+      "natural_stop_median": 107,
+      "natural_stop_max": 4096,
+      "hit_limit_share": 0.0621683093252464
+    }
+  },
+  "cells_written": 19785,
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_gsm8k_s36_budget_longest_configdepth_full_k1.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_gsm8k_s36_budget_longest_configdepth_full_k1.jsonl",
+  "acc_by_budget": {
+    "0": {
+      "0": {
+        "n": 1219,
+        "acc": 0.10254306808859721,
+        "acc_own": 0.0,
+        "acc_v2": 0.10254306808859721
+      }
+    },
+    "32": {
+      "32": {
+        "n": 1219,
+        "acc": 0.23543888433141918,
+        "acc_own": 0.18293683347005743,
+        "acc_v2": 0.2387202625102543
+      }
+    },
+    "128": {
+      "128": {
+        "n": 1219,
+        "acc": 0.33470057424118127,
+        "acc_own": 0.30352748154224773,
+        "acc_v2": 0.3412633305988515
+      }
+    },
+    "512": {
+      "512": {
+        "n": 1219,
+        "acc": 0.3388022969647252,
+        "acc_own": 0.34618539786710417,
+        "acc_v2": 0.34864643150123054
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 1219,
+        "acc": 0.3494667760459393,
+        "acc_own": 0.35931091058244463,
+        "acc_v2": 0.3601312551271534
+      }
+    },
+    "none": {
+      "0": {
+        "n": 1219,
+        "acc": 0.10172272354388844,
+        "acc_own": 0.0,
+        "acc_v2": 0.10172272354388844
+      },
+      "16": {
+        "n": 1219,
+        "acc": 0.11320754716981132,
+        "acc_own": 0.0,
+        "acc_v2": 0.11320754716981132
+      },
+      "32": {
+        "n": 1219,
+        "acc": 0.14109926168990977,
+        "acc_own": 0.01066447908121411,
+        "acc_v2": 0.13945857260049221
+      },
+      "64": {
+        "n": 1219,
+        "acc": 0.23051681706316654,
+        "acc_own": 0.06890894175553733,
+        "acc_v2": 0.22723543888433143
+      },
+      "128": {
+        "n": 1219,
+        "acc": 0.3305988515176374,
+        "acc_own": 0.29286300246103364,
+        "acc_v2": 0.3338802296964725
+      },
+      "256": {
+        "n": 1219,
+        "acc": 0.35192780968006565,
+        "acc_own": 0.3527481542247744,
+        "acc_v2": 0.3560295324036095
+      },
+      "512": {
+        "n": 1219,
+        "acc": 0.35192780968006565,
+        "acc_own": 0.3535684987694832,
+        "acc_v2": 0.3560295324036095
+      },
+      "1024": {
+        "n": 1219,
+        "acc": 0.35110746513535684,
+        "acc_own": 0.3535684987694832,
+        "acc_v2": 0.35520918785890077
+      },
+      "2048": {
+        "n": 1219,
+        "acc": 0.35110746513535684,
+        "acc_own": 0.3535684987694832,
+        "acc_v2": 0.35520918785890077
+      },
+      "4096": {
+        "n": 1219,
+        "acc": 0.35110746513535684,
+        "acc_own": 0.3535684987694832,
+        "acc_v2": 0.35520918785890077
+      }
+    }
+  },
+  "seconds": 2013.9,
+  "peak_gb": 38.579
+}

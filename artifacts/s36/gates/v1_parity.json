@@ -1,5 +1,5 @@
 {
-  "variant": "budget_longest",
+  "variant": "budget_longest_configdepth",
   "budget_line_present": true,
   "n_checked": 740,
   "diffs": 0,
