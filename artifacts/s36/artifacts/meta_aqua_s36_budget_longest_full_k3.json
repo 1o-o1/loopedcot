@@ -3,7 +3,7 @@
   "checkpoint": "s36_budget_longest",
   "variant": "budget_longest",
   "task": "aqua",
-  "k": 1,
+  "k": 3,
   "eval_rows": "production",
   "n_problems": 254,
   "n_eval": 154,
@@ -47,7 +47,9 @@
   "suffix_text": "\nThe answer is",
   "cache_patched_now": true,
   "nvidia_smi_at_start": "3557 MiB, 98304 MiB",
-  "oom_events": [],
+  "oom_events": [
+    "OOM read none b=28: CUDA out of memory. Tried to allocate 518.00 MiB. GPU 0 has a total capacity of 95.15 GiB of which 14.18 GiB is free. Including non-PyTorch memory, this process has 80.96 GiB memory in use. 80.88 GiB allowed; Of the allocated memory 80.31 GiB is allocated by PyTorch, and 82.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
   "errors": {},
   "passes": {
     "0": {
@@ -71,10 +73,10 @@
       "caps_scored": [
         32
       ],
-      "natural_stop_mean": 29.61023622047244,
+      "natural_stop_mean": 29.22047244094488,
       "natural_stop_median": 32,
       "natural_stop_max": 32,
-      "hit_limit_share": 0.7125984251968503
+      "hit_limit_share": 0.6653543307086615
     },
     "128": {
       "budget_line": "\nBudget: 128 tokens.",
@@ -84,10 +86,10 @@
       "caps_scored": [
         128
       ],
-      "natural_stop_mean": 74.30314960629921,
+      "natural_stop_mean": 75.74015748031496,
       "natural_stop_median": 70,
       "natural_stop_max": 128,
-      "hit_limit_share": 0.14173228346456693
+      "hit_limit_share": 0.14566929133858267
     },
     "512": {
       "budget_line": "\nBudget: 512 tokens.",
@@ -97,10 +99,10 @@
       "caps_scored": [
         512
       ],
-      "natural_stop_mean": 102.69685039370079,
-      "natural_stop_median": 70,
+      "natural_stop_mean": 89.22047244094489,
+      "natural_stop_median": 71,
       "natural_stop_max": 512,
-      "hit_limit_share": 0.06299212598425197
+      "hit_limit_share": 0.023622047244094488
     },
     "2048": {
       "budget_line": "\nBudget: 2048 tokens.",
@@ -110,10 +112,10 @@
       "caps_scored": [
         2048
       ],
-      "natural_stop_mean": 213.16141732283464,
-      "natural_stop_median": 70,
+      "natural_stop_mean": 127.46062992125984,
+      "natural_stop_median": 73,
       "natural_stop_max": 2048,
-      "hit_limit_share": 0.07086614173228346
+      "hit_limit_share": 0.023622047244094488
     },
     "none": {
       "budget_line": "\nBudget: no limit.",
@@ -132,119 +134,119 @@
         2048,
         4096
       ],
-      "natural_stop_mean": 313.0787401574803,
-      "natural_stop_median": 69,
+      "natural_stop_mean": 206.16141732283464,
+      "natural_stop_median": 74,
       "natural_stop_max": 4096,
-      "hit_limit_share": 0.05905511811023622
+      "hit_limit_share": 0.031496062992125984
     }
   },
   "cells_written": 3810,
-  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_aqua_s36_budget_longest_full_k1.jsonl",
-  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_aqua_s36_budget_longest_full_k1.jsonl",
+  "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_aqua_s36_budget_longest_full_k3.jsonl",
+  "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_aqua_s36_budget_longest_full_k3.jsonl",
   "acc_by_budget": {
-    "none": {
-      "0": {
-        "n": 154,
-        "acc": 0.24025974025974026,
-        "acc_own": 0.0,
-        "acc_v2": 0.24025974025974026
-      },
-      "16": {
-        "n": 154,
-        "acc": 0.2987012987012987,
-        "acc_own": 0.006493506493506494,
-        "acc_v2": 0.2987012987012987
-      },
-      "32": {
-        "n": 154,
-        "acc": 0.33766233766233766,
-        "acc_own": 0.025974025974025976,
-        "acc_v2": 0.33766233766233766
-      },
-      "64": {
-        "n": 154,
-        "acc": 0.3961038961038961,
-        "acc_own": 0.22727272727272727,
-        "acc_v2": 0.3961038961038961
-      },
-      "128": {
-        "n": 154,
-        "acc": 0.461038961038961,
-        "acc_own": 0.4025974025974026,
-        "acc_v2": 0.461038961038961
-      },
-      "256": {
-        "n": 154,
-        "acc": 0.4675324675324675,
-        "acc_own": 0.44155844155844154,
-        "acc_v2": 0.4675324675324675
-      },
-      "512": {
-        "n": 154,
-        "acc": 0.4805194805194805,
-        "acc_own": 0.44805194805194803,
-        "acc_v2": 0.4805194805194805
-      },
-      "1024": {
-        "n": 154,
-        "acc": 0.461038961038961,
-        "acc_own": 0.44805194805194803,
-        "acc_v2": 0.461038961038961
-      },
-      "2048": {
-        "n": 154,
-        "acc": 0.461038961038961,
-        "acc_own": 0.44805194805194803,
-        "acc_v2": 0.461038961038961
-      },
-      "4096": {
-        "n": 154,
-        "acc": 0.4675324675324675,
-        "acc_own": 0.44805194805194803,
-        "acc_v2": 0.4675324675324675
-      }
-    },
     "0": {
       "0": {
         "n": 154,
-        "acc": 0.24675324675324675,
+        "acc": 0.5584415584415584,
         "acc_own": 0.0,
-        "acc_v2": 0.24675324675324675
+        "acc_v2": 0.5584415584415584
       }
     },
     "32": {
       "32": {
         "n": 154,
-        "acc": 0.42857142857142855,
-        "acc_own": 0.16233766233766234,
-        "acc_v2": 0.42857142857142855
+        "acc": 0.5974025974025974,
+        "acc_own": 0.22727272727272727,
+        "acc_v2": 0.5974025974025974
       }
     },
     "128": {
       "128": {
         "n": 154,
-        "acc": 0.461038961038961,
-        "acc_own": 0.38311688311688313,
-        "acc_v2": 0.461038961038961
+        "acc": 0.6428571428571429,
+        "acc_own": 0.5974025974025974,
+        "acc_v2": 0.6428571428571429
       }
     },
     "512": {
       "512": {
         "n": 154,
-        "acc": 0.44155844155844154,
-        "acc_own": 0.4155844155844156,
-        "acc_v2": 0.44155844155844154
+        "acc": 0.6298701298701299,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6298701298701299
       }
     },
     "2048": {
       "2048": {
         "n": 154,
-        "acc": 0.44155844155844154,
-        "acc_own": 0.4090909090909091,
-        "acc_v2": 0.44155844155844154
+        "acc": 0.6558441558441559,
+        "acc_own": 0.6428571428571429,
+        "acc_v2": 0.6558441558441559
+      }
+    },
+    "none": {
+      "0": {
+        "n": 154,
+        "acc": 0.551948051948052,
+        "acc_own": 0.0,
+        "acc_v2": 0.551948051948052
+      },
+      "16": {
+        "n": 154,
+        "acc": 0.538961038961039,
+        "acc_own": 0.006493506493506494,
+        "acc_v2": 0.538961038961039
+      },
+      "32": {
+        "n": 154,
+        "acc": 0.564935064935065,
+        "acc_own": 0.06493506493506493,
+        "acc_v2": 0.564935064935065
+      },
+      "64": {
+        "n": 154,
+        "acc": 0.5974025974025974,
+        "acc_own": 0.2922077922077922,
+        "acc_v2": 0.5974025974025974
+      },
+      "128": {
+        "n": 154,
+        "acc": 0.6558441558441559,
+        "acc_own": 0.5909090909090909,
+        "acc_v2": 0.6558441558441559
+      },
+      "256": {
+        "n": 154,
+        "acc": 0.6298701298701299,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6298701298701299
+      },
+      "512": {
+        "n": 154,
+        "acc": 0.6298701298701299,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6298701298701299
+      },
+      "1024": {
+        "n": 154,
+        "acc": 0.6363636363636364,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6363636363636364
+      },
+      "2048": {
+        "n": 154,
+        "acc": 0.6363636363636364,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6363636363636364
+      },
+      "4096": {
+        "n": 154,
+        "acc": 0.6298701298701299,
+        "acc_own": 0.6298701298701299,
+        "acc_v2": 0.6298701298701299
       }
     }
   },
-  "seconds": 19.0,
-  "peak_gb": 2.822
+  "seconds": 1160.1,
+  "peak_gb": 80.565
 }

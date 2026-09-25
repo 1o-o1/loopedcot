@@ -146,46 +146,6 @@
   "cells_file_no_limit": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_math500_s36_budget_longest_full_k4.jsonl",
   "cells_file_budgeted": "/home/mzaoad/loopedcot/artifacts/s36/artifacts/cells_budget_math500_s36_budget_longest_full_k4.jsonl",
   "acc_by_budget": {
-    "0": {
-      "0": {
-        "n": 400,
-        "acc": 0.2325,
-        "acc_own": 0.0,
-        "acc_v2": 0.2325
-      }
-    },
-    "32": {
-      "32": {
-        "n": 400,
-        "acc": 0.3175,
-        "acc_own": 0.12,
-        "acc_v2": 0.305
-      }
-    },
-    "128": {
-      "128": {
-        "n": 400,
-        "acc": 0.4075,
-        "acc_own": 0.2825,
-        "acc_v2": 0.405
-      }
-    },
-    "512": {
-      "512": {
-        "n": 400,
-        "acc": 0.5475,
-        "acc_own": 0.4825,
-        "acc_v2": 0.55
-      }
-    },
-    "2048": {
-      "2048": {
-        "n": 400,
-        "acc": 0.595,
-        "acc_own": 0.5825,
-        "acc_v2": 0.5975
-      }
-    },
     "none": {
       "0": {
         "n": 400,
@@ -247,8 +207,48 @@
         "acc_own": 0.595,
         "acc_v2": 0.61
       }
+    },
+    "0": {
+      "0": {
+        "n": 400,
+        "acc": 0.2325,
+        "acc_own": 0.0,
+        "acc_v2": 0.2325
+      }
+    },
+    "32": {
+      "32": {
+        "n": 400,
+        "acc": 0.3175,
+        "acc_own": 0.12,
+        "acc_v2": 0.305
+      }
+    },
+    "128": {
+      "128": {
+        "n": 400,
+        "acc": 0.4075,
+        "acc_own": 0.2825,
+        "acc_v2": 0.405
+      }
+    },
+    "512": {
+      "512": {
+        "n": 400,
+        "acc": 0.5475,
+        "acc_own": 0.4825,
+        "acc_v2": 0.55
+      }
+    },
+    "2048": {
+      "2048": {
+        "n": 400,
+        "acc": 0.595,
+        "acc_own": 0.5825,
+        "acc_v2": 0.5975
+      }
     }
   },
-  "seconds": 5853.4,
-  "peak_gb": 80.759
+  "seconds": 8.7,
+  "peak_gb": 2.822
 }
